@@ -1,0 +1,10 @@
+NetworkMapPoint[] mvPoints
+NetworkMultiKeyFrame[] mvMultiKeyFrames
+uint8 action
+uint8 ADD=1
+uint8 UPDATE=2
+uint8 DELETE=3
+uint8 INIT=4
+uint8 RESET=5
+---
+# No response other than the true/false returned from the call

@@ -1,0 +1,4 @@
+Header header
+uint32 nNumPoints
+uint32 nNumPointsInTrash
+uint32 nNumMultiKeyFrames

@@ -1,0 +1,14 @@
+<launch>
+
+<!-- Kinect Camera Node -->
+<node name="$(arg camera_name)" pkg="openni_camera" type="openni_node" output="screen" ns="$(arg camera_name)">
+  <param name="rgb_camera_info_url" type="string" value="package://mcptam/calibrations/$(arg camera_name).yaml" />
+  <param name="depth_registration" type="bool" value="false" />
+  
+  <remap from="rgb/camera_info" to="camera_info" />
+  <remap from="rgb/image_raw" to="image_raw" />
+  <remap from="rgb/set_camera_info" to="set_camera_info" />
+</node>
+
+</launch>
+

@@ -1,0 +1,14 @@
+<launch>
+
+<!-- camera_calibrator node -->
+<node name="camera_calibrator" pkg="mcptam" type="camera_calibrator" output="screen">
+  <param name="cam_name" type="string" value="$(arg camera_name)"/>
+  <param name="image_transport" type="string" value="compressed"/> 
+  <param name="image_topic" type="string" value="image_raw"/>
+  <param name="info_topic" type="string" value="camera_info"/> 
+  <param name="set_info_topic" type="string" value="set_camera_info"/>
+  <param name="use_existing_params" type="bool" value="false" />
+</node>
+
+</launch>
+

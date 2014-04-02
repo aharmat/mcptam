@@ -1,0 +1,6 @@
+Header header
+float32 dFrameGrabDuration
+float32 dTrackingDuration
+float32 dFPS
+float32 dGrabSuccessRatio
+string message

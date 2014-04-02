@@ -1,0 +1,10 @@
+string mv3WorldPos
+uint8 mnSourceLevel
+string mv3PixelRight_W
+string mv3PixelDown_W
+float64[2] mirCenter
+string mId
+string mSourceId
+string mSourceCamName
+bool mbFixed
+bool mbOptimized

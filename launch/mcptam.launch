@@ -1,0 +1,29 @@
+<launch>
+
+<!-- mcptam node -->
+<node name="mcptam" pkg="mcptam" type="mcptam" clear_params="true" output="screen">
+  <rosparam command="load" file="$(find mcptam)/groups/$(arg group_name).yaml" />
+  
+  <remap from="reset" to="mcptam/reset" />
+  <param name="image_transport" type="string" value="compressed"/>
+  
+  <param name="get_pose_separately" type="bool" value="false" />   
+  <!--
+  <param name="camera_pose_file" type="string" value="$(find mcptam)/poses/poses.dat" />
+  -->
+
+  <!--
+  <rosparam command="load" file="$(find mcptam)/masks/masks.yaml" />
+  <param name="masks_dir" type="string" value="$(find mcptam)/masks" />
+  -->
+
+  <param name="mm_init_point_mode" type="string" value="both" />
+
+  <param name="kf_distance_mean_diff_fraction" type="double" value="0.5" /> 
+  <param name="mm_max_scaled_mkf_dist" type="double" value="0.3" />
+  <param name="mm_outlier_multiplier" type="double" value="1.1" />
+  <param name="mm_init_cov_thresh" type="double" value="1.0" />
+</node>
+
+</launch>
+
