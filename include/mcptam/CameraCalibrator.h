@@ -114,15 +114,13 @@ protected:
   /// Update the LM lambda after a good optimization step
   void ModifyLambda_GoodStep()
   {
-    mdLambdaFactor = 2.0;
-    mdLambda *= 0.3;
+    mdLambda /= mdLambdaFactor;
   }
 
   /// Update the LM lambda after a bad optimization step
   void ModifyLambda_BadStep()
   {
     mdLambda *= mdLambdaFactor;
-    mdLambdaFactor *= 2;
   }
   
   /** @brief Creates a new GLWindow2 object with the dimensions of the video source

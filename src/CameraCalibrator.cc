@@ -325,8 +325,7 @@ void CameraCalibrator::GUICommandHandler(std::string command, std::string params
     return;
   }
   
-  ROS_FATAL_STREAM("CameraCalibrator: Unhandled command in GUICommandHandler: " << command);
-  ros::shutdown();
+  ROS_WARN_STREAM("CameraCalibrator: Unhandled command in GUICommandHandler: " << command);
 }
 
 // Finds the best image poses, camera polynomials and center of projection using linear methods

@@ -387,12 +387,13 @@ Matrix<2,9> TaylorCamera::GetCameraParameterDerivs()
   {
     Vector<9> v9Update;
     v9Update = Zeros;
+    double const dMinUpdateMag = 1e-10;
     
-    double dUpdateMag = TaylorCamera::mv9DefaultParams[i] / 100.0; // Make update magnitude 1% of default value
+    double dUpdateMag = fabs(TaylorCamera::mv9DefaultParams[i] / 100.0); // Make update magnitude 1% of default value
     
-    if(dUpdateMag == 0)  // ie one of the default values is zero (ie d, e)
+    if( dUpdateMag < dMinUpdateMag )  // ie one of the default values is zero (ie d, e)
     {
-      dUpdateMag = 0.001;
+      dUpdateMag = dMinUpdateMag;
     }
     
     v9Update[i] += dUpdateMag; 
