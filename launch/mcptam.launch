@@ -25,5 +25,7 @@
   <param name="mm_init_cov_thresh" type="double" value="1.0" />
 </node>
 
+<node pkg="tf" type="static_transform_publisher" name="world_tf" args="0 0 0 -0.5 0.5 -0.5 0.5 world vision_world 100" />
+
 </launch>
 

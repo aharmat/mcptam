@@ -138,6 +138,13 @@ KeyFrame* MapMakerBase::ClosestKeyFrame(KeyFrame &kf, KeyFrameRegion region, boo
       }
     }
   }
+  
+  if( pClosestKF == NULL )
+  {
+    // Dump the cameras and map data
+    DumpToFile("fail_map.dat");
+  }
+  
   ROS_ASSERT(pClosestKF != NULL);
   return pClosestKF;
 }

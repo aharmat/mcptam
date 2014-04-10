@@ -18,5 +18,7 @@
     <param name="kf_distance_mean_diff_fraction" type="double" value="0.5" /> 
   </node>
  
+<node pkg="tf" type="static_transform_publisher" name="world_tf" args="0 0 0 -0.5 0.5 -0.5 0.5 world vision_world 100" />
+
 </launch>
 
