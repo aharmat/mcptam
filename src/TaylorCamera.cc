@@ -43,19 +43,28 @@
 
 using namespace TooN;
 
-// Static member
-const Vector<9> TaylorCamera::mv9DefaultParams = makeVector(500.0, -0.0005, 0.0, 0.0, 320, 240, 1.0,  0, 0);
-//const Vector<9> TaylorCamera::mv9DefaultParams = makeVector(352.7334,	-0.0005046,	-2.79172e-06,	2.09923e-09, 752*0.5, 480*0.5, 1.0,  0, 0);
-
-TaylorCamera::TaylorCamera(Vector<9> v9Params, CVD::ImageRef irCalibSize, CVD::ImageRef irFullScaleSize, CVD::ImageRef irImageSize, bool bCalibMode)
+TaylorCamera::TaylorCamera(Vector<9> v9Params, CVD::ImageRef irCalibSize, CVD::ImageRef irFullScaleSize, CVD::ImageRef irImageSize)
 {
   mv9CameraParams = v9Params;
   mv2CalibSize = CVD::vec(irCalibSize);
   mv2FullScaleSize = CVD::vec(irFullScaleSize);
   mv2ImageSize = CVD::vec(irImageSize);
-  mbCalibrationMode = bCalibMode;
+  mbCalibrationMode = false;
   
   RefreshParams();
+}
+
+TaylorCamera::TaylorCamera(CVD::ImageRef irCalibSize, CVD::ImageRef irFullScaleSize, CVD::ImageRef irImageSize)
+{
+  mv2CalibSize = CVD::vec(irCalibSize);
+  mv2FullScaleSize = CVD::vec(irFullScaleSize);
+  mv2ImageSize = CVD::vec(irImageSize);
+  mbCalibrationMode = true;
+  
+  mv9CameraParams = makeVector(0, 0, 0, 0, 0, 0, 1, 0, 0);  // the only non-zero value is for affine matrix to be identity
+  RefreshParams();
+  
+  ROS_WARN_STREAM(">>> TaylorCamera: In calibration mode, call SetParams AT LEAST ONCE before projecting or getting derivatives!!! <<<");
 }
 
 void TaylorCamera::SetImageSize(CVD::ImageRef irImageSize)
@@ -389,7 +398,7 @@ Matrix<2,9> TaylorCamera::GetCameraParameterDerivs()
     v9Update = Zeros;
     double const dMinUpdateMag = 1e-10;
     
-    double dUpdateMag = fabs(TaylorCamera::mv9DefaultParams[i] / 100.0); // Make update magnitude 1% of default value
+    double dUpdateMag = fabs(v9Original[i]/ 100.0); // Make update magnitude 1% of current value
     
     if( dUpdateMag < dMinUpdateMag )  // ie one of the default values is zero (ie d, e)
     {

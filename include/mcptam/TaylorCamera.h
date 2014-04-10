@@ -98,14 +98,23 @@ public:
       #endif
   }
   
-  /// Parameterized constructor
-  /** @param v9Params The Taylor model parameters, see detail in mv9CameraParams variable
+  /** @brief Constructor for live camera model, i.e. NOT for calibration! It expects a calibrated parameter vector.
+   * 
+   *  @param v9Params The Taylor model parameters, see detail in mv9CameraParams variable
    *  @param irCalibSize The image size that was used for camera calibration
    *  @param irFullScaleSize The size, AT THE ORIGINAL PIXEL LEVEL, that the currently used camera image occupies. 
    *         This is a product of the actual size of the current image and any binning that is being applied.
-   *  @param irImageSize The actual size of the currently used camera image
-   *  @param bCalibMode Is the camera model being used for calibration or live processing? Calibration mode is slower but more accurate.   */
-  TaylorCamera(TooN::Vector<9> v9Params, CVD::ImageRef irCalibSize, CVD::ImageRef irFullScaleSize, CVD::ImageRef irImageSize, bool bCalibMode = false);
+   *  @param irImageSize The actual size of the currently used camera image  */
+  TaylorCamera(TooN::Vector<9> v9Params, CVD::ImageRef irCalibSize, CVD::ImageRef irFullScaleSize, CVD::ImageRef irImageSize);
+  
+  /** @brief Constructor for calibrating the camera model, i.e. NOT for live applications! It expects no parameter vector 
+   *         since we'll be finding it through calibration.
+   * 
+   *  @param irCalibSize The image size that was used for camera calibration
+   *  @param irFullScaleSize The size, AT THE ORIGINAL PIXEL LEVEL, that the currently used camera image occupies. 
+   *         This is a product of the actual size of the current image and any binning that is being applied.
+   *  @param irImageSize The actual size of the currently used camera image  */
+  TaylorCamera(CVD::ImageRef irCalibSize, CVD::ImageRef irFullScaleSize, CVD::ImageRef irImageSize);
   
   // Functions for getting/setting image size
   /// Set the current image size. Useful for dealing with subsampled images ie SmallBlurryImage.
@@ -211,9 +220,6 @@ public:
    *         if you want things to work out as intended. */
   void UpdateParams(TooN::Vector<9> v9Update);
   
-  // Static members
-  static const TooN::Vector<9> mv9DefaultParams;  ///< Default camera parameters, used when starting to calibrate a camera
-    
 protected:
  
   // Polynomial functions

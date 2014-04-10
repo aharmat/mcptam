@@ -174,10 +174,7 @@ protected:
   ros::NodeHandle mNodeHandle;       ///< ROS global node handle
   ros::NodeHandle mNodeHandlePriv;   ///< ROS private node handle
   
-  TooN::Vector<9> mv9DefaultParams;  ///< The default values that will be used to initialize the camera params
-  
   std::queue<Command> mqCommands;   ///< Queued commands received by GUICommandCallBack
-  
 };
 
 #endif

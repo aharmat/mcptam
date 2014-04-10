@@ -52,6 +52,7 @@ using namespace GVars3;
 CameraCalibrator::CameraCalibrator()
 : mVideoSource(false)
 , mpGLWindow(InitWindow("CameraCalibrator"))
+, mpCamera(NULL)
 , mNodeHandlePriv("~")
 {
   GUI.RegisterCommand("CameraCalibrator.GrabNextFrame", GUICommandCallBack, this);
@@ -76,9 +77,6 @@ CameraCalibrator::CameraCalibrator()
   GUI.ParseLine("CalibMenu.AddMenuButton Opti Remove CameraCalibrator.Remove");
   GUI.ParseLine("CalibMenu.AddMenuButton Opti Save CameraCalibrator.SaveCalib");
   
-  bool bUseParams;
-  mNodeHandlePriv.param<bool>("use_existing_params", bUseParams , false);
-  
   mCamName = mVideoSource.GetCamName();
   mirSize = mVideoSource.GetSize();
   CVD::ImageRef irFullScaleSize = mVideoSource.GetFullScaleSize();
@@ -87,24 +85,23 @@ CameraCalibrator::CameraCalibrator()
   {
     ROS_ERROR("CameraCalibrator: Can't calibrate camera with binning turned on, relaunch camera with binning off");
     ros::shutdown();
+    return;
   }
   
-  mv9DefaultParams= bUseParams ? mVideoSource.GetParams() : TaylorCamera::mv9DefaultParams;
-  ROS_INFO_STREAM("Initializing cameras with params: "<<mv9DefaultParams);
-  
-  mpCamera = new TaylorCamera(mv9DefaultParams, mirSize, mirSize, mirSize, true);
-  
-  mbDone = false;
-  mbInit = false;
-  mnImageToShow = 0;
   Reset();
-
+  mbDone = false;
 }
 
 CameraCalibrator::~CameraCalibrator()
 {
   if(mpGLWindow)
     delete mpGLWindow;  
+    
+  if(mpCamera)
+    delete mpCamera;
+    
+  for(unsigned i=0; i < mvpCalibImgs.size(); ++i)
+    delete mvpCalibImgs[i];
 }
 
 void CameraCalibrator::Run()
@@ -205,17 +202,20 @@ void CameraCalibrator::Run()
 // Delete all acquired data, reset camera model parameters to defaults
 void CameraCalibrator::Reset()
 {
-  mpCamera->SetParams(mv9DefaultParams);
+  if(mpCamera)
+    delete mpCamera;
+    
+  mpCamera = new TaylorCamera(mirSize, mirSize, mirSize);
   
   mbGrabNextFrame =false;
   mbOptimizing = false;
   mbInit = false;
+  mnImageToShow = 0;
   
   for(unsigned i=0; i < mvpCalibImgs.size(); ++i)
     delete mvpCalibImgs[i];
   
   mvpCalibImgs.clear();
-  
 }
 
 // // This can be used with GUI.RegisterCommand to capture user input
