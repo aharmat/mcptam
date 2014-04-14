@@ -735,7 +735,8 @@ void KeyFrame::EraseBackLinksFromPoints()
   for(MeasPtrMap::iterator it = mmpMeasurements.begin(); it != mmpMeasurements.end(); ++it)
   {
     MapPoint& point = *(it->first);
-    ROS_ASSERT( point.mMMData.spMeasurementKFs.erase(this) );
+    int nErased = point.mMMData.spMeasurementKFs.erase(this);
+    ROS_ASSERT(nErased);
     // If this KeyFrame is the point's source, then mark it bad because it's about to
     // lose it. Alternatively, could transfer the role of source KF to another one in 
     // spMeasurementKFs, but that would need to be implemented and tested

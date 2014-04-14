@@ -2,7 +2,11 @@ cmake_minimum_required(VERSION 2.8.3)
 project(mcptam)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/${PROJECT_NAME}/cmake_modules")
-set(CMAKE_BUILD_TYPE RelWithDebInfo)
+set(CMAKE_BUILD_TYPE None)
+
+# Set our own specific flags. Want something like RelWithDebInfo but without the 
+# -DNDEBUG flag that disables asserts
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x -march=core2 -msse3 -O3 -g")
 
 # Find various packages in order to set up environment variables
 find_package(catkin REQUIRED COMPONENTS roscpp image_transport sensor_msgs cv_bridge geometry_msgs tf message_filters std_msgs
@@ -38,9 +42,6 @@ catkin_package(
   CATKIN_DEPENDS roscpp image_transport sensor_msgs cv_bridge geometry_msgs tf message_filters std_msgs std_srvs 
                  visualization_msgs dynamic_reconfigure pcl_ros message_runtime
   DEPENDS SuiteSparse CVD OpenGL GVars3)
-  
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x -march=core2 -msse3 -O3")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x -march=core2 -msse3 -O1 -g")
 
 add_executable(mcptam src/Main.cc src/GLWindow2.cc src/GLWindowMenu.cc src/VideoSourceMulti.cc src/CameraGroupSubscriber.cc 
                       src/SystemBase.cc src/System.cc src/TaylorCamera.cc src/KeyFrame.cc src/MapPoint.cc src/Map.cc 
@@ -91,6 +92,7 @@ target_link_libraries(pose_calibrator ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${S
 #~ target_link_libraries(bundle_test_file_2 ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${GVars3_LIBRARIES}
                                      #~ ${G2O_STUFF_LIBRARY} ${G2O_CORE_LIBRARY} ${G2O_SOLVER_CHOLMOD})
                                      #~ 
+                                     
 install(TARGETS mcptam mcptam_client mcptam_server camera_calibrator pose_calibrator
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}

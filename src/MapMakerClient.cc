@@ -216,7 +216,8 @@ void MapMakerClient::AddMultiKeyFrameFromTopOfQueue()
       if(point.mbBad)  // Point is bad, possibly sitting in trash, so remove measurement now
       {
         kf.EraseMeasurementOfPoint(&point);
-        ROS_ASSERT(point.mMMData.spMeasurementKFs.erase(&kf));
+        int nErased = point.mMMData.spMeasurementKFs.erase(&kf);
+        ROS_ASSERT(nErased);
       }
       
     }
