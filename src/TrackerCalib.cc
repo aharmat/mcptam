@@ -249,7 +249,10 @@ void TrackerCalib::TrackFrame(CVD::Image<CVD::byte>& imFrame, ros::Time timestam
 {
   ROS_ASSERT(mbNeedToDrop == false);  // otherwise there was an unhandled request to drop a new keyframe last time, bad
   
-  CVD::convolveGaussian(imFrame, 1.0);
+  // Smooth the image a bit? Improves performance if the image is grainy,
+  // but you should probably adjust the camera in this case, even optical
+  // blur from defocus would work.
+  //CVD::convolveGaussian(imFrame, 1.0);
   
   ImageBWMap imageMap;  // need to put image into a map to call base class TrackFrameSetup
   imageMap.insert(make_pair(mCamName, imFrame));

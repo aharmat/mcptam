@@ -469,10 +469,16 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
          (*gvnAddingMKFs &&
           mOverallTrackingQuality == GOOD &&
           mnLostFrames == 0 &&
-          //ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.1) &&
+          ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.1) &&
           //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, CountMeasurements()))
           mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF)))
       {
+        if(mbAddNext)
+          ROS_DEBUG("Adding MKF because add next was clicked");
+          
+        if(mMapMaker.Initializing())
+          ROS_DEBUG("Adding MKF because map is initializing");
+          
         mMessageForUser << " SHOULD BE Adding MultiKeyFrame to Map";
         RecordMeasurements();  // We've decided to add, so make measurements
         AddNewKeyFrame(); 

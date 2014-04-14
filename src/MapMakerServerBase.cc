@@ -204,13 +204,15 @@ bool MapMakerServerBase::InitFromMultiKeyFrame(MultiKeyFrame* pMKF, bool bPutPla
     ROS_ERROR_STREAM("MapMakerServerBase: Epipolar matching and init depth method didn't make enough map points: "<<mMap.mlpPoints.size()<<"  Minimum is: "<<MapMakerServerBase::snMinMapPoints);
     return false;
   }
-  
+    
   for(MapPointPtrList::iterator point_it = mMap.mlpPoints.begin(); point_it != mMap.mlpPoints.end(); ++point_it)
   {
     (*point_it)->mbOptimized = true; // want tracker to track these points, have to set them to optimized
   }
   
   mBundleAdjuster.SetNotConverged();
+  
+  pMKF->RefreshSceneDepthRobust();
   
   
   /*
@@ -220,7 +222,24 @@ bool MapMakerServerBase::InitFromMultiKeyFrame(MultiKeyFrame* pMKF, bool bPutPla
   }
   */ 
 
-  pMKF->RefreshSceneDepthRobust();
+  
+  /*
+  std::vector<std::pair<KeyFrame*, MapPoint*> > vOutliers;
+  mBundleAdjuster.UseTukey(false);
+  mBundleAdjuster.UseTwoStep(false);
+      
+  int nAccepted = mBundleAdjuster.BundleAdjustAll(vOutliers);
+  mdMaxCov = mBundleAdjuster.GetMaxCov();
+   
+  if(nAccepted < 0) // bad
+    return false;
+    
+  if(mdMaxCov < MapMakerServerBase::sdInitCovThresh) 
+  {
+    ROS_INFO_STREAM("INITIALIZING, Max cov "<<mdMaxCov<<" below threshold "<<MapMakerServerBase::sdInitCovThresh<<", switching to RUNNING");
+    mState = MM_RUNNING;
+  }
+  */
   
   ROS_INFO_STREAM("MapMakerServerBase: Made initial map with " << mMap.mlpPoints.size());
   ROS_INFO_STREAM("MapMakerServerBase: Initial MKF pose: "<<std::endl<<pMKF->mse3BaseFromWorld);

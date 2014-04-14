@@ -184,8 +184,8 @@ void MapMaker::run()
       ROS_INFO("MapMaker: Bundle adjusting recent");
       std::vector<std::pair<KeyFrame*, MapPoint*> > vOutliers;
       
-      mBundleAdjuster.UseTukey((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 4));
-      mBundleAdjuster.UseTwoStep((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 4));
+      mBundleAdjuster.UseTukey((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2));
+      mBundleAdjuster.UseTwoStep((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2));
       
       int nAccepted = mBundleAdjuster.BundleAdjustRecent(vOutliers);
       mdMaxCov = mBundleAdjuster.GetMaxCov();
@@ -228,8 +228,8 @@ void MapMaker::run()
       ROS_INFO_STREAM("MapMaker: Number of map points: "<<mMap.mlpPoints.size());
       std::vector<std::pair<KeyFrame*, MapPoint*> > vOutliers;
       
-      mBundleAdjuster.UseTukey(mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 4);
-      mBundleAdjuster.UseTwoStep((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 4));
+      mBundleAdjuster.UseTukey(mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2);
+      mBundleAdjuster.UseTwoStep((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2));
       
       int nAccepted = mBundleAdjuster.BundleAdjustAll(vOutliers);
       mdMaxCov = mBundleAdjuster.GetMaxCov();
@@ -256,9 +256,9 @@ void MapMaker::run()
         if(mState == MM_INITIALIZING && (mdMaxCov < MapMakerServerBase::sdInitCovThresh || mbStopInit)) 
         {
           ROS_INFO_STREAM("INITIALIZING, Max cov "<<mdMaxCov<<" below threshold "<<MapMakerServerBase::sdInitCovThresh<<", switching to RUNNING");
-          FinishIDPInit();
           mState = MM_RUNNING;
           mbStopInit = false;
+          FinishIDPInit();      
         }
       }
     }
@@ -367,6 +367,20 @@ TooN::SE3<> MapMaker::FinishIDPInit()
   }
   */
   
+  // Clear out anything in the incoming queue, since there might be a bunch
+  // of MKFs piled in there waiting to be added to the map. But since we're
+  // done initializing, we don't want to keep these really closely spaced MKFs
+
+  boost::mutex::scoped_lock lock(mQueueMutex);
+  while(mqpMultiKeyFramesFromTracker.size() > 0)
+  {
+    MultiKeyFrame* pMKF = mqpMultiKeyFramesFromTracker.front();
+    pMKF->EraseBackLinksFromPoints();
+    //pMKF->ClearMeasurements();
+    delete pMKF;
+    mqpMultiKeyFramesFromTracker.pop_front();
+  }
+  
   return pMKF->mse3BaseFromWorld;
 }
 
@@ -404,6 +418,7 @@ void MapMaker::AddMultiKeyFrameFromTopOfQueue()
   }
   else  // INITIALIZING
   {
+    ROS_DEBUG("Trying to add MKF and mark last as bad");
     AddMultiKeyFrameAndMarkLastBad(pMKF);
   }
   
@@ -415,14 +430,14 @@ void MapMaker::AddMultiKeyFrameFromTopOfQueue()
 // Deletes bad points and removes pointers to them from internal queues.
 void MapMaker::HandleBadEntities() 
 {
+  ROS_DEBUG_STREAM("HandleBadEntities: Before move to trash we have "<<mMap.mlpPoints.size()<<" map points, and "<<mMap.mlpMultiKeyFrames.size()<<" MKFs");
   mMap.MoveBadMultiKeyFramesToTrash();
   
   MarkDanglersAsBad();
   MarkOutliersAsBad();
   
-  ROS_DEBUG_STREAM("HandleBadEntities: Before move to trash we have "<<mMap.mlpPoints.size()<<" map points");
   mMap.MoveBadPointsToTrash();
-  ROS_DEBUG_STREAM("HandleBadEntities: After move to trash we have "<<mMap.mlpPoints.size()<<" map points");
+  ROS_DEBUG_STREAM("HandleBadEntities: After move to trash we have "<<mMap.mlpPoints.size()<<" map points, and "<<mMap.mlpMultiKeyFrames.size()<<" MKFs");
   
   EraseBadEntitiesFromQueues();
   mMap.EmptyTrash(); 

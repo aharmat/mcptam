@@ -89,7 +89,7 @@ void MapMakerClientBase::MarkOutliersAsBad()
   
   if(nMarkedBad > 0)
   {
-    ROS_INFO_STREAM("======== Handle outlier based on tracker marked "<<nMarkedBad<<" points as bad");
+    ROS_DEBUG_STREAM("======== Handle outlier based on tracker marked "<<nMarkedBad<<" points as bad");
   }
 }
 
@@ -125,18 +125,28 @@ bool MapMakerClientBase::NeedNewMultiKeyFrame(MultiKeyFrame &mkf)
   MultiKeyFrame *pClosestMKF = ClosestMultiKeyFrame(mkf);
   double dDist = mkf.Distance(*pClosestMKF);
   
+  ROS_DEBUG_STREAM("Closest dist in map: "<<dDist);
+  
   // See if there's anything closer in the queue
   MultiKeyFrame *pClosestMKFInQueue = ClosestMultiKeyFrameInQueue(mkf);
   if(pClosestMKFInQueue)
   {
     double dDistInQueue = mkf.Distance(*pClosestMKFInQueue);
+    ROS_DEBUG_STREAM("Closest dist in queue: "<<dDistInQueue);
     dDist = std::min(dDist,dDistInQueue);
   }
   
   dDist *= (1.0 / mkf.mdTotalDepthMean);  // scale by depth
-  bool bNeed = dDist > MapMakerClientBase::sdMaxScaledMKFDist;
   
-  ROS_INFO_STREAM("NeedNewMultiKeyFrame: dist: "<<dDist<<" mean depth: "<<mkf.mdTotalDepthMean<<" thresh: "<< MapMakerClientBase::sdMaxScaledMKFDist << " need: "<<(bNeed ? "yes" : "no"));
+  int nEffectiveSize = mMap.mlpMultiKeyFrames.size();
+  if(nEffectiveSize == 2)
+    nEffectiveSize = 1;
+    
+  double dMapSizeFactor = 1.0 - (1.0 / (0.5 + nEffectiveSize));
+  double dThresh = MapMakerClientBase::sdMaxScaledMKFDist * dMapSizeFactor;
+  bool bNeed = dDist > dThresh;
+  
+  ROS_INFO_STREAM("NeedNewMultiKeyFrame: dist: "<<dDist<<" mean depth: "<<mkf.mdTotalDepthMean<<" thresh: "<< dThresh << " need: "<<(bNeed ? "yes" : "no"));
   
   return bNeed;
 }
