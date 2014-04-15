@@ -229,9 +229,11 @@ void System::Run()
   std::queue<ros::Time> qLoopTimes;
   std::deque<ros::Duration> qTotalDurations;
   std::deque<ros::Duration> qFrameGrabDurations;
+  std::deque<ros::Duration> qFrameDelayDurations;
   
   unsigned int nMaxQueueSize = 10;
   ros::Time grabStartTime;
+  ros::Time grabEndTime;
   ros::Time trackStartTime;
   bool bLastGrabSuccess = true;
   
@@ -248,6 +250,7 @@ void System::Run()
       grabStartTime = ros::Time::now();
     ros::Time timestamp;
     bLastGrabSuccess = mpVideoSourceMulti->GetAndFillFrameBW(ros::WallDuration(0.2), mmFramesBW, timestamp);
+    grabEndTime = ros::Time::now();
     
     static gvar3<std::string> gvsCurrentSubMenu("Menu.CurrentSubMenu", "", HIDDEN|SILENT);
     bool bDrawKeyFrames = *gvsCurrentSubMenu == "View";
@@ -258,9 +261,13 @@ void System::Run()
       glClearColor(0,0,0,1);
       glClear(GL_COLOR_BUFFER_BIT);
   
-      qFrameGrabDurations.push_back(ros::Time::now() - grabStartTime);
+      qFrameGrabDurations.push_back(grabEndTime - grabStartTime);
       if(qFrameGrabDurations.size() > nMaxQueueSize)
         qFrameGrabDurations.pop_front();
+        
+      qFrameDelayDurations.push_back(grabEndTime - timestamp);
+      if(qFrameDelayDurations.size() > nMaxQueueSize)
+        qFrameDelayDurations.pop_front();
       
       trackStartTime = ros::Time::now();
       // Perform the actual tracking
@@ -318,6 +325,13 @@ void System::Run()
       captionStream << std::endl <<"Average Frame Grab Duration: "<< dAvg;
       info_msg.dFrameGrabDuration = dAvg;
     }  
+    
+    if(qFrameDelayDurations.size() == nMaxQueueSize)
+    {
+      double dAvg = AverageDuration(qFrameDelayDurations);
+      captionStream << std::endl <<"Average Frame Delay: "<< dAvg;
+      //info_msg.dFrameGrabDuration = dAvg;
+    } 
     
     if(qTotalDurations.size() == nMaxQueueSize)
     {
@@ -509,16 +523,17 @@ void System::PublishPose()
   // Some hacky heuristics here, may want to add these values to a config file
   if(mpTracker->GetTrackingQuality() == Tracker::GOOD)
   {
-    cov = cov *1e2;
+    cov = cov * 1e2;
   }
   else if(mpTracker->GetTrackingQuality() == Tracker::DODGY)
   {
-    cov = cov *1e4;
+    cov = cov *1e5;
   }
   else if(mpTracker->GetTrackingQuality() == Tracker::BAD)
   {
     cov = cov *1e8;
   }
+  
   
   pose_cov_msg.pose.pose = util::SE3ToPoseMsg(pose);
   

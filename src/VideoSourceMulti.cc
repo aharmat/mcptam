@@ -346,21 +346,15 @@ bool VideoSourceMulti::GetAndFillFrameBW(ros::WallDuration timeout, ImageBWMap &
 
   if(!success)
     return false;
-  
-  double stamp = 0;
+    
+  timestamp = mLastTimestamp;
   
   for(ImagePtrMap::iterator it = mmpLastImages.begin(); it != mmpLastImages.end(); it++)
   {
     util::ConversionBW(it->second->image, mmWorkspaceBW[it->first]);
     imBW[it->first] = mmWorkspaceBW[it->first];
-    stamp += it->second->header.stamp.toSec();
   }
   
-  if(mmpLastImages.size() == 1)  // want exact stamp, converting with toSec and then back again loses some precision
-    timestamp = mmpLastImages.begin()->second->header.stamp;
-  else
-    timestamp = ros::Time(stamp / mmpLastImages.size());
-    
   return true;
 }
 
@@ -376,6 +370,7 @@ void VideoSourceMulti::WaitForGroup(int nGroupIdx, bool* pThreadActive)
     {
       boost::mutex::scoped_lock lock(mImageMutex);
       mmpLastImages = mpTempImages;
+      mLastTimestamp = mvpCamGroups[nGroupIdx]->GetLastTimestamp();
     }
   }
   

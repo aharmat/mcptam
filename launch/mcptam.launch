@@ -8,6 +8,7 @@
   <param name="image_transport" type="string" value="compressed"/>
   
   <param name="get_pose_separately" type="bool" value="false" />   
+  <param name="dynamic_sync" type="bool" value="true" />
   <!--
   <param name="camera_pose_file" type="string" value="$(find mcptam)/poses/poses.dat" />
   -->

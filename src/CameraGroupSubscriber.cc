@@ -39,6 +39,7 @@
 CameraGroupSubscriber::CameraGroupSubscriber(std::vector<std::string> vCameraNames, bool bGetPoseSeparately)
 : mNodeHandlePriv("~")
 , mpSync(new message_filters::Synchronizer<ApproxTimePolicy>(ApproxTimePolicy(5)))  // queue size of 5
+, mLastTimestamp(0,0)
 {
   // Make sure we're using our own callback queue
   mNodeHandle.setCallbackQueue(&mCallbackQueue);
@@ -55,6 +56,7 @@ CameraGroupSubscriber::CameraGroupSubscriber(std::vector<std::string> vCameraNam
   mNodeHandlePriv.param<std::string>("info_topic", infoTopic ,"camera_info"); 
   mNodeHandlePriv.param<std::string>("pose_topic", poseTopic ,"pose"); 
   mNodeHandlePriv.param<std::string>("camera_prefix", cameraPrefix ,""); 
+  mNodeHandlePriv.param<bool>("dynamic_sync", mbDynamicSync, false);
   
   mNumCams = mvCameraNames.size();
   
@@ -90,7 +92,7 @@ CameraGroupSubscriber::CameraGroupSubscriber(std::vector<std::string> vCameraNam
   /*
   ApproxTimePolicy* policy = dynamic_cast<ApproxTimePolicy*>( mpSync->getPolicy() );
   for(unsigned i=0; i < 8; ++i)
-    policy->setInterMessageLowerBound(i, ros::Duration((1.0/framerate) * 1.5));
+    policy->setInterMessageLowerBound(i, ros::Duration((1.0/8.0)));
   */
   
   // Create space for our image subscribers
@@ -281,6 +283,32 @@ void CameraGroupSubscriber::ImageCallback(const sensor_msgs::ImageConstPtr& msg1
     return;
   }
   
+  ros::Time currTimestamp;
+  
+  if(mmLastImages.size() == 1)  // want exact stamp, converting with toSec and then back again loses some precision
+  {
+    currTimestamp = mmLastImages.begin()->second->header.stamp;
+  }
+  else
+  {
+    double dStamp = 0;
+    
+    for(ImagePtrMap::iterator it = mmLastImages.begin(); it != mmLastImages.end(); it++)
+    {
+      dStamp += it->second->header.stamp.toSec();
+    }
+    
+    currTimestamp = ros::Time(dStamp / mmLastImages.size());
+  }
+  
+  if(mbDynamicSync && !mLastTimestamp.isZero())
+  {
+    ApproxTimePolicy* policy = dynamic_cast<ApproxTimePolicy*>( mpSync->getPolicy() );
+    for(unsigned i=0; i < 8; ++i)
+      policy->setInterMessageLowerBound(i, (currTimestamp - mLastTimestamp) * 0.8);
+  }
+  
+  mLastTimestamp = currTimestamp;
 }
 
 // Grab a new set of images from all the cameras in the group

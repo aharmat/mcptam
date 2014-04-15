@@ -81,6 +81,9 @@ public:
    *  @return A map of camera names => CvImageConstPtr, from which images can be extracted in OpenCV format */
   ImagePtrMap GetNewImage(bool* bActive);
   
+  /** @brief Returns the average timestamp of the last acquisition */
+  ros::Time GetLastTimestamp(){ return mLastTimestamp; }
+  
   /** @brief Get the internal calibration from all the cameras
    * 
    *  This function returns a saved CameraInfo message it got during initialization, so if the camera starts sending 
@@ -142,12 +145,14 @@ protected:
   
   unsigned mNumCams;                       ///< The number of cameras in this group
   std::vector<std::string> mvCameraNames;   ///< Vector of camera names in this group
+  bool mbDynamicSync;                      ///< Dynamically set the inter message lower bound of the synchronizer based on observed framerate?
   
   message_filters::Synchronizer<ApproxTimePolicy>* mpSync;   ///< The message synchronizer, using the ApproxTimePolicy we defined 
   std::vector< image_transport::SubscriberFilter* > mvpImageSubs;   ///< Vector of image subscribers (one per camera) as SubscriberFilter pointers so they can be chained with the synchronizer
   std::vector< ros::Subscriber > mvInfoSubs;    ///< Vector of regular subscribers (one per camera) for getting camera info, these don't need to be synchronized
   std::vector< ros::Subscriber > mvPoseSubs;    ///< Vector of regular subscribers (one per camera) for getting camera pose, these don't need to be synchronized
   
+  ros::Time mLastTimestamp;    ///< Last (average) timestamp of the acquired images
   ImagePtrMap mmLastImages;    ///< A map of camera name => CvImageConstPtr from the last acquisition
   InfoMap mmSavedInfos;        ///< A map of camera name => CameraInfo that we saved from the initialization
   PoseMap mmSavedPoses;        ///< A map of camera name => Pose that we saved from the initialization

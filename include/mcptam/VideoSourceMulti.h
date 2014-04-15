@@ -199,6 +199,8 @@ protected:
   ParamMap mmParams;                 ///< %Map of camera parameters
   SE3Map mmPoses;                    ///< %Map of camera poses
   
+  ros::Time mLastTimestamp;    ///< Last (average) timestamp of the acquired images
+  
   ImageBWMap mmWorkspaceBW;          ///< %Map of greyscale images that are overwritten and not deleted, used as a scratchpad for image acquisition
   ImageRGBMap mmWorkspaceRGB;        ///< %Map of color RGB images that are overwritten and not deleted, used as a scratchpad for image acquisition
   
