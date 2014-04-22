@@ -307,7 +307,7 @@ void SystemServer::SystemInfoCallback(const mcptam::SystemInfoConstPtr& info_msg
   mdTrackingDuration = info_msg->dTrackingDuration;
   mdFPS = info_msg->dFPS;
   mdGrabSuccessRatio = info_msg->dGrabSuccessRatio;
-  std::cout<<info_msg->message<<std::endl;
+  //std::cout<<info_msg->message<<std::endl;
 }
 
 // Callback called when a new tracker state message received

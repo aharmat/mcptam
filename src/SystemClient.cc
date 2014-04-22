@@ -162,7 +162,7 @@ SystemClient::SystemClient()
   }
   
   // Full size of compound small image
-  mirSmallImageSize = CVD::ir(LevelNPos(CVD::vec(mpVideoSourceMulti->GetTotalSize(false)), mnSmallImageLevel));
+  mirSmallImageSize = CVD::ir_rounded(LevelNPos(CVD::vec(mpVideoSourceMulti->GetTotalSize(false)), mnSmallImageLevel));
   
   double rate;
   mNodeHandlePriv.param<double>("pose_publish_rate", rate, 0);
