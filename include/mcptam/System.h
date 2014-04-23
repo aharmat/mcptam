@@ -48,18 +48,15 @@
 #ifndef __SYSTEM_H
 #define __SYSTEM_H
 
-#include <mcptam/SystemBase.h>
-#include <mcptam/Types.h>
-#include <mcptam/Reset.h>
-#include <ros/ros.h>
+#include <mcptam/SystemFrontendBase.h>
+//#include <ros/ros.h>
 
 class MapMaker;
-class Tracker;
 class BundleAdjusterMulti;
 class KeyFrameViewer;
 
 /** @brief Implements the rest of the objects necessary to run MCTAM */
-class System : public SystemBase
+class System : public SystemFrontendBase
 {
 public:
   /// Creates objects, sets up GUI
@@ -80,34 +77,10 @@ protected:
    *  @param command The saved command
    *  @param params The saved command parameters */
   void GUICommandHandler(std::string command, std::string params);
-  
-  /// Callback for Tracker reset command
-  bool ResetSystemCallback(mcptam::Reset::Request &request, mcptam::Reset::Response &response);
-  
-  /// Publish the system state
-  void PublishState();
-  
-  /// Publish the current pose
-  void PublishPose();
 
-  ImageBWMap mmFramesBW;                  ///< Map of greyscale CVD::Images
-  
   MapMaker* mpMapMaker;                   ///< Pointer to the standalone version of MapMaker
-  Tracker* mpTracker;                     ///< Pointer to the Tracker
   BundleAdjusterMulti* mpBundleAdjuster;  ///< Pointer to the BundleAdjuster
   KeyFrameViewer *mpKeyFrameViewer;       ///< Pointer to the KeyFrameViewer
-  
-  bool mbDone;                            ///< Should I quit run loop?
-  
-  ros::Publisher mSystemInfoPub;          ///< Publishes diagnostic messages about framerate and computation durations
-  ros::Publisher mTrackerStatePub;        ///< Publisher for tracker state information
-  ros::Publisher mTrackerPoseWithCovPub;  ///< Publisher for tracker pose (position, orientation, covariances)
-  ros::Publisher mTrackerPosePub;
-  
-  ros::ServiceServer mResetSystemServer;  ///< Service to allow system reset, needed for map maker
-  
-  ros::Duration mPosePublishDur;          ///< How often to publish pose
-  ros::Time mLastPosePublishTime;         ///< Last time pose was published
   
 };
 

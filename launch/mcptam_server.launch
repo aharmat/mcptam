@@ -4,13 +4,17 @@
     <node name="mcptam_server" pkg="mcptam" type="mcptam_server" clear_params="true" output="screen">
     <rosparam command="load" file="$(find mcptam)/groups/$(arg group_name).yaml" />
     
-    <param name="get_pose_separately" type="bool" value="true" />
+    <param name="get_pose_separately" type="bool" value="false" />
     <param name="mm_init_point_mode" type="string" value="stereo" /> 
+    
+    <!--
     <param name="camera_pose_file" type="string" value="$(find mcptam)/poses/poses.dat" />
+    -->
   
     <remap from="modify_map" to="mcptam_client/modify_map"/>
     <remap from="tracker_state" to="mcptam_client/tracker_state" />
     <remap from="tracker_small_image/compressed" to="mcptam_client/tracker_small_image/compressed" />
+    <remap from="tracker_small_image_points" to="mcptam_client/tracker_small_image_points" />
     <remap from="reset" to="mcptam_client/reset" />
     <remap from="init" to="mcptam_client/init" />
     <remap from="system_info" to="mcptam_client/system_info" />

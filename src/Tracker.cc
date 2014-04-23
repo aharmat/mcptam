@@ -139,6 +139,7 @@ void Tracker::Reset(bool bSavePose, bool bResetMap)
   mbInitRequested = false;
   mbPutPlaneAtOrigin = true;
   mbAddNext = false;
+  mmSimpleMeas.clear();
    
   mLastProcessTime = ros::Time::now();
   mse3StartPose = SE3<>();  
@@ -642,7 +643,7 @@ void Tracker::TrackForInitialMap()
     }
   }
   else
-    mMessageForUser << "Point camera at planar scene and press spacebar to build initial map." << std::endl;
+    mMessageForUser << "Press spacebar to build initial map." << std::endl;
   
 }
 
@@ -1145,6 +1146,31 @@ void Tracker::TrackMap()
   startTime = ros::WallTime::now();
   RefreshSceneDepth(mvIterationSets);
   timingMsg.depth = (ros::WallTime::now() - startTime).toSec();
+  
+  SaveSimpleMeasurements(mvIterationSets);
+}
+
+// Save a simplified copy of the measurements made during tracking
+void Tracker::SaveSimpleMeasurements(std::vector<TrackerDataPtrVector>& vIterationSets)
+{
+  mmSimpleMeas.clear();
+  
+  for(unsigned i=0; i < mvCurrCamNames.size(); ++i)
+  {
+    std::string camName = mvCurrCamNames[i];
+  
+    ROS_DEBUG_STREAM("Tracker: Recording "<<vIterationSets[i].size()<<" simple measurements in camera "<<i);
+    
+    for(TrackerDataPtrVector::iterator td_it = vIterationSets[i].begin(); td_it!= vIterationSets[i].end(); ++td_it)
+    {
+      TrackerData& td = *(*td_it);
+      
+      if(!td.mbFound || td.mPoint.mbBad)
+        continue;
+        
+      mmSimpleMeas[camName][td.mnSearchLevel].push_back(td.mv2Found);
+    }
+  }
 }
 
 // Update the scene depth variables of the current MultiKeyFrame and KeyFrames without recording any measurements
@@ -1727,6 +1753,16 @@ CVD::Image<CVD::byte> Tracker::GetKeyFrameImage(std::string camName, unsigned nL
   
   KeyFrame& kf = *(kf_it->second);
   return kf.maLevels[nLevel].image;
+}
+
+std::vector<TooN::Vector<2> > Tracker::GetKeyFrameSimpleMeas(std::string camName, unsigned nLevel)
+{
+  ROS_ASSERT(nLevel < LEVELS);
+  
+  if(!mmSimpleMeas.count(camName))
+    return std::vector<TooN::Vector<2> >();
+  
+  return mmSimpleMeas[camName][nLevel];
 }
 
 // Copy the scene depth from the given MKF, used when the map maker take our MKF and we want to regenerate our scene depths

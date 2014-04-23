@@ -54,8 +54,14 @@
 #include <mcptam/TrackerState.h>
 #include <mcptam/SystemInfo.h>
 #include <ros/ros.h>
+#include <message_filters/subscriber.h>
+#include <message_filters/synchronizer.h>
+#include <message_filters/sync_policies/exact_time.h>
 #include <image_transport/image_transport.h>
+#include <image_transport/subscriber_filter.h>
 #include <sensor_msgs/Image.h>
+#include <pcl_ros/point_cloud.h>
+#include <pcl/point_types.h>
 
 class MapMakerServer;
 class BundleAdjusterMulti;
@@ -85,13 +91,13 @@ protected:
   void GUICommandHandler(std::string command, std::string params);
   
   /// Callback called when a new tracker state message received
-  void TrackerStateCallback(const mcptam::TrackerStateConstPtr& state_msg);
+  void TrackerStateCallback(const mcptam::TrackerStateConstPtr& stateMsg);
   
   /// Callback called when a new small preview image is received
-  void TrackerSmallImageCallback(const sensor_msgs::ImageConstPtr& image_msg);
+  void TrackerSmallImageCallback(const sensor_msgs::ImageConstPtr& imageMsg, const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& pointMsg);
   
   /// Callback called when a new system info message received
-  void SystemInfoCallback(const mcptam::SystemInfoConstPtr& info_msg);
+  void SystemInfoCallback(const mcptam::SystemInfoConstPtr& infoMsg);
  
   MapMakerServer *mpMapMakerServer;    ///< Pointer to the MapMakerServer
   BundleAdjusterMulti *mpBundleAdjuster;  ///< Pointer to the bundle adjuster that uses MultiBundle
@@ -103,8 +109,11 @@ protected:
   TooN::SE3<> mse3TrackerPose;                ///< Pose from the Tracker
   Tracker::TrackingQuality mTrackingQuality;  ///< Quality of the pose tracking
   bool mbTrackerLost;                         ///< Is the tracker lost?
-  CVD::Image<CVD::byte> mTrackerSmallImage;   ///< Small blurry image from the tracker for relocalisation
+  CVD::Image<CVD::Rgb<CVD::byte> >  mTrackerSmallImage;   ///< Small composite image sent from the tracker
+  pcl::PointCloud<pcl::PointXYZ> mTrackerSmallImagePoints;  ///< Measurement points to be overlaid on small image
+  
   double mdFrameGrabDuration;                 ///< Time to grab the camera frames
+  double mdFrameDelayDuration;                ///< Delay between image capture and receiving at client
   double mdTrackingDuration;                  ///< Time to track the pose
   double mdFPS;                               ///< Number of frames per second
   double mdGrabSuccessRatio;                  ///< Frame grab success rate
@@ -113,8 +122,15 @@ protected:
   ros::ServiceClient mResetSystemClient;   ///< Used to call reset on client
   ros::Subscriber mTrackerStateSub;        ///< Subscribe to tracker state messages
   ros::Subscriber mSystemInfoSub;          ///< Subscribe to system info messages
-  image_transport::Subscriber mTrackerSmallImageSub;  ///< Subscribe to small preview image messages
+  
+  //image_transport::Subscriber mTrackerSmallImageSub;  ///< Subscribe to small preview image messages
+  
   image_transport::ImageTransport mImageTransport;    ///< Image transport for the image messages
+  image_transport::SubscriberFilter mSmallImageSub; 
+  message_filters::Subscriber<pcl::PointCloud<pcl::PointXYZ> > mSmallImagePointsSub;
+  
+  typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, pcl::PointCloud<pcl::PointXYZ> > ExactTimePolicy;  
+  message_filters::Synchronizer<ExactTimePolicy> mSync;
   
 };
 

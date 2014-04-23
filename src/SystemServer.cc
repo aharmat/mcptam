@@ -46,6 +46,7 @@
 #include <mcptam/Map.h>
 #include <mcptam/Utility.h>
 #include <mcptam/Reset.h>
+#include <mcptam/LevelHelpers.h>
 #include <gvars3/instances.h>
 #include <std_srvs/Empty.h>
 
@@ -55,6 +56,7 @@ using namespace TooN;
 SystemServer::SystemServer()
 : SystemBase("mcptam_server", true, true)
 , mImageTransport(mNodeHandle)
+, mSync(ExactTimePolicy(5))
 { 
   // Register some commands with GVars, these commands will be triggered
   // by button presses and will result in GUICommandCallBack being called
@@ -84,12 +86,14 @@ SystemServer::SystemServer()
   GUI.ParseLine("GLWindow.AddMenu Menu Menu");
   GUI.ParseLine("Menu.ShowMenu Root");
   
+  GUI.ParseLine("DrawTrackerMeas=1");
   GUI.ParseLine("DrawCandidates=0");
   GUI.ParseLine("DrawLevel=0");
   
   // Main Menu
   GUI.ParseLine("Menu.AddMenuButton Root Reset Reset Root");
   GUI.ParseLine("Menu.AddMenuButton Root Init InitTracker Root");
+  GUI.ParseLine("Menu.AddMenuToggle Root \"LiveMeas\" DrawTrackerMeas Root");
   GUI.ParseLine("Menu.AddMenuButton Root \"Keyframes...\" \"\" View");
 
   // View Keyframes
@@ -110,8 +114,13 @@ SystemServer::SystemServer()
   
   mSystemInfoSub = mNodeHandle.subscribe("system_info", 1, &SystemServer::SystemInfoCallback, this);
   mTrackerStateSub = mNodeHandle.subscribe("tracker_state", 1, &SystemServer::TrackerStateCallback, this);
-  mTrackerSmallImageSub = mImageTransport.subscribe("tracker_small_image", 1, &SystemServer::TrackerSmallImageCallback, this);
+  //mTrackerSmallImageSub = mImageTransport.subscribe("tracker_small_image", 1, &SystemServer::TrackerSmallImageCallback, this);
   
+  mSmallImageSub.subscribe(mImageTransport, "tracker_small_image", 1); 
+  mSmallImagePointsSub.subscribe(mNodeHandle, "tracker_small_image_points", 1);
+  
+  mSync.connectInput(mSmallImageSub, mSmallImagePointsSub);
+  mSync.registerCallback(&SystemServer::TrackerSmallImageCallback, this);
   
   mpBundleAdjuster = new BundleAdjusterMulti(*mpMap, mmCameraModels);
   mpMapMakerServer = new MapMakerServer(*mpMap, mmCameraModels, *mpBundleAdjuster);
@@ -156,6 +165,8 @@ void SystemServer::Run()
     static gvar3<std::string> gvsCurrentSubMenu("Menu.CurrentSubMenu", "", HIDDEN|SILENT);
     bool bDrawKeyFrames = *gvsCurrentSubMenu == "View";
     
+    static gvar3<int> gvnDrawTrackerMeas("DrawTrackerMeas", 1, HIDDEN|SILENT);
+    
     std::stringstream captionStream;
     
     if(!bDrawKeyFrames)
@@ -168,6 +179,25 @@ void SystemServer::Run()
         
       glRasterPos(irOffset);  // Top left corner
       glDrawPixels(mTrackerSmallImage);
+      
+      if(*gvnDrawTrackerMeas)
+      {
+        glPointSize(4);
+        glEnable(GL_BLEND);
+        glEnable(GL_POINT_SMOOTH);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glBegin(GL_POINTS);
+        
+        for(unsigned i=0; i < mTrackerSmallImagePoints.points.size(); ++i)
+        {
+          pcl::PointXYZ& point = mTrackerSmallImagePoints.points[i];
+          CVD::glColor(gavLevelColors[(int)point.z]);
+          CVD::glVertex(CVD::vec(irOffset) + TooN::makeVector(point.x, point.y));
+        }
+        
+        glEnd();
+      }
+      
     }
     else
     {
@@ -199,6 +229,7 @@ void SystemServer::Run()
     
     captionStream<<"Frame Grab Success Ratio: "<<mdGrabSuccessRatio<<std::endl;
     captionStream<<"Frame Grab Dur: "<<mdFrameGrabDuration<<std::endl;
+    captionStream<<"Frame Delay Dur: "<<mdFrameDelayDuration<<std::endl;
     captionStream<<"Tracking Dur: "<<mdTrackingDuration<<std::endl;
     captionStream<<"FPS: "<<mdFPS<<std::endl;
     
@@ -301,27 +332,44 @@ void SystemServer::GUICommandHandler(std::string command, std::string params)
 }
 
 // Callback called when a new system info message received
-void SystemServer::SystemInfoCallback(const mcptam::SystemInfoConstPtr& info_msg)
+void SystemServer::SystemInfoCallback(const mcptam::SystemInfoConstPtr& infoMsg)
 {
-  mdFrameGrabDuration = info_msg->dFrameGrabDuration;
-  mdTrackingDuration = info_msg->dTrackingDuration;
-  mdFPS = info_msg->dFPS;
-  mdGrabSuccessRatio = info_msg->dGrabSuccessRatio;
-  //std::cout<<info_msg->message<<std::endl;
+  mdFrameGrabDuration = infoMsg->dFrameGrabDuration;
+  mdFrameDelayDuration = infoMsg->dFrameDelayDuration;
+  mdTrackingDuration = infoMsg->dTrackingDuration;
+  mdFPS = infoMsg->dFPS;
+  mdGrabSuccessRatio = infoMsg->dGrabSuccessRatio;
+  //std::cout<<infoMsg->message<<std::endl;
 }
 
 // Callback called when a new tracker state message received
-void SystemServer::TrackerStateCallback(const mcptam::TrackerStateConstPtr& state_msg)
+void SystemServer::TrackerStateCallback(const mcptam::TrackerStateConstPtr& stateMsg)
 {
   std::stringstream ss;
-  ss << state_msg->se3TrackerPose;
+  ss << stateMsg->se3TrackerPose;
   ss >> mse3TrackerPose;
-  mTrackingQuality = Tracker::TrackingQuality(state_msg->mTrackingQuality);
-  mbTrackerLost = state_msg->bLost;
+  mTrackingQuality = Tracker::TrackingQuality(stateMsg->mTrackingQuality);
+  mbTrackerLost = stateMsg->bLost;
 }
 
 // Callback called when a new small preview image is received
-void SystemServer::TrackerSmallImageCallback(const sensor_msgs::ImageConstPtr& image_msg)
+void SystemServer::TrackerSmallImageCallback(const sensor_msgs::ImageConstPtr& imageMsg, const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& pointMsg)
 {
-  util::MsgToImage(*image_msg, mTrackerSmallImage);
+  ROS_DEBUG("In TrackerSmallImageCallback!");
+  
+  cv_bridge::CvImageConstPtr cvPtr;
+  
+  try
+  {
+    // Try a conversion
+    cvPtr = cv_bridge::toCvShare(imageMsg);
+  }
+  catch (cv_bridge::Exception& e)
+  {
+    ROS_ERROR("TrackerSmallImageCallback: cv_bridge exception: %s", e.what());
+    return;
+  }
+  
+  util::ConversionRGB(cvPtr->image, mTrackerSmallImage);
+  mTrackerSmallImagePoints = *pointMsg;
 }

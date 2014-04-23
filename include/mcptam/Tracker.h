@@ -98,8 +98,10 @@ struct LevelsArray
 
 typedef LevelsArray<TrackerDataPtrVector> TDVLevels;
 typedef LevelsArray<int> IntLevels;
+typedef LevelsArray<std::vector<TooN::Vector<2> > > V2Levels;
 
 typedef std::map<std::string, IntLevels > IntLevelsMap;
+typedef std::map<std::string, V2Levels > V2LevelsMap;
 
 /** @brief Determines the pose of the system from stream of camera images
  * 
@@ -168,6 +170,12 @@ public:
    *  @param nLevel The pyramid level of the image to get
    *  @return The image from the camera */
   CVD::Image<CVD::byte> GetKeyFrameImage(std::string camName, unsigned nLevel);
+  
+  /** @brief Get the points corresponding to the measurements in a camera at a certain level
+   *  @param camName The name of the camera
+   *  @param nLevel The pyramid level to get measurements from
+   *  @return Vector of measurement points (IN LEVEL ZERO COORDINATES!) */
+  std::vector<TooN::Vector<2> > GetKeyFrameSimpleMeas(std::string camName, unsigned nLevel);
   
   /** @brief Get the current tracking quality metric
    *  @return The tracking quality */
@@ -298,6 +306,10 @@ protected:
    *  @param vIterationSets The set of ALL TrackerDatas collected, for all cameras */
   void RefreshSceneDepth(std::vector<TrackerDataPtrVector>& vIterationSets);
   
+  /** @brief Save a simplified copy of the measurements made during tracking. Can be retrieved with GetKeyFrameSimpleMeas,
+   *  used only for visualization */
+  void SaveSimpleMeasurements(std::vector<TrackerDataPtrVector>& vIterationSets);
+  
   // Functions used when adding a MultiKeyFrame to the Map
   /** @brief Create measurements of the MapPoints referenced in mvIterationSets, add them to the current KeyFrames
    * 
@@ -361,12 +373,6 @@ protected:
   /** @return The average rotation */
   TooN::Vector<3> FindAverageRotation(std::vector<TooN::Vector<3> >& vRots);
   
-  /// Send a message containing the base frame's pose and the tracking quality
-  void PublishState();
-  
-  /// Send a message containing a small thumbnail image of the first camera in the latest group to be processed
-  void PublishSmallImage();
-  
   // Drawing functions
   /// Draws the reference grid at z=0 as an overlay
   void RenderGrid(); 
@@ -403,6 +409,7 @@ protected:
   bool mbJustRecoveredSoUseCoarse;      ///< Always use coarse tracking after recovery!
 
   std::vector<TrackerDataPtrVector> mvIterationSets;   ///< Vector of TrackerData pointers, one for each camera, filled in TrackMap and used to calculate a new pose
+  V2LevelsMap mmSimpleMeas;                        ///< %Map of camera names to 2-vectors at LEVELS levels, holds the last measurements in simplified form (used for visualization only)
 
   // Frame-to-frame motion init:
   std::map<std::string, SmallBlurryImage*> mmpSBILastFrame;   ///< SmallBlurryImage of the last image processed, space for all the cameras but only first of each group used

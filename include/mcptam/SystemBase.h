@@ -121,6 +121,8 @@ protected:
   ImageRefMap mmDrawOffsets;        ///< %Map of drawing offset coordinates
   SE3Map mmPoses;                   ///< %Map of fixed relative camera poses
   
+  bool mbDone;              ///< Should I quit run loop?
+  
   std::queue<Command> mqCommands;   ///< Queued commands received by GUICommandCallBack
   ros::CallbackQueue mCallbackQueueROS;         ///< Custom callback queue so we can spin just for our own callbacks instead of a node-wide spin
 
