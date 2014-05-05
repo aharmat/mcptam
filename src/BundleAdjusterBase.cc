@@ -210,15 +210,18 @@ int BundleAdjusterBase::BundleAdjustRecent(std::vector<std::pair<KeyFrame*, MapP
   }
   
   // Now we find the set of features which they contain.
-  for(std::set<MultiKeyFrame*>::iterator iter = spAdjustSet.begin(); iter!=spAdjustSet.end(); iter++)
+  for(std::set<MultiKeyFrame*>::iterator mkf_it = spAdjustSet.begin(); mkf_it != spAdjustSet.end(); ++mkf_it)
   {
-    MultiKeyFrame& mkf = *(*iter);
-    for(KeyFramePtrMap::iterator it = mkf.mmpKeyFrames.begin(); it != mkf.mmpKeyFrames.end(); ++it)
+    MultiKeyFrame& mkf = *(*mkf_it);
+    for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
     {
-      MeasPtrMap& meas_map = it->second->mmpMeasurements;
-      for(MeasPtrMap::iterator jiter = meas_map.begin(); jiter!= meas_map.end(); ++jiter)
+      KeyFrame& kf = *(kf_it->second);
+      
+      boost::mutex::scoped_lock lock(kf.mMeasMutex);
+      
+      for(MeasPtrMap::iterator meas_it = kf.mmpMeasurements.begin(); meas_it!= kf.mmpMeasurements.end(); ++meas_it)
       {
-        MapPoint& point = *(jiter->first);
+        MapPoint& point = *(meas_it->first);
         
         if(point.mbBad)
           continue;
@@ -227,7 +230,6 @@ int BundleAdjusterBase::BundleAdjustRecent(std::vector<std::pair<KeyFrame*, MapP
           continue;
           
         spMapPoints.insert(&point);
-        
       }
     }
   }

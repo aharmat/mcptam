@@ -1,10 +1,17 @@
+Header header
 NetworkMapPoint[] mvPoints
 NetworkMultiKeyFrame[] mvMultiKeyFrames
+NetworkOutlier[] mvOutliers
+uint8 mState
+float64 mdMaxCov
+
 uint8 action
 uint8 ADD=1
 uint8 UPDATE=2
 uint8 DELETE=3
-uint8 INIT=4
-uint8 RESET=5
+uint8 OUTLIERS=4
+uint8 INIT=5
+uint8 RESET=6
+uint8 STATE=7
 ---
 # No response other than the true/false returned from the call

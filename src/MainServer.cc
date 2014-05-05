@@ -85,10 +85,6 @@ int main(int argc, char** argv)
   LoadStaticParamsGeneral();
   LoadStaticParamsServer();
   
-  
-  ROS_INFO("IMPORTANT: mcptam_server only works with \"stereo\" init point mode, ignoring value of mm_init_point_mode param!");
-  MapMakerServerBase::ssInitPointMode = "stereo";
-  
   try
   {
     SystemServer sys;

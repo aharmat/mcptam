@@ -49,7 +49,10 @@ MapMakerClient::MapMakerClient(Map &map)
 : MapMakerBase(map, false)
 , MapMakerClientBase(map)
  // The network manager needs to be bound to the appropriate callback functions
-, mNetworkManager(boost::bind(&MapMakerClient::AddCallback, this, _1, _2), boost::bind(&MapMakerClient::DeleteCallback, this, _1, _2), "Client")
+, mNetworkManager(boost::bind(&MapMakerClient::AddCallback, this, _1, _2), 
+                  boost::bind(&MapMakerClient::DeleteCallback, this, _1, _2), 
+                  boost::bind(&MapMakerClient::StateCallback, this, _1, _2), 
+                  "Client")
 {
   ROS_DEBUG("MapMakerClient: Starting constructor");
   ROS_DEBUG("MapMakerClient: Resetting");
@@ -86,13 +89,13 @@ void MapMakerClient::Reset()
   
   // not dealing with special initialization phase in client/server model right now
   // We have to set the state to running, otherwise the Tracker will try to feed us MKFs continuously
-  mState = MM_RUNNING; 
+  //mState = MM_RUNNING; 
 }
 
 // This executes in its own thread
 void MapMakerClient::run()
 {
-  ros::Rate loopRate(50); // 50 Hz
+  ros::Rate loopRate(500);
   ros::Rate publishRate(10);
   ros::Duration publishDur = publishRate.expectedCycleTime();
   ros::Time lastPublishTime = ros::Time::now();
@@ -116,7 +119,7 @@ void MapMakerClient::run()
     
     if(ResetRequested()) {Reset(); continue;}
     
-    while(TrackerQueueSize() > 0)
+    if(TrackerQueueSize() > 0)
       AddMultiKeyFrameFromTopOfQueue(); // Add MKF to map
       
     if(ResetRequested()) {Reset(); continue;}
@@ -208,6 +211,10 @@ void MapMakerClient::AddMultiKeyFrameFromTopOfQueue()
   for(KeyFramePtrMap::iterator it = pMKF->mmpKeyFrames.begin(); it != pMKF->mmpKeyFrames.end(); it++)
   {
     KeyFrame& kf = *(it->second);
+    
+    // In the interval between the Tracker recording the measurements and then releasing
+    // the point locks, and here, points might have been made bad. Check for bad points,
+    // remove measurements.
     for(MeasPtrMap::iterator iter = kf.mmpMeasurements.begin(); iter!=kf.mmpMeasurements.end();)
     {
       MapPoint& point = *(iter->first);
@@ -221,8 +228,24 @@ void MapMakerClient::AddMultiKeyFrameFromTopOfQueue()
       }
       
     }
+  
+    kf.MakeSBI();  // only needed for relocalizer
+  }
+  
+  // When initializing, we don't need to send or keep images for the 2nd MKF,
+  // so strip out images before sending/saving
+  if(mState == MM_INITIALIZING)
+  {
+    if(mMap.mlpMultiKeyFrames.size() > 0)
+      pMKF->RemoveImages();
     
-    kf.MakeKeyFrame_Rest();  // only needed for relocalizer's SBI, could just build that but whatever
+    if(mMap.mlpMultiKeyFrames.size() > 1)
+    {
+      // Get rid of MKF at back of map
+      //mNetworkManager.RemoveFromDictionary(mMap.mlpMultiKeyFrames.back());
+      mMap.mlpMultiKeyFrames.back()->mbDeleted = true;
+      mMap.MoveDeletedMultiKeyFramesToTrash();
+    }
   }
   
   mNetworkManager.SendAdd(pMKF);  // Send the new multikeyframe to the server
@@ -240,6 +263,8 @@ void MapMakerClient::HandleBadPoints()
   MarkOutliersAsBad();  // from MapMakerClientBase
   
   std::set<MapPoint*> spBadPoints = mMap.MoveBadPointsToTrash();  // the points that were trashed
+  
+  //ROS_INFO_STREAM("About to send "<<spBadPoints.size()<<" bad points to server");
   
   if(spBadPoints.size() > 0)
     mNetworkManager.SendDelete(spBadPoints);
@@ -282,4 +307,14 @@ void MapMakerClient::DeleteCallback(std::set<MultiKeyFrame*> spMultiKeyFrames, s
   
   mMap.MoveDeletedMultiKeyFramesToTrash();
   mMap.MoveDeletedPointsToTrash();
+}
+
+// Function that mNetworkManger calls when a "state" message from the server is processed
+void MapMakerClient::StateCallback(MapMakerBase::State state, double dMaxCov)
+{
+  if(mState == MM_JUST_FINISHED_INIT && state == MM_RUNNING)
+    ClearIncomingQueue();
+  
+  mState = state;
+  mdMaxCov = dMaxCov;
 }

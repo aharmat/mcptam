@@ -70,7 +70,7 @@ void MapMakerServer::Reset()
 {
   ROS_DEBUG("MapMakerServer: Reset");
   
-  mbInitialized = false;
+  mbInitializedByClient = false;
   
   MapMakerServerBase::Reset();
   MapMakerBase::Reset(); // resets the actual map
@@ -94,7 +94,7 @@ void MapMakerServer::ResetCallback()
 // This executes in its own thread
 void MapMakerServer::run()
 {
-  ros::Rate loopRate(50); // 50 Hz
+  ros::Rate loopRate(500);
   ros::Rate publishRate(10);
   ros::Duration publishDur = publishRate.expectedCycleTime();
   ros::Time lastPublishTime = ros::Time::now();
@@ -103,7 +103,7 @@ void MapMakerServer::run()
   {
     if(ResetRequested()) {Reset(); continue;}
     
-    if(!mbInitialized || !mMap.mbGood)  // Nothing to do if there is no map yet!
+    if(!mbInitializedByClient || !mMap.mbGood)  // Nothing to do if there is no map yet!
     {
       loopRate.sleep();
       continue;
@@ -129,8 +129,8 @@ void MapMakerServer::run()
       ROS_DEBUG("MapMakerServer: Bundle adjusting recent");
       std::vector<std::pair<KeyFrame*, MapPoint*> > vOutliers;
       
-      mBundleAdjuster.UseTukey(mMap.mlpMultiKeyFrames.size() > 4);
-      mBundleAdjuster.UseTwoStep(mMap.mlpMultiKeyFrames.size() > 4);
+      mBundleAdjuster.UseTukey((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2));
+      mBundleAdjuster.UseTwoStep((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2));
       
       int nAccepted = mBundleAdjuster.BundleAdjustRecent(vOutliers);  
       if(nAccepted < 0) // bad
@@ -142,10 +142,11 @@ void MapMakerServer::run()
           RequestResetInternal();
         }
       }
-      else
+      else if(nAccepted > 0)
       {
         mnNumConsecutiveFailedBA = 0;          
         HandleOutliers(vOutliers);
+        mNetworkManager.SendOutliers(vOutliers);
         PublishMapVisualization();
       }
     }
@@ -153,7 +154,7 @@ void MapMakerServer::run()
     if(ResetRequested()) {Reset(); continue;}
     
     // Are there any newly-made map points which need more measurements from older key-frames?
-    if(mBundleAdjuster.ConvergedRecent() && IncomingQueueSize() == 0)
+    if(mBundleAdjuster.ConvergedRecent() && IncomingQueueSize() == 0 && mState == MM_RUNNING)
     {
       ROS_DEBUG("MapMakerServer: ReFindNewlyMade");
       ReFindNewlyMade();  
@@ -167,10 +168,12 @@ void MapMakerServer::run()
       ROS_DEBUG("MapMakerServer: Bundle adjusting all");
       std::vector<std::pair<KeyFrame*, MapPoint*> > vOutliers;
       
-      mBundleAdjuster.UseTukey(mMap.mlpMultiKeyFrames.size() > 4);
-      mBundleAdjuster.UseTwoStep(mMap.mlpMultiKeyFrames.size() > 4);
+      mBundleAdjuster.UseTukey(mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2);
+      mBundleAdjuster.UseTwoStep((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2));
       
       int nAccepted = mBundleAdjuster.BundleAdjustAll(vOutliers);
+      mdMaxCov = mBundleAdjuster.GetMaxCov();
+      
       if(nAccepted < 0) // bad
       {
         mnNumConsecutiveFailedBA++;
@@ -180,11 +183,21 @@ void MapMakerServer::run()
           RequestResetInternal();
         }
       }
-      else
+      else if(nAccepted > 0)
       {
         mnNumConsecutiveFailedBA = 0;
         HandleOutliers(vOutliers);
+        mNetworkManager.SendOutliers(vOutliers);
         PublishMapVisualization();
+        
+        if(mState == MM_INITIALIZING && (mdMaxCov < MapMakerServerBase::sdInitCovThresh)) 
+        {
+          ROS_INFO_STREAM("INITIALIZING, Max cov "<<mdMaxCov<<" below threshold "<<MapMakerServerBase::sdInitCovThresh<<", switching to JUST_FINISHED_INIT");
+          mState = MM_JUST_FINISHED_INIT;
+          mNetworkManager.ClearIncomingQueue();  // get rid of any MKFs with no images that the client has already sent us    
+        }
+        
+        mNetworkManager.SendState(mState, mdMaxCov);
       }
     }
     
@@ -204,7 +217,7 @@ void MapMakerServer::run()
     if(ResetRequested()) {Reset(); continue;}
     
     // Any new key-frames to be added?
-    while(IncomingQueueSize() > 0)
+    if(IncomingQueueSize() > 0)
       mNetworkManager.HandleNextIncoming(); // Integrate into map data struct, and process
       
     if(ResetRequested()) {Reset(); continue;}
@@ -219,25 +232,33 @@ void MapMakerServer::HandleBadEntities()
   std::set<MapPoint*> spBadPoints = mMap.MoveBadPointsToTrash();
   std::set<MultiKeyFrame*> spBadMKFs = mMap.MoveBadMultiKeyFramesToTrash();
   
-  if(mbInitialized && (spBadPoints.size() > 0 || spBadMKFs.size() > 0))  // only do this if initialized because otherwise client might not have same data yet
+  if(mbInitializedByClient && (spBadPoints.size() > 0 || spBadMKFs.size() > 0))  // only do this if initialized because otherwise client might not have same data yet
   {
     ROS_DEBUG_STREAM("In HandleBadEntities, sending "<<spBadMKFs.size()<<" bad mkfs, "<<spBadPoints.size()<<" bad points");
     mNetworkManager.SendDelete(spBadMKFs, spBadPoints);
   }
+  
+  // MKFs are marked deleted on server side only during initialization. During this time, the 
+  // client is removing his own MKFs as well, so no need to send anything about deleting them.
+  mMap.MoveDeletedMultiKeyFramesToTrash();
   
   EraseBadEntitiesFromQueues();
   mMap.EmptyTrash(); 
 }
 
 // Send updates of certain MultiKeyFrames and MapPoints to the client
-void MapMakerServer::SendUpdate(std::set<MultiKeyFrame*>& spAdjustedFrames, std::set<MapPoint*>& spAdjustedPoints)
+void MapMakerServer::SendUpdate(std::set<MultiKeyFrame*> spAdjustedFrames, std::set<MapPoint*> spAdjustedPoints)
 {  
-  if(mbInitialized) // only do this if initialized because otherwise client might not have same data yet
+  if(mbInitializedByClient) // only do this if initialized because otherwise client might not have same data yet
   {
+    if(mState == MM_INITIALIZING || mState == MM_JUST_FINISHED_INIT)  // don't send updates for MKF since client will already have deleted it
+    {
+      spAdjustedFrames.clear();
+    }
+    
     ROS_DEBUG_STREAM("MapMakerServer: sending updates of "<<spAdjustedFrames.size()<<" MKFs and "<<spAdjustedPoints.size()<<" points");
     mNetworkManager.SendUpdate(spAdjustedFrames, spAdjustedPoints);
   }
-   
 }
 
 // Sends points to the client as an "add" message
@@ -255,7 +276,7 @@ void MapMakerServer::SendPoints(MapPointPtrList::iterator begin_it, MapPointPtrL
 // Function that mNetworkManager calls when an "init" message from the client is processed
 bool MapMakerServer::InitCallback(MultiKeyFrame* pMKF)
 {
-  if(mbInitialized)
+  if(mbInitializedByClient)
   {
     ROS_ERROR("MapMakerServer: Got initialize action but I'm already initialized, returning false");
     return false;
@@ -269,10 +290,10 @@ bool MapMakerServer::InitCallback(MultiKeyFrame* pMKF)
     return false;
   }
   
+  SendPoints(mMap.mlpPoints.begin(), mMap.mlpPoints.end());  // always send points before update
   mNetworkManager.SendUpdate(mMap.mlpMultiKeyFrames.front());
-  SendPoints(mMap.mlpPoints.begin(), mMap.mlpPoints.end());
   
-  mbInitialized = true;
+  mbInitializedByClient = true;
 
   return true;
 }
@@ -299,19 +320,59 @@ void MapMakerServer::AddCallback(std::set<MultiKeyFrame*> spMultiKeyFrames, std:
   }
   */
   
-  bool bSuccess = AddMultiKeyFrameAndCreatePoints(pMKF);  // from MapMakerServerBase, this will add points to map
-  
-  if(!bSuccess)
+  if(mState == MM_RUNNING)
   {
-    pMKF->EraseBackLinksFromPoints();
-    ROS_ERROR("Failed adding new points with mkf, sending back as delete");
-    mNetworkManager.SendDelete(pMKF);
-    delete pMKF;
+    ROS_INFO("MM_RUNNING: Trying to add MKF and create points");
+    bool bSuccess = AddMultiKeyFrameAndCreatePoints(pMKF);   // from MapMakerServerBase
+    if(!bSuccess)
+    {
+      pMKF->EraseBackLinksFromPoints();
+      ROS_ERROR("Failed adding new points with mkf, sending back as delete");
+      mNetworkManager.SendDelete(pMKF);
+      delete pMKF;
+    }
+    else
+    {
+      SendPoints(++prevOneBeforeEnd_it, mMap.mlpPoints.end());  // always send points before update
+      mNetworkManager.SendUpdate(mMap.mlpMultiKeyFrames.back());  // just to update the scene depth 
+    }
   }
-  else
+  else if(mState == MM_JUST_FINISHED_INIT)
   {
-    mNetworkManager.SendUpdate(mMap.mlpMultiKeyFrames.back());
-    SendPoints(++prevOneBeforeEnd_it, mMap.mlpPoints.end());
+    ROS_ASSERT(mMap.mlpMultiKeyFrames.size() <= 2);
+    
+    // some MKFs with no images might have snuck through in between clearing the network manager incoming queue
+    // and here, since it takes time to inform the client about the new map status and he might have already
+    // fired off an MKF or two. 
+    if(!pMKF->NoImages())  
+    {
+      ROS_INFO("MM_JUST_FINISHED_INIT: Trying to add MKF and mark last as bad, switching to running");
+      //mNetworkManager.RemoveFromDictionary(mMap.mlpMultiKeyFrames.back());
+      AddMultiKeyFrameAndMarkLastDeleted(pMKF, true);
+      mMap.MoveDeletedMultiKeyFramesToTrash();
+      
+      mState = MM_RUNNING;
+      mNetworkManager.SendState(mState, mdMaxCov);
+    }
+    else  // delete it, don't bother telling client since it will already have deleted it
+    {
+      ROS_INFO("MM_JUST_FINISHED_INIT: Got an MKF with no image, ignoring");
+      //mNetworkManager.RemoveFromDictionary(pMKF);
+      pMKF->EraseBackLinksFromPoints();
+      delete pMKF;
+    }
+  }
+  else  // INITIALIZING
+  {
+    ROS_INFO("MM_INITIALIZING: Trying to add MKF and mark last as bad");
+    /*
+    if(mMap.mlpMultiKeyFrames.size() > 1)
+    {
+      mNetworkManager.RemoveFromDictionary(mMap.mlpMultiKeyFrames.back());
+    }
+    */
+    AddMultiKeyFrameAndMarkLastDeleted(pMKF, false);
+    mMap.MoveDeletedMultiKeyFramesToTrash();
   }
 }
 

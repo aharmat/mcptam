@@ -168,6 +168,8 @@ bool MapMakerServerBase::InitFromMultiKeyFrame(MultiKeyFrame* pMKF, bool bPutPla
   int nLevelPointsLeft;
   static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN|SILENT);
   
+  ROS_INFO_STREAM("==== STARTING INIT POINT CREATION, MODE: "<<MapMakerServerBase::ssInitPointMode<<"  =========");
+  
   // Add points to the map using only the KeyFrames belonging to the last added MultiKeyFrame
   // In this case could set region to KF_ALL since there are no other MultiKeyFrames to begin with
   for(int l = 3; l >= 0; --l)
@@ -314,22 +316,23 @@ void MapMakerServerBase::MarkFurthestMultiKeyFrameAsBad(MultiKeyFrame& mkf)
 }
 
 // Add a new MultikeyFrame to the map, erase the one at the end of the map
-void MapMakerServerBase::AddMultiKeyFrameAndMarkLastBad(MultiKeyFrame *pMKF)
+void MapMakerServerBase::AddMultiKeyFrameAndMarkLastDeleted(MultiKeyFrame *pMKF, bool bMakeRest)
 {
-  pMKF->mbFixed = false;
-  
   if(mMap.mlpMultiKeyFrames.size() > 1)
   {
     MultiKeyFrame& mkf = *(mMap.mlpMultiKeyFrames.back());
-    mkf.mbBad = true;
+    mkf.mbDeleted = true;
   }
+ 
+  pMKF->mbFixed = false;
   
-  // Make a SmallBlurryImage of the keyframes: The relocaliser uses these.
-  // Needed since we're not calling MakeKeyFrame_Rest(), which usually handles this
+  // Make a SmallBlurryImage of the keyframes: The relocaliser uses these. 
+  // Alternatively make rest.
   for(KeyFramePtrMap::iterator it = pMKF->mmpKeyFrames.begin(); it != pMKF->mmpKeyFrames.end(); it++)
   {
     KeyFrame& kf = *(it->second);
-    kf.MakeSBI();
+    if(bMakeRest)
+      kf.MakeKeyFrame_Rest();
   }
     
   mMap.mlpMultiKeyFrames.push_back(pMKF);
@@ -494,6 +497,8 @@ void MapMakerServerBase::AddInitDepthMapPoints(MultiKeyFrame& mkfSrc, int nLevel
     
     int nLevelScale = LevelScale(nLevel);
     
+    std::cout<<"AddInitDepthMapPoints, processing "<<level.vCandidates.size()<<" candidates"<<std::endl;
+    
     for(unsigned int i = 0; i<level.vCandidates.size() && (int)i < nLimit; ++i)
     {
       Vector<2> v2RootPos = LevelZeroPos(level.vCandidates[i].irLevelPos, nLevel);
@@ -523,8 +528,9 @@ void MapMakerServerBase::AddInitDepthMapPoints(MultiKeyFrame& mkfSrc, int nLevel
       pMeas->nLevel = nLevel;
       pMeas->eSource = Measurement::SRC_ROOT;
       
-      kfSrc.mmpMeasurements[pPointNew] = pMeas;
-      pPointNew->mMMData.spMeasurementKFs.insert(&kfSrc);
+      kfSrc.AddMeasurement(pPointNew, pMeas);
+      //kfSrc.mmpMeasurements[pPointNew] = pMeas;
+      //pPointNew->mMMData.spMeasurementKFs.insert(&kfSrc);
     }
   }
 }
@@ -882,10 +888,14 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame &kfSrc, KeyFrame &kfTarget, i
   pMeasTarget->v2RootPos = v2SubPixPos;
   
   // Record map point and its measurement in the right places
-  kfSrc.mmpMeasurements[pPointNew] = pMeasSrc;
-  kfTarget.mmpMeasurements[pPointNew] = pMeasTarget;
-  pPointNew->mMMData.spMeasurementKFs.insert(&kfSrc);
-  pPointNew->mMMData.spMeasurementKFs.insert(&kfTarget);
+  kfSrc.AddMeasurement(pPointNew, pMeasSrc);
+  kfTarget.AddMeasurement(pPointNew, pMeasTarget);
+  
+  //kfSrc.mmpMeasurements[pPointNew] = pMeasSrc;
+  //kfTarget.mmpMeasurements[pPointNew] = pMeasTarget;
+  //pPointNew->mMMData.spMeasurementKFs.insert(&kfSrc);
+  //pPointNew->mMMData.spMeasurementKFs.insert(&kfTarget);
+  
   mMap.mlpPoints.push_back(pPointNew);
   mlpNewQueue.push_back(pPointNew);
   
@@ -974,8 +984,10 @@ bool MapMakerServerBase::ReFind_Common(KeyFrame &kf, MapPoint &point)
   if(kf.mmpMeasurements.count(&point))
     ROS_BREAK(); // This should never happen, we checked for this at the start.
   
-  kf.mmpMeasurements[&point] = pMeas;
-  point.mMMData.spMeasurementKFs.insert(&kf);
+  kf.AddMeasurement(&point, pMeas);
+  
+  //kf.mmpMeasurements[&point] = pMeas;
+  //point.mMMData.spMeasurementKFs.insert(&kf);
     
   return true;
 }
@@ -1177,6 +1189,7 @@ void MapMakerServerBase::HandleOutliers(std::vector<std::pair<KeyFrame*, MapPoin
 {
   std::set<MapPoint*> spBadPoints;
   std::set<MapPoint*> spFixedOutliers;
+  std::vector<std::pair<KeyFrame*, MapPoint*> > vOutliersRemoved;
   
   for(unsigned i=0; i < vOutliers.size(); ++i)
   {
@@ -1203,10 +1216,16 @@ void MapMakerServerBase::HandleOutliers(std::vector<std::pair<KeyFrame*, MapPoin
       else
         point.mMMData.spNeverRetryKFs.insert(&kf);
         
-      kf.EraseMeasurementOfPoint(&point);
-      assert(point.mMMData.spMeasurementKFs.erase(&kf));
+      kf.EraseMeasurementOfPoint(&point); 
+      int nErased = point.mMMData.spMeasurementKFs.erase(&kf);
+      ROS_ASSERT(nErased);
+      
+      if(meas.bTransferred)
+        vOutliersRemoved.push_back(vOutliers[i]);
     }
   }
+  
+  vOutliers.swap(vOutliersRemoved);
   
   ROS_INFO_STREAM("======== Number of outlier fixed points: "<<spFixedOutliers.size());
   

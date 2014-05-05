@@ -96,9 +96,6 @@ public:
    *  @param bPutPlaneAtOrigin If false, origin will be at location of first MKF, otherwise plane fitted to first set of points */
   virtual bool Init(MultiKeyFrame*& pMKF_Incoming, bool bPutPlaneAtOrigin);
   
-  /// Called when initialization phase has finished, cleans up last MKF
-  TooN::SE3<> FinishIDPInit();
-  
   /// Overridden from MapMakerClientBase, requests an abort from the bundle adjuster and sets flags that signal a reset is waiting
   virtual void RequestReset();
   

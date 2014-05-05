@@ -44,8 +44,9 @@
 #ifndef __NETWORK_MANAGER_H
 #define __NETWORK_MANAGER_H
 
-#include <mcptam/NetworkDictionary.h>
+#include <mcptam/Dictionary.h>
 #include <mcptam/ModifyMap.h>
+#include <mcptam/MapMakerBase.h>  // just for State enum
 #include <cvd/thread.h>
 #include <queue>
 #include <set>
@@ -56,6 +57,7 @@
 class KeyFrame;
 class MultiKeyFrame;
 class MapPoint;
+class Measurement;
 
 /** @brief Handles all communication between client and server. 
  * 
@@ -73,6 +75,7 @@ public:
   typedef boost::function<void (std::set<MultiKeyFrame*>, std::set<MapPoint*>)> AddCallbackType;
   typedef boost::function<void (std::set<MultiKeyFrame*>, std::set<MapPoint*>)> DeleteCallbackType;
   typedef boost::function<void()> ResetCallbackType;
+  typedef boost::function<void (MapMakerBase::State, double)> StateCallbackType;
 
   // Two constructors because the client will not receive an INIT or RESET request, so it
   // shouldn't have to provide callback functions for those
@@ -86,13 +89,14 @@ public:
    *  @param role A name for the calling code, used for debugging NetworkDictionary problems */
   NetworkManager(InitCallbackType init, AddCallbackType add, DeleteCallbackType del, ResetCallbackType res, std::string role);
   
-  /** @brief The version called by the client, without the INIT callback argument
+  /** @brief The version called by the client, without the INIT callback argument, but with a STATE callback argument
    * 
    * Calls the Initialize() function to connect to the other NetworkManager
    *  @param add A boost function that will be called for ADD messages
    *  @param del A boost function that will be called for DELETE messages
+   *  @param st  A boost function that will be called for STATE messages
    *  @param role A name for the calling code, used for debugging NetworkDictionary problems */
-  NetworkManager(AddCallbackType add, DeleteCallbackType del, std::string role);
+  NetworkManager(AddCallbackType add, DeleteCallbackType del, StateCallbackType st, std::string role);
   
   /// Stops the running thread
   ~NetworkManager();
@@ -164,6 +168,14 @@ public:
    *  @param spMKFs Pointers to the MultiKeyFrames to send
    *  @param spPoints Pointers to the MapPoints to send */
   void SendUpdate(std::set<MultiKeyFrame*> spMKFs, std::set<MapPoint*> spPoints);
+  
+  void SendOutliers(std::vector<std::pair<KeyFrame*, MapPoint*> >& vOutliers);
+  
+  void SendState(MapMakerBase::State state, double dMaxCov);
+  
+  void ClearIncomingQueue();
+  
+  //void RemoveFromDictionary(MultiKeyFrame* pMKF);
   
   
 protected:
@@ -274,8 +286,23 @@ protected:
    *  @param point_msg The message 
    *  @return Pointer the MapPoint that should be deleted */
   MapPoint* DeleteMsg_To_MapPoint(mcptam::NetworkMapPoint &point_msg);
+  
+  void OutliersMsg_ApplyTo_Affected(mcptam::NetworkOutlier& outlier_msg);
+  
+  void Outlier_To_OutlierMsg(std::pair<KeyFrame*, MapPoint*>& outlier, mcptam::NetworkOutlier& outlier_msg);
 
-  NetworkDictionary mDict;   ///< The NetworkDictionary
+  //NetworkDictionary mDict;   ///< The NetworkDictionary
+  Dictionary<MapPoint> mMapPointDict;            ///< The MapPoint Dictionary
+  Dictionary<MultiKeyFrame> mMultiKeyFrameDict;  ///< The MultiKeyFrame Dictionary
+  //Dictionary<Measurement> mMeasurementDict;      ///< The Measurement Dictionary, used only to keep track of which measurements have been sent
+  std::map<std::tuple<KeyFrame*, std::string, int>, std::tuple<int, Measurement*> > mmMeasDebugSentAdd;
+  std::map<std::tuple<KeyFrame*, std::string, int>, std::tuple<int, Measurement*> > mmMeasDebugReceivedAdd;
+  std::map<std::tuple<KeyFrame*, std::string, int>, std::tuple<int, Measurement*> > mmMeasDebugSentUpdate;
+  std::map<std::tuple<KeyFrame*, std::string, int>, std::tuple<int, Measurement*> > mmMeasDebugReceivedUpdate;
+  std::set<std::tuple<KeyFrame*, std::string, int> > msMeasDebugUnaccounted;
+  std::map<std::tuple<KeyFrame*, std::string, int>, int > mmMeasDebugAlreadyDeleted;
+  long int mnSeqSend, mnSeqReceived;
+  
   std::queue<mcptam::ModifyMap::Request*> mIncomingQueue;  ///< Incoming queue of messages
   std::queue<mcptam::ModifyMap::Request*> mOutgoingQueue;  ///< Outgoing queue of messages
   
@@ -284,6 +311,7 @@ protected:
   AddCallbackType mAddCallbackWrapper;             ///< Boost function to call when processing ADD message
   DeleteCallbackType mDeleteCallbackWrapper;       ///< Boost function to call when processing DELETE message
   ResetCallbackType mResetCallbackWrapper;
+  StateCallbackType mStateCallbackWrapper;
   
   ros::NodeHandle mNodeHandle;             ///< Global node handle
   ros::NodeHandle mNodeHandlePriv;         ///< Private namespace node handle

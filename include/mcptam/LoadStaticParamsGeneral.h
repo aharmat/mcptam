@@ -48,6 +48,7 @@
 #include <mcptam/KeyFrame.h>
 #include <mcptam/SmallBlurryImage.h>
 #include <mcptam/PatchFinder.h>
+#include <mcptam/CameraGroupSubscriber.h>
 #include <ros/ros.h>
 
 /// Load static parameters from the ROS parameter server for the client and server modules
@@ -63,6 +64,12 @@ void LoadStaticParamsGeneral()
   nh_priv.getParam("sbi_height", SmallBlurryImage::sirSize.y);
   
   nh_priv.getParam("finder_max_ssd_per_pixel", PatchFinder::snMaxSSDPerPixel);
+  
+  nh_priv.getParam("image_topic", CameraGroupSubscriber::sImageTopic);
+  nh_priv.getParam("info_topic", CameraGroupSubscriber::sInfoTopic);
+  nh_priv.getParam("pose_topic", CameraGroupSubscriber::sPoseTopic);
+  nh_priv.getParam("camera_prefix", CameraGroupSubscriber::sCameraPrefix);
+  nh_priv.getParam("dynamic_sync", CameraGroupSubscriber::sbDynamicSync);
 }
 
 

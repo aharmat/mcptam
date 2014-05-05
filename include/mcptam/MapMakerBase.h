@@ -89,8 +89,9 @@ public:
   /** @brief Used to indicate the status of the map maker
    *
    * INITIALIZING: Initialization phase
+   * JUST_FINISHED_INIT: Just finished initialization
    * RUNNING: Normal running phase */   
-  enum State{MM_INITIALIZING, MM_RUNNING} mState;
+  enum State{MM_INITIALIZING, MM_JUST_FINISHED_INIT, MM_RUNNING} mState;
 
   /** @brief Need to call constructor with Map as argument
    *  @param map The Map being worked on 

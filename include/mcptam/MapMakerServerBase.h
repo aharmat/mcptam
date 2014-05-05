@@ -194,7 +194,7 @@ protected:
   bool AddMultiKeyFrameAndCreatePoints(MultiKeyFrame *pMKF);
   
   /// Add a new MultikeyFrame to the map, erase the one at the end of the map.
-  void AddMultiKeyFrameAndMarkLastBad(MultiKeyFrame *pMKF);
+  void AddMultiKeyFrameAndMarkLastDeleted(MultiKeyFrame *pMKF, bool bMakeRest);
   
   /// Mark the MKF which is furthest from the given one as bad and erase it
   void MarkFurthestMultiKeyFrameAsBad(MultiKeyFrame& mkf);

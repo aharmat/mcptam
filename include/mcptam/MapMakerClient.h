@@ -125,6 +125,8 @@ protected:
    *  @param spPoints The points that will get deleted */
   void DeleteCallback(std::set<MultiKeyFrame*> spMultiKeyFrames, std::set<MapPoint*> spPoints);
   
+  void StateCallback(MapMakerBase::State state, double dMaxCov);
+  
   NetworkManager mNetworkManager;   ///< The network manager, handles all data transactions with the server
 };
 

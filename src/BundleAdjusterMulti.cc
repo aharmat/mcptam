@@ -190,6 +190,7 @@ int BundleAdjusterMulti::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std:
           continue;
           
         Measurement& meas = *(meas_it->second);
+        
         int nPoint_BundleID = mmPoint_BundleID[&point];
         
         multiBundle.AddMeas(vCams, nPoint_BundleID, meas.v2RootPos, LevelScale(meas.nLevel) * LevelScale(meas.nLevel), camName);

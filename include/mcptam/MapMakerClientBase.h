@@ -175,6 +175,9 @@ protected:
    *
    * @param mkf The MultiKeyFrame to find the closest MKF in the queue to */
   MultiKeyFrame* ClosestMultiKeyFrameInQueue(MultiKeyFrame &mkf);
+  
+  /// Called when initialization phase has finished, clears incoming queue
+  void ClearIncomingQueue();
    
   std::deque<MultiKeyFrame*> mqpMultiKeyFramesFromTracker;  ///< Queue of MultiKeyFrames from the tracker waiting to be processed
   boost::mutex mQueueMutex;     ///< Mutex to protect the MKF queue

@@ -89,7 +89,7 @@ void MapMakerClientBase::MarkOutliersAsBad()
   
   if(nMarkedBad > 0)
   {
-    ROS_DEBUG_STREAM("======== Handle outlier based on tracker marked "<<nMarkedBad<<" points as bad");
+    ROS_INFO_STREAM("======== Handle outlier based on tracker marked "<<nMarkedBad<<" points as bad");
   }
 }
 
@@ -116,7 +116,7 @@ bool MapMakerClientBase::NeedNewMultiKeyFrame(MultiKeyFrame &mkf)
     return false;
   }
     
-  if(mState == MM_INITIALIZING)  // always need the new MKF when initializing
+  if(mState == MM_INITIALIZING || mState == MM_JUST_FINISHED_INIT)  // always need the new MKF when initializing or just finished
   {
     ROS_DEBUG("NeedNewMultiKeyFrame: initializing, returning true");
     return true;
@@ -278,5 +278,21 @@ MultiKeyFrame* MapMakerClientBase::ClosestMultiKeyFrameInQueue(MultiKeyFrame &mk
   }
 
   return pClosestMKF;
+}
+
+void MapMakerClientBase::ClearIncomingQueue()
+{
+  // Clear out anything in the incoming queue, since there might be a bunch
+  // of MKFs piled in there waiting to be added to the map. But since we're
+  // done initializing, we don't want to keep these really closely spaced MKFs
+
+  boost::mutex::scoped_lock lock(mQueueMutex);
+  while(mqpMultiKeyFramesFromTracker.size() > 0)
+  {
+    MultiKeyFrame* pMKF = mqpMultiKeyFramesFromTracker.front();
+    pMKF->EraseBackLinksFromPoints();
+    delete pMKF;
+    mqpMultiKeyFramesFromTracker.pop_front();
+  }
 }
 

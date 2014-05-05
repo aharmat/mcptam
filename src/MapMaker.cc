@@ -125,7 +125,7 @@ void MapMaker::Reset()
 
 void MapMaker::run()
 {
-  ros::WallRate loopRate(50); // 50 Hz
+  ros::WallRate loopRate(500);
   ros::Rate publishRate(10);
   ros::Duration publishDur = publishRate.expectedCycleTime();
   ros::Time lastPublishTime = ros::Time::now();
@@ -179,6 +179,8 @@ void MapMaker::run()
     if(!mMap.mbGood){ continue; }  
     
     // Should we run local bundle adjustment?
+    // Need to do this even if initializing just so the converged recent flag gets set to true, 
+    // even though no optimization will take place since the map is too small
     if(!mBundleAdjuster.ConvergedRecent() && IncomingQueueSize() == 0)  
     {
       ROS_INFO("MapMaker: Bundle adjusting recent");
@@ -188,11 +190,11 @@ void MapMaker::run()
       mBundleAdjuster.UseTwoStep((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2));
       
       int nAccepted = mBundleAdjuster.BundleAdjustRecent(vOutliers);
-      mdMaxCov = mBundleAdjuster.GetMaxCov();
+      //mdMaxCov = mBundleAdjuster.GetMaxCov();
       
       ROS_DEBUG_STREAM("Accepted iterations: "<<nAccepted);
       ROS_DEBUG_STREAM("Number of outliers: "<<vOutliers.size());
-      ROS_DEBUG_STREAM("Max cov: "<<mdMaxCov);
+      //ROS_DEBUG_STREAM("Max cov: "<<mdMaxCov);
       
       if(nAccepted < 0) // bad
       {
@@ -203,7 +205,7 @@ void MapMaker::run()
           RequestResetInternal();
         }
       }
-      else
+      else if(nAccepted > 0)
       {
         mnNumConsecutiveFailedBA = 0;
         HandleOutliers(vOutliers);
@@ -247,7 +249,7 @@ void MapMaker::run()
           RequestResetInternal();
         }
       }
-      else
+      else if(nAccepted > 0)
       {
         mnNumConsecutiveFailedBA = 0;
         HandleOutliers(vOutliers);
@@ -255,10 +257,9 @@ void MapMaker::run()
         
         if(mState == MM_INITIALIZING && (mdMaxCov < MapMakerServerBase::sdInitCovThresh || mbStopInit)) 
         {
-          ROS_INFO_STREAM("INITIALIZING, Max cov "<<mdMaxCov<<" below threshold "<<MapMakerServerBase::sdInitCovThresh<<", switching to RUNNING");
-          mState = MM_RUNNING;
+          ROS_INFO_STREAM("INITIALIZING, Max cov "<<mdMaxCov<<" below threshold "<<MapMakerServerBase::sdInitCovThresh<<", switching to JUST_FINISHED_INIT");
+          mState = MM_JUST_FINISHED_INIT;
           mbStopInit = false;
-          FinishIDPInit();      
         }
       }
     }
@@ -345,56 +346,41 @@ bool MapMaker::Init(MultiKeyFrame*& pMKF_Incoming, bool bPutPlaneAtOrigin)
   return InitFromMultiKeyFrame(pMKF, bPutPlaneAtOrigin);  // from MapMakerServerBase
 }
 
-TooN::SE3<> MapMaker::FinishIDPInit()
-{
-  MultiKeyFrame* pMKF = mMap.mlpMultiKeyFrames.back();
-  for(KeyFramePtrMap::iterator kf_it = pMKF->mmpKeyFrames.begin(); kf_it != pMKF->mmpKeyFrames.end(); kf_it++)
-  {
-    KeyFrame& kf = *(kf_it->second);
-    
-    if(kf.mpSBI)
-    {
-      delete kf.mpSBI; // Mapmaker uses a different SBI than the tracker, so will re-gen its own
-      kf.mpSBI = NULL;
-    }
-    
-    kf.MakeKeyFrame_Rest();
-  }
-  /*
-  if(mbPutPlaneAtOrigin)
-  {
-    ApplyGlobalTransformationToMap(CalcPlaneAligner());
-  }
-  */
-  
-  // Clear out anything in the incoming queue, since there might be a bunch
-  // of MKFs piled in there waiting to be added to the map. But since we're
-  // done initializing, we don't want to keep these really closely spaced MKFs
-
-  boost::mutex::scoped_lock lock(mQueueMutex);
-  while(mqpMultiKeyFramesFromTracker.size() > 0)
-  {
-    MultiKeyFrame* pMKF = mqpMultiKeyFramesFromTracker.front();
-    pMKF->EraseBackLinksFromPoints();
-    //pMKF->ClearMeasurements();
-    delete pMKF;
-    mqpMultiKeyFramesFromTracker.pop_front();
-  }
-  
-  return pMKF->mse3BaseFromWorld;
-}
-
 // Add a MultiKeyFrame from the internal queue to the map
 void MapMaker::AddMultiKeyFrameFromTopOfQueue()
 {
-  ROS_DEBUG("Adding MKF from top of queue");
+  ROS_INFO("Adding MKF from top of queue");
   boost::mutex::scoped_lock lock(mQueueMutex);
   
   if(mqpMultiKeyFramesFromTracker.size() == 0)
     return;
   
   MultiKeyFrame *pMKF = mqpMultiKeyFramesFromTracker.front();
-  lock.unlock();
+  mqpMultiKeyFramesFromTracker.pop_front(); 
+  lock.unlock();  // important!!
+  
+  for(KeyFramePtrMap::iterator it = pMKF->mmpKeyFrames.begin(); it != pMKF->mmpKeyFrames.end(); it++)
+  {
+    KeyFrame& kf = *(it->second);
+    
+    // In the interval between the Tracker recording the measurements and then releasing
+    // the point locks, and here, points might have been made bad. Check for bad points,
+    // remove measurements.
+    for(MeasPtrMap::iterator iter = kf.mmpMeasurements.begin(); iter!=kf.mmpMeasurements.end();)
+    {
+      MapPoint& point = *(iter->first);
+      ++iter; // advance iterator so if erasure needed it will not be invalidated
+      
+      if(point.mbBad)  // Point is bad, possibly sitting in trash, so remove measurement now
+      {
+        kf.EraseMeasurementOfPoint(&point);
+        int nErased = point.mMMData.spMeasurementKFs.erase(&kf);
+        ROS_ASSERT(nErased);
+      }
+    }
+    
+    kf.MakeSBI();  // only needed for relocalizer
+  }
   
 /*
   // Placing a limit on the number of MKFs in the map
@@ -408,7 +394,7 @@ void MapMaker::AddMultiKeyFrameFromTopOfQueue()
   
   if(mState == MM_RUNNING)
   {
-    ROS_DEBUG("Trying to add MKF and create points");
+    ROS_INFO("MM_RUNNING: Trying to add MKF and create points");
     bool bSuccess = AddMultiKeyFrameAndCreatePoints(pMKF);   // from MapMakerServerBase
     if(!bSuccess)
     {
@@ -416,15 +402,26 @@ void MapMaker::AddMultiKeyFrameFromTopOfQueue()
       delete pMKF;
     }
   }
+  else if(mState == MM_JUST_FINISHED_INIT)
+  {
+    ROS_INFO("MM_JUST_FINISHED_INIT: Trying to add MKF and mark last as bad, switching to running");
+    AddMultiKeyFrameAndMarkLastDeleted(pMKF, true);
+    mMap.MoveDeletedMultiKeyFramesToTrash();
+    
+    mState = MM_RUNNING;
+    
+    ClearIncomingQueue();
+  }
   else  // INITIALIZING
   {
-    ROS_DEBUG("Trying to add MKF and mark last as bad");
-    AddMultiKeyFrameAndMarkLastBad(pMKF);
+    // Simulate effect of removing images on client side
+    pMKF->RemoveImages();
+    
+    ROS_INFO("MM_INITIALIZING: Trying to add MKF and mark last as bad");
+    AddMultiKeyFrameAndMarkLastDeleted(pMKF, false);
+    mMap.MoveDeletedMultiKeyFramesToTrash();
   }
-  
-  lock.lock();
-  mqpMultiKeyFramesFromTracker.pop_front(); 
-  lock.unlock();
+
 }
 
 // Deletes bad points and removes pointers to them from internal queues.
@@ -432,14 +429,15 @@ void MapMaker::HandleBadEntities()
 {
   ROS_DEBUG_STREAM("HandleBadEntities: Before move to trash we have "<<mMap.mlpPoints.size()<<" map points, and "<<mMap.mlpMultiKeyFrames.size()<<" MKFs");
   mMap.MoveBadMultiKeyFramesToTrash();
+  mMap.MoveDeletedMultiKeyFramesToTrash();
   
   MarkDanglersAsBad();
   MarkOutliersAsBad();
   
   mMap.MoveBadPointsToTrash();
+  mMap.MoveDeletedPointsToTrash();
   ROS_DEBUG_STREAM("HandleBadEntities: After move to trash we have "<<mMap.mlpPoints.size()<<" map points, and "<<mMap.mlpMultiKeyFrames.size()<<" MKFs");
   
   EraseBadEntitiesFromQueues();
   mMap.EmptyTrash(); 
-    
 }

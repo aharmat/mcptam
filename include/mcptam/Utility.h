@@ -45,6 +45,8 @@
 
 #include <cvd/image.h>
 #include <cvd/rgb.h>
+#include <opencv2/highgui/highgui.hpp>
+//#include <cvd/image_io.h>
 #include <opencv2/core/core.hpp>
 #include <TooN/TooN.h>
 #include <TooN/se3.h>
@@ -52,6 +54,7 @@
 #include <geometry_msgs/Pose.h>
 #include <sensor_msgs/Image.h>
 #include <ros/assert.h>
+#include <boost/interprocess/streams/vectorstream.hpp>
 
 // Don't pollute the global namespace
 namespace util{
@@ -262,20 +265,79 @@ inline void ImageToMsg(const CVD::SubImage<CVD::byte>& image, sensor_msgs::Image
   memcpy(&image_msg.data[0], pImage, nTotalSize);
 }
 
+inline void ImageToMsg(CVD::Image<CVD::byte>& image, int nJPEGQuality, sensor_msgs::Image& image_msg)
+{
+  CVD::ImageRef size = image.size();
+  
+  image_msg.width = size.x;
+  image_msg.height = size.y;
+  image_msg.encoding = "jpeg";
+  
+  // Not sure if this works properly, haven't tested it on a bigendian system
+#ifdef __BYTE_ORDER
+  #if __BYTE_ORDER == __BIG_ENDIAN
+    image_msg.is_bigendian = 1;
+  #endif
+#endif
+
+  if(image.totalsize() > 0)
+  {
+    cv::Mat imageWrapped(image.size().y, image.size().x, CV_8U, image.data(), image.row_stride());
+    std::vector<int> vParams;
+    vParams.push_back(CV_IMWRITE_JPEG_QUALITY);
+    vParams.push_back(nJPEGQuality); 
+    cv::imencode(".jpg", imageWrapped, image_msg.data, vParams);
+  }
+
+/*
+  boost::interprocess::basic_vectorstream<std::vector<char> > jpegStream;
+  std::map<std::string, CVD::Parameter<> > param;
+	param["jpeg.quality"] = CVD::Parameter<int>(nJPEGQuality);
+  CVD::img_save<CVD::byte>(image, jpegStream, CVD::ImageType::JPEG, param);
+
+  //jpegStream.swap_vector(reinterpret_cast<std::vector<char>&>(image_msg.data));
+  image_msg.data.assign(jpegStream.vector().begin(), jpegStream.vector().end());
+  */
+}
+/*
+struct wrap_vector_as_istream : std::streambuf
+{
+    wrap_vector_as_istream(std::vector<unsigned char> & vec ) {
+        this->setg(&vec[0], &vec[0], &vec[0]+vec.size() );
+    }
+};
+*/
 /** @brief Converts a sensor_msgs::Image message to a CVD::byte image
  *  @param image_msg The input message
  *  @param [out] image The image to fill */
-inline void MsgToImage(const sensor_msgs::Image& image_msg, CVD::Image<CVD::byte>& image)
+inline void MsgToImage(sensor_msgs::Image& image_msg, CVD::Image<CVD::byte>& image)
 {
   if(image_msg.width == 0 || image_msg.height == 0)
     return;
   
   image.resize(CVD::ImageRef(image_msg.width, image_msg.height));
-  CVD::byte* pImage = image.data();
-  int nTotalSize = image.totalsize();
-      
-  // Copy data directly into image
-  memcpy(pImage, &image_msg.data[0], nTotalSize);
+  
+  if(image_msg.encoding == "jpeg")
+  {
+    cv::Mat imageWrapped(image.size().y, image.size().x, CV_8U, image.data(), image.row_stride());
+    cv::imdecode(image_msg.data, 0, &imageWrapped);
+    
+    /*
+    //boost::interprocess::basic_bufferstream<unsigned char> input_stream(&image_msg.data[0], image_msg.data.size());
+    boost::interprocess::basic_vectorstream<std::vector<char> > jpegStream;
+    jpegStream.swap_vector(reinterpret_cast<std::vector<char>&>(image_msg.data));
+    //CVD::img_load<CVD::byte>(image, wrap_vector_as_istream(image_msg.data));
+    CVD::img_load<CVD::byte>(image, jpegStream);
+    */
+  }
+  else
+  {
+    CVD::byte* pImage = image.data();
+    int nTotalSize = image.totalsize();
+        
+    // Copy data directly into image
+    memcpy(pImage, &image_msg.data[0], nTotalSize);
+  }
 }
 
 inline void InvertMask(CVD::SubImage<CVD::byte>& mask)

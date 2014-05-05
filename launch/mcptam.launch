@@ -9,7 +9,7 @@
   <remap from="reset" to="mcptam/reset" />
   <param name="image_transport" type="string" value="compressed"/>
   
-  <param name="get_pose_separately" type="bool" value="false" />   
+  <param name="get_pose_separately" type="bool" value="true" />   
   <param name="dynamic_sync" type="bool" value="true" />
   <!--
   <param name="camera_pose_file" type="string" value="$(find mcptam)/poses/poses.dat" />
@@ -20,7 +20,7 @@
   <param name="masks_dir" type="string" value="$(find mcptam)/masks" />
   -->
 
-  <param name="mm_init_point_mode" type="string" value="stereo" />
+  <param name="mm_init_point_mode" type="string" value="idp" />
 
   <param name="kf_distance_mean_diff_fraction" type="double" value="0.5" /> 
   <param name="mm_max_scaled_mkf_dist" type="double" value="0.3" />

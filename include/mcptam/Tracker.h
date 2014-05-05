@@ -212,6 +212,7 @@ public:
   static double sdTrackingQualityGood; ///< If fraction of potentially visible points actually founds exceeds this, tracking quality is good
   static double sdTrackingQualityBad; ///< If fraction of potentially visible points actually founds is below this, tracking quality is bad
   static int snLostFrameThresh;       ///< Cap the number of frames where tracker is lost
+  static bool sbCollectAllPoints;  ///< Should we project the whole map or do something smarter? (affects CollectNearestPoints)
   
 protected:
   

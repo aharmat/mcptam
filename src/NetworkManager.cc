@@ -40,8 +40,39 @@
 #include <mcptam/Utility.h>
 #include <boost/thread/thread.hpp>
 
+void printNetworkOutlier(mcptam::NetworkOutlier& outlier_msg, KeyFrame* pKF, MapPoint* pPoint, int nSeq, std::string action="")
+{
+  std::cerr<<"("<<nSeq<<") "<<outlier_msg.mMKFId<<"::"<<outlier_msg.mCamName<<" ["<<pKF<<"] <==> "<<outlier_msg.mapPointId<<" ["<<pPoint<<"]  "<<action<<std::endl;
+}
+
+void printNetworkMeasurement(mcptam::NetworkMeasurement& meas_msg, std::string cameraName, std::string mkfParentId, int nSeq)
+{
+  std::cerr<<"("<<nSeq<<") "<<mkfParentId<<"::"<<cameraName<<" <==> "<<meas_msg.mapPointId<<" level: "<<(int)meas_msg.nLevel;
+  std::cerr<< " v2RootPos: ["<<meas_msg.v2RootPos[0]<<", "<<meas_msg.v2RootPos[1] <<"] source: "<<(int) meas_msg.eSource<<std::endl; 
+}
+
+void printNetworkMeasurement(mcptam::NetworkMeasurement& meas_msg, KeyFrame* pKF, MapPoint* pPoint, int nSeq)
+{
+  std::cerr<<"("<<nSeq<<") "<<pKF<<" <==> "<<pPoint<<" level: "<<(int)meas_msg.nLevel;
+  std::cerr<< " v2RootPos: ["<<meas_msg.v2RootPos[0]<<", "<<meas_msg.v2RootPos[1] <<"] source: "<<(int) meas_msg.eSource<<std::endl; 
+}
+
+void printNetworkMeasurement(mcptam::NetworkMeasurement& meas_msg, std::string mkfParentId, KeyFrame* pKF, MapPoint* pPoint, int nSeq)
+{
+  std::cerr<<"("<<nSeq<<") "<<mkfParentId<<"::"<<pKF->mCamName<<" ["<<pKF<<"] <==> "<<meas_msg.mapPointId<<" ["<<pPoint<<"] level: "<<(int)meas_msg.nLevel;
+  std::cerr<< " v2RootPos: ["<<meas_msg.v2RootPos[0]<<", "<<meas_msg.v2RootPos[1] <<"] source: "<<(int) meas_msg.eSource<<std::endl; 
+}
+
+void printNetworkMapPoint(mcptam::NetworkMapPoint& point_msg, MapPoint* pPoint, int nSeq, std::string action="")
+{
+  std::cerr<<"("<<nSeq<<") "<<point_msg.mId<<" ["<<pPoint<<"] "<<action<<std::endl;
+}
+
 NetworkManager::NetworkManager(InitCallbackType init, AddCallbackType add, DeleteCallbackType del, ResetCallbackType res, std::string role)
-: mInitCallbackWrapper(init)
+: mMapPointDict("MP")
+, mMultiKeyFrameDict("MKF") 
+//, mMeasurementDict("MEAS")
+, mInitCallbackWrapper(init)
 , mAddCallbackWrapper(add)
 , mDeleteCallbackWrapper(del)
 , mResetCallbackWrapper(res)
@@ -51,9 +82,13 @@ NetworkManager::NetworkManager(InitCallbackType init, AddCallbackType add, Delet
   Initialize();
 }
 
-NetworkManager::NetworkManager(AddCallbackType add, DeleteCallbackType del, std::string role)
-: mAddCallbackWrapper(add)
+NetworkManager::NetworkManager(AddCallbackType add, DeleteCallbackType del, StateCallbackType st, std::string role)
+: mMapPointDict("MP")
+, mMultiKeyFrameDict("MKF") 
+//, mMeasurementDict("MEAS")
+, mAddCallbackWrapper(add)
 , mDeleteCallbackWrapper(del)
+, mStateCallbackWrapper(st)
 , mNodeHandlePriv("~")
 {
   mRole = role;
@@ -74,6 +109,8 @@ void NetworkManager::Initialize()
   {
 		ROS_WARN_STREAM("NetworkManager: Waiting for modify_map service to be advertised...");
 	}
+  
+  mnSeqSend = 1;
   
   start();
 }
@@ -146,7 +183,17 @@ void NetworkManager::Reset()
     mOutgoingQueue.pop();
   }
   
-  mDict.Clear();
+  mMultiKeyFrameDict.Clear();
+  mMapPointDict.Clear();
+}
+
+void NetworkManager::ClearIncomingQueue()
+{
+  while(!mIncomingQueue.empty())
+  {
+    delete mIncomingQueue.front();
+    mIncomingQueue.pop();
+  }
 }
 
 // The callback called by the ROS service server when a new message is received
@@ -154,6 +201,8 @@ bool NetworkManager::ModifyMapCallback(mcptam::ModifyMap::Request &request, mcpt
 {
   if(request.action == request.INIT)  // Don't push to incoming queue, call callback immediately
   {
+    mnSeqReceived = request.header.seq;
+    
     MultiKeyFrame* pMKF = AddMsg_To_MultiKeyFrame(request.mvMultiKeyFrames[0]);
     
     if(mInitCallbackWrapper.empty())  // No init callback given!
@@ -209,6 +258,15 @@ void NetworkManager::HandleNextOutgoing()
   mcptam::ModifyMap::Request* pReq = mOutgoingQueue.front();
   mOutgoingQueue.pop();
   
+  ROS_INFO_STREAM("Calling request with stamp: "<<pReq->header.stamp<<" seq: "<<pReq->header.seq);
+  
+  if(pReq->action == pReq->DELETE)
+  {
+    ROS_INFO("NetworkManager: sending DELETE message"); 
+    std::cout<<"Sending "<<pReq->mvMultiKeyFrames.size()<<" MKFs to delete"<<std::endl;
+    std::cout<<"Sending "<<pReq->mvPoints.size()<<" Points to delete"<<std::endl;
+  }
+  
   // Very simple method for dealing with a failed service call: keep trying
   // until it succeeds
   while(!mModifyMapClient.call(*pReq, res) && ros::ok())
@@ -232,6 +290,10 @@ void NetworkManager::HandleNextIncoming()
   mcptam::ModifyMap::Request* pReq = mIncomingQueue.front();
   mIncomingQueue.pop();
   
+  mnSeqReceived = pReq->header.seq;
+  
+  ROS_INFO_STREAM("Got request with stamp: "<<pReq->header.stamp<<" seq: "<<pReq->header.seq);
+  
   // Don't have to check for INIT since they don't get pushed to the queue
   
   if(pReq->action == pReq->ADD)
@@ -244,6 +306,7 @@ void NetworkManager::HandleNextIncoming()
     for(unsigned i=0; i < pReq->mvMultiKeyFrames.size(); ++i)
       spMKFs.insert( AddMsg_To_MultiKeyFrame(pReq->mvMultiKeyFrames[i]) );
       
+    std::cerr<<"---- RECEIVING ADD MESSAGE ----"<<std::endl;
     for(unsigned i=0; i < pReq->mvPoints.size(); ++i)
       spPoints.insert( AddMsg_To_MapPoint(pReq->mvPoints[i]) );  
     
@@ -251,7 +314,7 @@ void NetworkManager::HandleNextIncoming()
   }
   else if(pReq->action == pReq->DELETE)
   {
-    ROS_DEBUG("NetworkManager: Processing DELETE message");
+    ROS_INFO("NetworkManager: Processing DELETE message");
     
     std::set<MultiKeyFrame*> spMultiKeyFrames;
     for(unsigned i=0; i < pReq->mvMultiKeyFrames.size(); ++i)
@@ -261,6 +324,8 @@ void NetworkManager::HandleNextIncoming()
       spMultiKeyFrames.insert(pMKF);  
     }
     
+    std::cout<<"Got "<<spMultiKeyFrames.size()<<" MKFs to delete"<<std::endl;
+    
     std::set<MapPoint*> spPoints;
     for(unsigned i=0; i < pReq->mvPoints.size(); ++i)
     {
@@ -268,18 +333,32 @@ void NetworkManager::HandleNextIncoming()
       if(pPoint)
         spPoints.insert(pPoint);  
     }
+    
+    std::cout<<"Got "<<spPoints.size()<<" Points to delete"<<std::endl;
       
     mDeleteCallbackWrapper(spMultiKeyFrames, spPoints);
   }
   else if(pReq->action == pReq->UPDATE)
   {
     ROS_DEBUG("NetworkManager: Processing UPDATE message");
-    
-    for(unsigned i=0; i < pReq->mvMultiKeyFrames.size(); ++i)
-      UpdateMsg_ApplyTo_MultiKeyFrame(pReq->mvMultiKeyFrames[i]);
-      
+    std::cerr<<"===== RECEIVING UPDATE MSG ====="<<std::endl;
     for(unsigned i=0; i < pReq->mvPoints.size(); ++i)
       UpdateMsg_ApplyTo_MapPoint(pReq->mvPoints[i]); 
+      
+    for(unsigned i=0; i < pReq->mvMultiKeyFrames.size(); ++i)
+      UpdateMsg_ApplyTo_MultiKeyFrame(pReq->mvMultiKeyFrames[i]);
+  }
+  else if(pReq->action == pReq->OUTLIERS)
+  {
+    ROS_DEBUG("NetworkManager: Processing OUTLIERS message");
+    std::cerr<<"===== RECEIVING OUTLIER MSG ====="<<std::endl;
+    for(unsigned i=0; i < pReq->mvOutliers.size(); ++i)
+      OutliersMsg_ApplyTo_Affected(pReq->mvOutliers[i]); 
+  }
+  else if(pReq->action == pReq->STATE)
+  {
+    ROS_DEBUG("NetworkManager: Processing STATE message");
+    mStateCallbackWrapper(static_cast<MapMakerBase::State>(pReq->mState), pReq->mdMaxCov);
   }
   else
   {
@@ -312,6 +391,10 @@ void NetworkManager::SendAdd(MultiKeyFrame* pMKF)
   pAdd->mvMultiKeyFrames.resize(1);
   
   MultiKeyFrame_To_AddMsg(*pMKF, pAdd->mvMultiKeyFrames[0]);
+  
+  pAdd->header.stamp = ros::Time::now();
+  pAdd->header.seq = mnSeqSend;
+  mnSeqSend++;
     
   mOutgoingQueue.push(pAdd);
 }
@@ -326,6 +409,10 @@ void NetworkManager::SendAdd(std::set<MapPoint*> spPoints)
   unsigned i = 0;
   for(std::set<MapPoint*>::iterator it = spPoints.begin(); it != spPoints.end(); it++, i++)
     MapPoint_To_AddMsg(*(*it), pAdd->mvPoints[i]);
+    
+  pAdd->header.stamp = ros::Time::now();
+  pAdd->header.seq = mnSeqSend;
+  mnSeqSend++;
     
   mOutgoingQueue.push(pAdd);
 }
@@ -356,11 +443,35 @@ void NetworkManager::SendDelete(std::set<MultiKeyFrame*> spMultiKeyFrames, std::
   for(std::set<MultiKeyFrame*>::iterator mkf_it = spMultiKeyFrames.begin(); mkf_it != spMultiKeyFrames.end(); mkf_it++, i++)
     MultiKeyFrame_To_DeleteMsg(*(*mkf_it), pDel->mvMultiKeyFrames[i]);
    
+  std::cerr<<"---- SENDING DELETE MESSAGE: "<<spPoints.size()<<" points -----"<<std::endl;
   i = 0;
   for(std::set<MapPoint*>::iterator point_it = spPoints.begin(); point_it != spPoints.end(); point_it++, i++)
     MapPoint_To_DeleteMsg(*(*point_it), pDel->mvPoints[i]);
   
+  pDel->header.stamp = ros::Time::now();
+  pDel->header.seq = mnSeqSend;
+  mnSeqSend++;
+  
   mOutgoingQueue.push(pDel);
+}
+
+void NetworkManager::SendOutliers(std::vector<std::pair<KeyFrame*, MapPoint*> >& vOutliers)
+{
+  mcptam::ModifyMap::Request* pOutliers = new mcptam::ModifyMap::Request;
+  pOutliers->action = pOutliers->OUTLIERS;
+  pOutliers->mvOutliers.resize(vOutliers.size());
+  
+  std::cerr<<"===== SENDING OUTLIER MSG ====="<<std::endl;
+  for(unsigned i=0; i < vOutliers.size(); ++i)
+  {
+    Outlier_To_OutlierMsg(vOutliers[i], pOutliers->mvOutliers[i]);
+  }
+  
+  pOutliers->header.stamp = ros::Time::now();
+  pOutliers->header.seq = mnSeqSend;
+  mnSeqSend++;
+  
+  mOutgoingQueue.push(pOutliers);
 }
 
 // Send a MultiKeyFrame as an UPDATE message
@@ -388,7 +499,25 @@ void NetworkManager::SendUpdate(std::set<MultiKeyFrame*> spMKFs, std::set<MapPoi
   for(std::set<MapPoint*>::iterator it = spPoints.begin(); it != spPoints.end(); it++, i++)
     MapPoint_To_UpdateMsg(*(*it), pUpdate->mvPoints[i]);
     
+  pUpdate->header.stamp = ros::Time::now();
+  pUpdate->header.seq = mnSeqSend;
+  mnSeqSend++;
+    
   mOutgoingQueue.push(pUpdate);
+}
+
+void NetworkManager::SendState(MapMakerBase::State state, double dMaxCov)
+{
+  mcptam::ModifyMap::Request* pState = new mcptam::ModifyMap::Request;
+  pState->action = pState->STATE;
+  pState->mState = state;
+  pState->mdMaxCov = dMaxCov;
+  
+  pState->header.stamp = ros::Time::now();
+  pState->header.seq = mnSeqSend;
+  mnSeqSend++;
+    
+  mOutgoingQueue.push(pState);
 }
 
 // Converts an ADD message to a MultiKeyFrame, reconstructs all data
@@ -396,7 +525,7 @@ MultiKeyFrame* NetworkManager::AddMsg_To_MultiKeyFrame(mcptam::NetworkMultiKeyFr
 {
   ROS_DEBUG_STREAM("NetworkManager: In AddMsg_To_MultiKeyFrame, incoming mkf id: "<<mkf_msg.mId);
   
-  MultiKeyFrame* pMKF = mDict.IdToMultiKeyFramePtr(mkf_msg.mId, true);
+  MultiKeyFrame* pMKF = mMultiKeyFrameDict.IdToPtr(mkf_msg.mId, true);
   ROS_ASSERT(pMKF);
 
   std::stringstream ss;
@@ -406,6 +535,7 @@ MultiKeyFrame* NetworkManager::AddMsg_To_MultiKeyFrame(mcptam::NetworkMultiKeyFr
   pMKF->mbFixed = mkf_msg.mbFixed;
   pMKF->mdTotalDepthMean = mkf_msg.mdTotalDepthMean;
   
+  std::cerr<<"==== RECEIVING ADD MESSAGE ===="<<std::endl;
   for(unsigned i=0; i < mkf_msg.mvKeyFrames.size(); ++i)
   {
     std::string camName = mkf_msg.mvKeyFrames[i].mCamName;
@@ -417,13 +547,19 @@ MultiKeyFrame* NetworkManager::AddMsg_To_MultiKeyFrame(mcptam::NetworkMultiKeyFr
     AddMsg_To_KeyFrame(mkf_msg.mvKeyFrames[i], *pKF);
   }
   
+  if(pMKF->NoImages())
+  {
+    ROS_INFO_STREAM("Received MKF has no images, removing from dictionary");
+    mMultiKeyFrameDict.Remove(pMKF, mRole);
+  }
+  
   return pMKF;
 }
 
 // Converts a MultiKeyFrame to an ADD message, encodes all data
 void NetworkManager::MultiKeyFrame_To_AddMsg(MultiKeyFrame &mkf, mcptam::NetworkMultiKeyFrame &mkf_msg)
 {
-  mkf_msg.mId = mDict.PtrToId(&mkf, true);
+  mkf_msg.mId = mMultiKeyFrameDict.PtrToId(&mkf, true);
   
   ROS_DEBUG_STREAM("NetworkManager: In MultiKeyFrame_To_AddMsg, outgoing mkf id: "<<mkf_msg.mId);
   
@@ -434,18 +570,24 @@ void NetworkManager::MultiKeyFrame_To_AddMsg(MultiKeyFrame &mkf, mcptam::Network
   mkf_msg.mbFixed = mkf.mbFixed;
   mkf_msg.mdTotalDepthMean = mkf.mdTotalDepthMean;
  
+  std::cerr<<"===== SENDING ADD MSG ====="<<std::endl;
   for(KeyFramePtrMap::iterator it = mkf.mmpKeyFrames.begin(); it != mkf.mmpKeyFrames.end(); it++)
   {
     mkf_msg.mvKeyFrames.push_back(mcptam::NetworkKeyFrame());
     KeyFrame_To_AddMsg(*it->second, mkf_msg.mvKeyFrames.back());
   }
   
+  if(mkf.NoImages())
+  {
+    ROS_INFO_STREAM("Sent MKF has no images, removing from dictionary");
+    mMultiKeyFrameDict.Remove(&mkf, mRole);
+  }
 }
 
 // Converts a MultiKeyFrame to an UPDATE message, encodes all data
 void NetworkManager::MultiKeyFrame_To_UpdateMsg(MultiKeyFrame &mkf, mcptam::NetworkMultiKeyFrame &mkf_msg)
 {
-  mkf_msg.mId = mDict.PtrToId(&mkf, false);
+  mkf_msg.mId = mMultiKeyFrameDict.PtrToId(&mkf, false);
   
   ROS_DEBUG_STREAM("NetworkManager: In MultiKeyFrame_To_UpdateMsg, outgoing mkf id: "<<mkf_msg.mId);
   
@@ -456,6 +598,7 @@ void NetworkManager::MultiKeyFrame_To_UpdateMsg(MultiKeyFrame &mkf, mcptam::Netw
   mkf_msg.mbFixed = mkf.mbFixed;
   mkf_msg.mdTotalDepthMean = mkf.mdTotalDepthMean;
   
+  std::cerr<<"==== SENDING UPDATE MESSAGE ======="<<std::endl;
   for(KeyFramePtrMap::iterator it = mkf.mmpKeyFrames.begin(); it != mkf.mmpKeyFrames.end(); it++)
   {
     mcptam::NetworkKeyFrame kf_msg;
@@ -468,8 +611,8 @@ void NetworkManager::MultiKeyFrame_To_UpdateMsg(MultiKeyFrame &mkf, mcptam::Netw
 // Converts a MultiKeyFrame to a DELETE message, encodes only the id 
 void NetworkManager::MultiKeyFrame_To_DeleteMsg(MultiKeyFrame &mkf, mcptam::NetworkMultiKeyFrame &mkf_msg)
 {
-  mkf_msg.mId = mDict.PtrToId(&mkf, false);
-  mDict.Remove(&mkf, mRole);
+  mkf_msg.mId = mMultiKeyFrameDict.PtrToId(&mkf, false);
+  mMultiKeyFrameDict.Remove(&mkf, mRole);
 }
 
 // Applies an UPDATE message to the MultiKeyFrame it encodes for
@@ -477,8 +620,12 @@ void NetworkManager::UpdateMsg_ApplyTo_MultiKeyFrame(mcptam::NetworkMultiKeyFram
 {
   ROS_DEBUG_STREAM("NetworkManager: In UpdateMsg_ApplyTo_MultiKeyFrame, incoming mkf id: "<<mkf_msg.mId);
   
-  MultiKeyFrame* pMKF = mDict.IdToMultiKeyFramePtr(mkf_msg.mId, false);
-  ROS_ASSERT(pMKF);
+  MultiKeyFrame* pMKF = mMultiKeyFrameDict.IdToPtr(mkf_msg.mId, false);
+  if(!pMKF)
+  {
+    ROS_ERROR_STREAM("Couldn't convert MKF id to pointer, removed by: "<<mMultiKeyFrameDict.WhoRemoved(mkf_msg.mId));
+    ROS_BREAK();
+  }
   
   std::stringstream ss;
   ss << mkf_msg.mse3BaseFromWorld;
@@ -487,6 +634,7 @@ void NetworkManager::UpdateMsg_ApplyTo_MultiKeyFrame(mcptam::NetworkMultiKeyFram
   pMKF->mbFixed = mkf_msg.mbFixed;
   pMKF->mdTotalDepthMean = mkf_msg.mdTotalDepthMean;
       
+  std::cerr<<"===== RECEIVING UPDATE MESSAGE ========"<<std::endl;
   for(unsigned j=0; j < mkf_msg.mvKeyFrames.size(); ++j)
   {
     std::string camName = mkf_msg.mvKeyFrames[j].mCamName;
@@ -498,7 +646,7 @@ void NetworkManager::UpdateMsg_ApplyTo_MultiKeyFrame(mcptam::NetworkMultiKeyFram
 // Converts a DELETE message to the MultiKeyFrame it represents
 MultiKeyFrame* NetworkManager::DeleteMsg_To_MultiKeyFrame(mcptam::NetworkMultiKeyFrame &mkf_msg)
 {
-  MultiKeyFrame* pMKF = mDict.IdToMultiKeyFramePtr(mkf_msg.mId, false);
+  MultiKeyFrame* pMKF = mMultiKeyFrameDict.IdToPtr(mkf_msg.mId, false);
   
   if(pMKF)
   {
@@ -509,7 +657,7 @@ MultiKeyFrame* NetworkManager::DeleteMsg_To_MultiKeyFrame(mcptam::NetworkMultiKe
     else
       remover = "Server";
       
-    mDict.Remove(pMKF, remover);
+    mMultiKeyFrameDict.Remove(pMKF, remover);
   } 
   
   // Don't perform assert check, callback should deal with NULL pointer if present
@@ -531,20 +679,32 @@ void NetworkManager::AddMsg_To_KeyFrame(mcptam::NetworkKeyFrame &kf_msg, KeyFram
   for(unsigned i=0; i < kf_msg.mvMeasurements.size(); ++i)
   {
     mcptam::NetworkMeasurement& meas_msg = kf_msg.mvMeasurements[i];
-    MapPoint* pPoint = mDict.IdToMapPointPtr(meas_msg.mapPointId, false);
+    MapPoint* pPoint = mMapPointDict.IdToPtr(meas_msg.mapPointId, false);
     
     if(pPoint) // if NULL, then map point was deleted while the KeyFrame message was in transit, so don't build a measurement for it
     {
+      //printNetworkMeasurement(meas_msg, kf_msg.mCamName, kf_msg.mParentId, mnSeqReceived);
+      printNetworkMeasurement(meas_msg, kf_msg.mParentId, &kf, pPoint, mnSeqReceived);
+      
       Measurement* pMeas = new Measurement;
+      
+      // make sure we haven't already received this
+      /*
+      ROS_ASSERT(mmMeasDebugReceivedAdd.count(std::make_tuple(&kf, meas_msg.mapPointId, meas_msg.nLevel)) == 0);
+      
+      mmMeasDebugReceivedAdd[std::make_tuple(&kf, meas_msg.mapPointId, meas_msg.nLevel)] = std::make_tuple(mnSeqReceived, pMeas);
+     */
      
+      pMeas->bTransferred = true;
       pMeas->eSource = static_cast<Measurement::Src>(meas_msg.eSource);
       pMeas->v2RootPos[0] = meas_msg.v2RootPos[0];
       pMeas->v2RootPos[1] = meas_msg.v2RootPos[1];
       pMeas->nLevel = meas_msg.nLevel;
       pMeas->bSubPix = meas_msg.bSubPix;
       
-      kf.mmpMeasurements[pPoint] = pMeas;
-      pPoint->mMMData.spMeasurementKFs.insert(&kf);
+      kf.AddMeasurement(pPoint, pMeas);
+      //kf.mmpMeasurements[pPoint] = pMeas;
+      //pPoint->mMMData.spMeasurementKFs.insert(&kf);
     }
   }
   
@@ -555,15 +715,17 @@ void NetworkManager::AddMsg_To_KeyFrame(mcptam::NetworkKeyFrame &kf_msg, KeyFram
   // Set mask before creating rest of keyframe internals
   if(mask.totalsize() > 0)
     kf.SetMask(mask);
+    
   // Don't do deep copy of image since we just created it and nobody else will use it
   // Also don't do glare masking since this would have been done on client side
-  kf.MakeKeyFrame_Lite(image, false, false);
+  if(image.totalsize() > 0)
+    kf.MakeKeyFrame_Lite(image, false, false);
 }
 
 // Converts a KeyFrame to an ADD message, encodes all measurements and data needed by MakeKeyFrame_Lite
 void NetworkManager::KeyFrame_To_AddMsg(KeyFrame &kf, mcptam::NetworkKeyFrame &kf_msg)
 {
-  kf_msg.mParentId = mDict.PtrToId(kf.mpParent, false);  // parent MKF should already have an id
+  kf_msg.mParentId = mMultiKeyFrameDict.PtrToId(kf.mpParent, false);  // parent MKF should already have an id
   kf_msg.mCamName = kf.mCamName;
   
   std::stringstream ss;
@@ -590,18 +752,35 @@ void NetworkManager::KeyFrame_To_AddMsg(KeyFrame &kf, mcptam::NetworkKeyFrame &k
     kf_msg.mvMeasurements[i].eSource = meas.eSource;
     kf_msg.mvMeasurements[i].v2RootPos[0] = meas.v2RootPos[0];
     kf_msg.mvMeasurements[i].v2RootPos[1] = meas.v2RootPos[1];
+    kf_msg.mvMeasurements[i].mapPointId = mMapPointDict.PtrToId(&point, false);  // map point should have id from when it was received
     
-    kf_msg.mvMeasurements[i].mapPointId = mDict.PtrToId(&point, false);  // map point should have id from when it was received
+    //printNetworkMeasurement(kf_msg.mvMeasurements[i], kf_msg.mCamName, kf_msg.mParentId, mnSeqSend);
+    printNetworkMeasurement(kf_msg.mvMeasurements[i], kf_msg.mParentId, &kf, &point, mnSeqSend);
+    
+    // Add message should only be generated for a new MKF addition, so none of the measurements should
+    // have been transferred yet
+    ROS_ASSERT(!meas.bTransferred); 
+    
+    meas.bTransferred = true; // mark as transferred
+    /*
+    if(mmMeasDebugSentAdd.count(std::make_tuple(&kf, kf_msg.mvMeasurements[i].mapPointId, meas.nLevel)))
+    {
+      ROS_ERROR_STREAM("Already sent this measurement with an ADD, seq: "<<std::get<0>(mmMeasDebugSentAdd[std::make_tuple(&kf, kf_msg.mvMeasurements[i].mapPointId, meas.nLevel)])<<" current send seq: "<<mnSeqSend);
+      ROS_BREAK();
+    }
+    
+    mmMeasDebugSentAdd[std::make_tuple(&kf, kf_msg.mvMeasurements[i].mapPointId, meas.nLevel)] = std::make_tuple(mnSeqSend, &meas);
+    */
   }
   
-  util::ImageToMsg(kf.maLevels[0].image, kf_msg.image);
-  util::ImageToMsg(kf.maLevels[0].mask, kf_msg.mask);
+  util::ImageToMsg(kf.maLevels[0].image, 90, kf_msg.image);
+  util::ImageToMsg(kf.maLevels[0].mask, 90, kf_msg.mask);
 }
 
-// Converts a KeyFrame to an UPDATE message, encodes only poses and scene depth
+// Converts a KeyFrame to an UPDATE message, encodes, poses, scene depth and measurements to add/delete
 void NetworkManager::KeyFrame_To_UpdateMsg(KeyFrame &kf, mcptam::NetworkKeyFrame &kf_msg)
 {
-  kf_msg.mParentId = mDict.PtrToId(kf.mpParent, false);  // parent MKF should already have been assigned an id
+  kf_msg.mParentId = mMultiKeyFrameDict.PtrToId(kf.mpParent, false);  // parent MKF should already have been assigned an id
   kf_msg.mCamName = kf.mCamName;
   
   std::stringstream ss;
@@ -614,12 +793,81 @@ void NetworkManager::KeyFrame_To_UpdateMsg(KeyFrame &kf, mcptam::NetworkKeyFrame
   
   kf_msg.mdSceneDepthMean = kf.mdSceneDepthMean;
   kf_msg.mdSceneDepthSigma = kf.mdSceneDepthSigma;
+  
+  for(MeasPtrMap::iterator meas_it = kf.mmpMeasurements.begin(); meas_it != kf.mmpMeasurements.end(); ++meas_it)
+  {
+    Measurement& meas = *(meas_it->second);
+    MapPoint& point = *(meas_it->first);
+      
+    if(meas.bTransferred) // we already sent this one
+      continue;
+    
+    meas.bTransferred = true; // mark as sent
+    
+    mcptam::NetworkMeasurement meas_msg;
+    meas_msg.mapPointId = mMapPointDict.PtrToId(&point, false);  // map point should have id from when it was first sent out
+    meas_msg.nLevel = meas.nLevel;
+    meas_msg.bSubPix = meas.bSubPix;
+    meas_msg.eSource = meas.eSource;
+    meas_msg.v2RootPos[0] = meas.v2RootPos[0];
+    meas_msg.v2RootPos[1] = meas.v2RootPos[1];
+    
+    //printNetworkMeasurement(meas_msg, kf_msg.mCamName, kf_msg.mParentId, mnSeqSend);
+    printNetworkMeasurement(meas_msg, kf_msg.mParentId, &kf, &point, mnSeqSend);
+  /*  
+    if(mmMeasDebugReceivedAdd.count(std::make_tuple(&kf, meas_msg.mapPointId, meas.nLevel)))
+    {
+      ROS_ERROR_STREAM("We received this meas in seq: "<<std::get<0>(mmMeasDebugReceivedAdd[std::make_tuple(&kf, meas_msg.mapPointId, meas.nLevel)])<<" (current seq: "<<mnSeqReceived<<")");
+      ROS_ERROR_STREAM("Saved pointer: "<<std::get<1>(mmMeasDebugReceivedAdd[std::make_tuple(&kf, meas_msg.mapPointId, meas.nLevel)])<<" current pointer: "<<&meas);
+      ROS_BREAK();
+    }
+    
+    for(int i=0; i < LEVELS; ++i)
+    {
+      if(i == meas.nLevel)
+        continue;
+        
+      if(mmMeasDebugReceivedAdd.count(std::make_tuple(&kf, meas_msg.mapPointId, i)))
+      {
+        ROS_ERROR_STREAM("Already received different level measurement in seq: "<<std::get<0>(mmMeasDebugReceivedAdd[std::make_tuple(&kf, meas_msg.mapPointId, i)])<<" (current seq: "<<mnSeqSend<<")");
+        ROS_ERROR_STREAM("Saved pointer: "<<std::get<1>(mmMeasDebugReceivedAdd[std::make_tuple(&kf, meas_msg.mapPointId, i)])<<" current pointer: "<<&meas);
+        ROS_ERROR_STREAM("Saved level: "<<i<<" current level: "<<meas.nLevel);
+        ROS_BREAK();  
+      }
+    }
+    
+    
+    if(mmMeasDebugSentUpdate.count(std::make_tuple(&kf, meas_msg.mapPointId, meas.nLevel)))
+    {
+      ROS_ERROR_STREAM("Already sent measurement in seq: "<<std::get<0>(mmMeasDebugSentUpdate[std::make_tuple(&kf, meas_msg.mapPointId, meas.nLevel)])<<" (current seq: "<<mnSeqSend<<")");
+      ROS_ERROR_STREAM("Saved pointer: "<<std::get<1>(mmMeasDebugSentUpdate[std::make_tuple(&kf, meas_msg.mapPointId, meas.nLevel)])<<" current pointer: "<<&meas);
+      ROS_BREAK();
+    }
+    
+    for(int i=0; i < LEVELS; ++i)
+    {
+      if(i == meas.nLevel)
+        continue;
+        
+      if(mmMeasDebugSentUpdate.count(std::make_tuple(&kf, meas_msg.mapPointId, i)))
+      {
+        ROS_ERROR_STREAM("Already sent different level measurement in seq: "<<std::get<0>(mmMeasDebugSentUpdate[std::make_tuple(&kf, meas_msg.mapPointId, i)])<<" (current seq: "<<mnSeqSend<<")");
+        ROS_ERROR_STREAM("Saved pointer: "<<std::get<1>(mmMeasDebugSentUpdate[std::make_tuple(&kf, meas_msg.mapPointId, i)])<<" current pointer: "<<&meas);
+        ROS_ERROR_STREAM("Saved level: "<<i<<" current level: "<<meas.nLevel);
+        ROS_BREAK();  
+      }
+    }
+    
+    mmMeasDebugSentUpdate[std::make_tuple(&kf, meas_msg.mapPointId, meas.nLevel)] = std::make_tuple(mnSeqSend, &meas);
+     */ 
+    kf_msg.mvMeasurements.push_back(meas_msg);
+  }
 }
 
 // Applies an UPDATE message to the KeyFrame it encodes for
 void NetworkManager::UpdateMsg_ApplyTo_KeyFrame(mcptam::NetworkKeyFrame &kf_msg)
 {
-  MultiKeyFrame* pParent = mDict.IdToMultiKeyFramePtr(kf_msg.mParentId, false);
+  MultiKeyFrame* pParent = mMultiKeyFrameDict.IdToPtr(kf_msg.mParentId, false);
   ROS_ASSERT(pParent);
   ROS_ASSERT(pParent->mmpKeyFrames.count(kf_msg.mCamName) != 0);
   
@@ -631,12 +879,89 @@ void NetworkManager::UpdateMsg_ApplyTo_KeyFrame(mcptam::NetworkKeyFrame &kf_msg)
   
   kf.mdSceneDepthMean = kf_msg.mdSceneDepthMean;
   kf.mdSceneDepthSigma = kf_msg.mdSceneDepthSigma;
+  
+  //ROS_INFO_STREAM(">>>>>> Update KF, "<<kf_msg.mvMeasurements.size()<<" meas to add and "<<kf_msg.mvDeletedMeas.size()<<" meas to delete");
+  //ROS_INFO_STREAM(">>>>>> Received seq: "<<mnSeqReceived);
+  
+  for(unsigned i=0; i < kf_msg.mvMeasurements.size(); ++i)
+  {
+    mcptam::NetworkMeasurement& meas_msg = kf_msg.mvMeasurements[i];
+    MapPoint* pPoint = mMapPointDict.IdToPtr(meas_msg.mapPointId, false);
+    
+    if(pPoint) // if NULL, then map point was deleted while the KeyFrame message was in transit, so don't build a measurement for it
+    {
+      //printNetworkMeasurement(meas_msg, kf_msg.mCamName, kf_msg.mParentId, mnSeqReceived);
+      printNetworkMeasurement(meas_msg, kf_msg.mParentId, &kf, pPoint, mnSeqReceived);
+      /*
+      if(msMeasDebugUnaccounted.count(std::make_tuple(&kf, meas_msg.mapPointId, meas_msg.nLevel)))
+      {
+        ROS_ERROR("We needed this measurement before for deletion and didn't have it, means it arrived out of order!");
+        ROS_BREAK();
+      }
+      
+      if(mmMeasDebugSentAdd.count(std::make_tuple(&kf, meas_msg.mapPointId, meas_msg.nLevel)))
+      {
+        ROS_ERROR_STREAM("Received meas, but we sent this measurement ourself in an ADD with seq: "<<std::get<0>(mmMeasDebugSentAdd[std::make_tuple(&kf, meas_msg.mapPointId, meas_msg.nLevel)])<<", current send seq: "<<mnSeqSend);
+        ROS_BREAK();
+      }
+      
+      for(int i=0; i < LEVELS; ++i)
+      {
+        if(i == meas_msg.nLevel)
+          continue;
+          
+        if(mmMeasDebugSentAdd.count(std::make_tuple(&kf, meas_msg.mapPointId, i)))
+        {
+          ROS_ERROR_STREAM("We sent different level measurement in an ADD with seq: "<<std::get<0>(mmMeasDebugSentAdd[std::make_tuple(&kf, meas_msg.mapPointId, i)])<<" (current send seq: "<<mnSeqSend<<")");
+          ROS_ERROR_STREAM("Saved level: "<<i<<" current level: "<<(int)meas_msg.nLevel);
+          ROS_BREAK();  
+        }
+      }
+      
+      if(mmMeasDebugReceivedUpdate.count(std::make_tuple(&kf, meas_msg.mapPointId, meas_msg.nLevel)))
+      {
+        ROS_ERROR_STREAM("We already received this measurement in an UPDATE with seq: "<<std::get<0>(mmMeasDebugReceivedUpdate[std::make_tuple(&kf, meas_msg.mapPointId, meas_msg.nLevel)])<<", current receive seq: "<<mnSeqReceived);
+        ROS_BREAK();
+      }
+      
+      for(int i=0; i < LEVELS; ++i)
+      {
+        if(i == meas_msg.nLevel)
+          continue;
+          
+        if(mmMeasDebugReceivedUpdate.count(std::make_tuple(&kf, meas_msg.mapPointId, i)))
+        {
+          ROS_ERROR_STREAM("We received a different level measurement in an UPDATE with seq: "<<std::get<0>(mmMeasDebugReceivedUpdate[std::make_tuple(&kf, meas_msg.mapPointId, i)])<<" (current receive seq: "<<mnSeqReceived<<")");
+          ROS_ERROR_STREAM("Saved level: "<<i<<" current level: "<<(int)meas_msg.nLevel);
+          ROS_BREAK();  
+        }
+      }
+      */
+      Measurement* pMeas = new Measurement;
+      
+      //mmMeasDebugReceivedUpdate[std::make_tuple(&kf, meas_msg.mapPointId, meas_msg.nLevel)] = std::make_tuple(mnSeqReceived, pMeas);
+      
+      pMeas->bTransferred = true;
+      pMeas->eSource = static_cast<Measurement::Src>(meas_msg.eSource);
+      pMeas->v2RootPos[0] = meas_msg.v2RootPos[0];
+      pMeas->v2RootPos[1] = meas_msg.v2RootPos[1];
+      pMeas->nLevel = meas_msg.nLevel;
+      pMeas->bSubPix = meas_msg.bSubPix;
+      
+      kf.AddMeasurement(pPoint, pMeas);
+      //kf.mmpMeasurements[pPoint] = pMeas;
+      //pPoint->mMMData.spMeasurementKFs.insert(&kf);
+    }
+  }
 }
     
 // Converts a MapPoint to an ADD message, encodes all data except for RefreshPixelVector intermediaries
 void NetworkManager::MapPoint_To_AddMsg(MapPoint& point, mcptam::NetworkMapPoint &point_msg)
 {
-  point_msg.mId = mDict.PtrToId(&point, true);
+  point_msg.mId = mMapPointDict.PtrToId(&point, true);
+  
+  printNetworkMapPoint(point_msg, &point, mnSeqSend, "SENDING ADD");
+  
   point_msg.mbFixed = point.mbFixed;
   point_msg.mbOptimized = point.mbOptimized;
   
@@ -656,7 +981,7 @@ void NetworkManager::MapPoint_To_AddMsg(MapPoint& point, mcptam::NetworkMapPoint
   point_msg.mirCenter[0] = point.mirCenter[0];
   point_msg.mirCenter[1] = point.mirCenter[1];
   
-  point_msg.mSourceId = mDict.PtrToId(point.mpPatchSourceKF->mpParent, false);  // MKF should have had id assigned when it was received
+  point_msg.mSourceId = mMultiKeyFrameDict.PtrToId(point.mpPatchSourceKF->mpParent, false);  // MKF should have had id assigned when it was received
   point_msg.mSourceCamName = point.mpPatchSourceKF->mCamName;
 
 }
@@ -664,7 +989,7 @@ void NetworkManager::MapPoint_To_AddMsg(MapPoint& point, mcptam::NetworkMapPoint
 // Converts a MapPoint to an UPDATE message, encodes all position and pixel vector data
 void NetworkManager::MapPoint_To_UpdateMsg(MapPoint& point, mcptam::NetworkMapPoint &point_msg)
 {
-  point_msg.mId = mDict.PtrToId(&point, false);
+  point_msg.mId = mMapPointDict.PtrToId(&point, false);
   point_msg.mbFixed = point.mbFixed;
   point_msg.mbOptimized = point.mbOptimized;
   
@@ -684,14 +1009,20 @@ void NetworkManager::MapPoint_To_UpdateMsg(MapPoint& point, mcptam::NetworkMapPo
 // Converts a MapPoint to a DELETE message, encodes only the id 
 void NetworkManager::MapPoint_To_DeleteMsg(MapPoint& point, mcptam::NetworkMapPoint &point_msg)
 {
-  point_msg.mId = mDict.PtrToId(&point, false);
-  mDict.Remove(&point, mRole);
+  point_msg.mId = mMapPointDict.PtrToId(&point, false);
+  
+  printNetworkMapPoint(point_msg, &point, mnSeqSend, "SENDING DELETE");
+  
+  mMapPointDict.Remove(&point, mRole);
 }
 
 // Converts a an ADD message to a MapPoint, reconstructs all data
 MapPoint* NetworkManager::AddMsg_To_MapPoint(mcptam::NetworkMapPoint &point_msg)
 {
-  MapPoint* pPoint = mDict.IdToMapPointPtr(point_msg.mId, true);
+  MapPoint* pPoint = mMapPointDict.IdToPtr(point_msg.mId, true);
+  
+  printNetworkMapPoint(point_msg, pPoint, mnSeqReceived, "RECEIVING ADD");
+  
   ROS_ASSERT(pPoint);
   pPoint->mbFixed = point_msg.mbFixed;
   pPoint->mbOptimized = point_msg.mbOptimized;
@@ -703,7 +1034,7 @@ MapPoint* NetworkManager::AddMsg_To_MapPoint(mcptam::NetworkMapPoint &point_msg)
   pPoint->mnSourceLevel = point_msg.mnSourceLevel;
   pPoint->mirCenter = CVD::ImageRef(point_msg.mirCenter[0], point_msg.mirCenter[1]);
 
-  MultiKeyFrame* pMKF = mDict.IdToMultiKeyFramePtr(point_msg.mSourceId, false);
+  MultiKeyFrame* pMKF = mMultiKeyFrameDict.IdToPtr(point_msg.mSourceId, false);
   ROS_ASSERT(pMKF);
   
   ROS_ASSERT(pMKF->mmpKeyFrames.count(point_msg.mSourceCamName) != 0);
@@ -716,7 +1047,7 @@ MapPoint* NetworkManager::AddMsg_To_MapPoint(mcptam::NetworkMapPoint &point_msg)
 // Applies an UPDATE message to the MapPoint it encodes for
 void NetworkManager::UpdateMsg_ApplyTo_MapPoint(mcptam::NetworkMapPoint &point_msg)
 {
-  MapPoint* pPoint = mDict.IdToMapPointPtr(point_msg.mId, false);
+  MapPoint* pPoint = mMapPointDict.IdToPtr(point_msg.mId, false);
   
   if(pPoint)  // if the point exists
   {
@@ -734,10 +1065,12 @@ void NetworkManager::UpdateMsg_ApplyTo_MapPoint(mcptam::NetworkMapPoint &point_m
 // Converts a DELETE message to the MapPoint it represents
 MapPoint* NetworkManager::DeleteMsg_To_MapPoint(mcptam::NetworkMapPoint &point_msg)
 {
-  MapPoint* pPoint = mDict.IdToMapPointPtr(point_msg.mId, false);
+  MapPoint* pPoint = mMapPointDict.IdToPtr(point_msg.mId, false);
   
   if(pPoint)
   {
+    printNetworkMapPoint(point_msg, pPoint, mnSeqReceived, "RECEIVING DELETE");
+    
     // Need to find sender's role
     std::string remover;
     if(mRole == "Server")
@@ -745,7 +1078,7 @@ MapPoint* NetworkManager::DeleteMsg_To_MapPoint(mcptam::NetworkMapPoint &point_m
     else
       remover = "Server";
       
-    mDict.Remove(pPoint, remover);
+    mMapPointDict.Remove(pPoint, remover);
   } 
   
   // Don't perform assert check, if pPoint is NULL then map point has already
@@ -753,3 +1086,139 @@ MapPoint* NetworkManager::DeleteMsg_To_MapPoint(mcptam::NetworkMapPoint &point_m
   
   return pPoint;
 }
+
+void NetworkManager::Outlier_To_OutlierMsg(std::pair<KeyFrame*, MapPoint*>& outlier, mcptam::NetworkOutlier& outlier_msg)
+{
+  KeyFrame* pKF = outlier.first;
+  MapPoint* pPoint = outlier.second;
+  
+  outlier_msg.mMKFId = mMultiKeyFrameDict.PtrToId(pKF->mpParent, false);  // parent MKF should already have been assigned an id
+  outlier_msg.mCamName = pKF->mCamName;
+  outlier_msg.mapPointId = mMapPointDict.PtrToId(pPoint, false);
+  
+  printNetworkOutlier(outlier_msg, pKF, pPoint, mnSeqSend, "SENDING OUTLIER");
+}
+
+void NetworkManager::OutliersMsg_ApplyTo_Affected(mcptam::NetworkOutlier& outlier_msg)
+{
+  MultiKeyFrame* pMKF = mMultiKeyFrameDict.IdToPtr(outlier_msg.mMKFId, false);
+  
+  if(!pMKF)  // MultiKeyFrame already deleted, get out
+    return;
+    
+  ROS_ASSERT(pMKF->mmpKeyFrames.count(outlier_msg.mCamName));
+  KeyFrame& kf = *(pMKF->mmpKeyFrames[outlier_msg.mCamName]);
+  
+  MapPoint* pPoint = mMapPointDict.IdToPtr(outlier_msg.mapPointId, false);
+  
+  if(!pPoint)  // MapPoint already deleted, get out
+    return;
+    
+  if(pPoint->mbBad)  // MapPoint labeled bad on client side, no point doing anything more since it'll be deleted soon
+    return;
+    
+  printNetworkOutlier(outlier_msg, &kf, pPoint, mnSeqReceived, "RECEIVED OUTLIER");
+    
+  if(!kf.mmpMeasurements.count(pPoint))
+  {
+    ROS_ERROR("Couldn't find measurement of point");
+    
+    if(pPoint->mbBad)
+    {
+      ROS_ERROR("Point is bad, about to be deleted along with all measurements");
+    }
+    
+    if(pPoint->mbDeleted)
+    {
+      ROS_ERROR("Point is deleted");
+    }
+    
+    if(mmMeasDebugSentAdd.count(std::make_tuple(&kf, outlier_msg.mapPointId, -1)))
+    {
+      ROS_ERROR_STREAM("KF and point appear in debug set, we sent this measurement ourself with an ADD message");
+    }
+    
+    if(mmMeasDebugReceivedUpdate.count(std::make_tuple(&kf, outlier_msg.mapPointId, -1)))
+    {
+      ROS_ERROR_STREAM("KF and point appear in debug set, got this measurement with an UPDATE message");
+    }
+    
+    if(mmMeasDebugAlreadyDeleted.count(std::make_tuple(&kf, outlier_msg.mapPointId, -1)))
+    {
+      ROS_ERROR_STREAM("We have already deleted this measurement here before, seq: "<<mmMeasDebugAlreadyDeleted[std::make_tuple(&kf, outlier_msg.mapPointId, -1)]);
+    }
+    
+    msMeasDebugUnaccounted.insert(std::make_tuple(&kf, outlier_msg.mapPointId, -1));
+    ROS_ERROR_STREAM("Unaccounted measurements: "<<msMeasDebugUnaccounted.size());
+    if(msMeasDebugUnaccounted.size() > 1)
+      ROS_BREAK();
+      
+  }
+  
+  mmMeasDebugAlreadyDeleted[std::make_tuple(&kf, outlier_msg.mapPointId, -1)] = mnSeqReceived;
+  
+  kf.EraseMeasurementOfPoint(pPoint);
+  int nErased = pPoint->mMMData.spMeasurementKFs.erase(&kf);
+  ROS_ASSERT(nErased);
+}
+
+/*
+ for(unsigned i=0; i < kf_msg.mvDeletedMeas.size(); ++i)
+  {
+    mcptam::NetworkMeasurement& meas_msg = kf_msg.mvDeletedMeas[i];
+    MapPoint* pPoint = mMapPointDict.IdToPtr(meas_msg.mapPointId, false);
+    
+    if(pPoint) // if NULL, then map point was deleted while the KeyFrame message was in transit, so don't do anything
+    {
+      if(!kf.mmpMeasurements.count(pPoint))
+      {
+        ROS_ERROR("Couldn't find measurement of point");
+        
+        if(pPoint->mbBad)
+        {
+          ROS_ERROR("Point is bad, about to be deleted along with all measurements");
+        }
+        
+        if(pPoint->mbDeleted)
+        {
+          ROS_ERROR("Point is deleted");
+        }
+        
+        if(mmMeasDebugSentAdd.count(std::make_tuple(&kf, meas_msg.mapPointId, meas_msg.nLevel)))
+        {
+          ROS_ERROR_STREAM("KF and point appear in debug set, we sent this measurement ourself with an ADD message");
+        }
+        
+        if(mmMeasDebugReceivedUpdate.count(std::make_tuple(&kf, meas_msg.mapPointId, meas_msg.nLevel)))
+        {
+          ROS_ERROR_STREAM("KF and point appear in debug set, got this measurement with an UPDATE message");
+        }
+        
+        if(mmMeasDebugAlreadyDeleted.count(std::make_tuple(&kf, meas_msg.mapPointId, meas_msg.nLevel)))
+        {
+          ROS_ERROR_STREAM("We have already deleted this measurement here before, seq: "<<mmMeasDebugAlreadyDeleted[std::make_tuple(&kf, meas_msg.mapPointId, meas_msg.nLevel)]);
+        }
+        
+        msMeasDebugUnaccounted.insert(std::make_tuple(&kf, meas_msg.mapPointId, meas_msg.nLevel));
+        ROS_ERROR_STREAM("Unaccounted measurements: "<<msMeasDebugUnaccounted.size());
+        if(msMeasDebugUnaccounted.size() > 1)
+          ROS_BREAK();
+          
+        continue;
+      }
+      
+      mmMeasDebugAlreadyDeleted[std::make_tuple(&kf, meas_msg.mapPointId, meas_msg.nLevel)] = mnSeqReceived;
+      
+      kf.EraseMeasurementOfPoint(pPoint);
+      int nErased = pPoint->mMMData.spMeasurementKFs.erase(&kf);
+      ROS_ASSERT(nErased);
+    }
+  }
+*/
+/*
+void NetworkManager::RemoveFromDictionary(MultiKeyFrame* pMKF)
+{
+  ROS_ASSERT(!pMKF->mbFixed);
+  mMultiKeyFrameDict.Remove(pMKF, mRole);
+}
+*/

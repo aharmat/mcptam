@@ -89,9 +89,14 @@ void MapPoint::RefreshPixelVectors()
 // Calls the EraseMeasurementOfPoint() function of all keyframes that hold measurements of this point 
 void MapPoint::EraseAllMeasurements()
 {
+  ROS_ASSERT(mbBad);
+  
   for(std::set<KeyFrame*>::iterator it = mMMData.spMeasurementKFs.begin(); it != mMMData.spMeasurementKFs.end(); ++it)
   {
-    (*it)->EraseMeasurementOfPoint(this);
+    // delete measurements immediately since this function only gets called when a point is being trashed,
+    // in which case, both server and client will delete the point and there's no reason to keep a list of
+    // deleted measurements to the point
+    (*it)->EraseMeasurementOfPoint(this);  
   }
   
   mMMData.spMeasurementKFs.clear();

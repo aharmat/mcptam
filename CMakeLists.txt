@@ -6,7 +6,7 @@ set(CMAKE_BUILD_TYPE None)
 
 # Set our own specific flags. Want something like RelWithDebInfo but without the 
 # -DNDEBUG flag that disables asserts
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x -march=core2 -msse3 -O3 -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x -march=core2 -msse3 -O1 -g")
 
 # Find various packages in order to set up environment variables
 find_package(catkin REQUIRED COMPONENTS roscpp image_transport sensor_msgs cv_bridge geometry_msgs tf message_filters std_msgs
@@ -25,7 +25,7 @@ link_directories(${catkin_LIBRARY_DIRS} ${Boost_LIBRARY_DIRS} ${SUITESPARSE_LIBR
 
 add_message_files(
   DIRECTORY msg
-  FILES MapInfo.msg NetworkMapPoint.msg NetworkMeasurement.msg NetworkKeyFrame.msg NetworkMultiKeyFrame.msg 
+  FILES MapInfo.msg NetworkMapPoint.msg NetworkMeasurement.msg NetworkKeyFrame.msg NetworkMultiKeyFrame.msg NetworkOutlier.msg
         SystemInfo.msg TrackerTiming.msg TrackerState.msg
 )
 
@@ -55,7 +55,7 @@ target_link_libraries(mcptam ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARS
 add_executable(mcptam_client src/MainClient.cc src/GLWindow2.cc src/GLWindowMenu.cc src/VideoSourceMulti.cc src/CameraGroupSubscriber.cc  
                              src/SystemBase.cc src/SystemFrontendBase.cc src/SystemClient.cc src/TaylorCamera.cc src/KeyFrame.cc src/MapPoint.cc src/Map.cc 
                              src/SmallBlurryImage.cc src/ShiTomasi.cc src/MapMakerClient.cc src/MapMakerBase.cc src/MapMakerClientBase.cc 
-                             src/NetworkManager.cc src/NetworkDictionary.cc src/PatchFinder.cc src/Relocaliser.cc src/MiniPatch.cc 
+                             src/NetworkManager.cc src/PatchFinder.cc src/Relocaliser.cc src/MiniPatch.cc 
                              src/Tracker.cc src/KeyFrameViewer.cc)
 add_dependencies(mcptam_client ${PROJECT_NAME}_gencpp)
 target_link_libraries(mcptam_client ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${GVars3_LIBRARIES})
@@ -63,7 +63,7 @@ target_link_libraries(mcptam_client ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUI
 add_executable(mcptam_server src/MainServer.cc src/GLWindow2.cc src/GLWindowMenu.cc src/VideoSourceMulti.cc src/CameraGroupSubscriber.cc   
                              src/SystemBase.cc src/SystemServer.cc src/TaylorCamera.cc src/KeyFrame.cc src/MapPoint.cc src/Map.cc 
                              src/SmallBlurryImage.cc src/ShiTomasi.cc src/MapMakerServer.cc src/MapMakerBase.cc src/MapMakerServerBase.cc 
-                             src/NetworkManager.cc src/NetworkDictionary.cc src/PatchFinder.cc src/KeyFrameViewer.cc  src/MiniPatch.cc 
+                             src/NetworkManager.cc src/PatchFinder.cc src/KeyFrameViewer.cc  src/MiniPatch.cc 
                              src/BundleAdjusterBase.cc src/BundleAdjusterMulti.cc src/ChainBundle.cc)
 add_dependencies(mcptam_server ${PROJECT_NAME}_gencpp)
 target_link_libraries(mcptam_server ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${GVars3_LIBRARIES}

@@ -101,7 +101,7 @@ protected:
   /** @brief Send updates of certain MultiKeyFrames and MapPoints to the client
    *  @param spAdjustedFrames The MultiKeyFrames whose updated pose and scene depth will be sent to client
    *  @param spAdjustedPoints The MapPoints whose updated position and internal pixel vectors will be sent to client */
-  void SendUpdate(std::set<MultiKeyFrame*>& spAdjustedFrames, std::set<MapPoint*>& spAdjustedPoints);
+  void SendUpdate(std::set<MultiKeyFrame*> spAdjustedFrames, std::set<MapPoint*> spAdjustedPoints);
 
   /** @brief Overridden from MapMakerServerBase, deletes bad points, sends message to client, and removes pointers to
    * deleted points from internal queues. */
@@ -143,7 +143,7 @@ protected:
   void ResetCallback();
   
   NetworkManager mNetworkManager;        ///< The network manager, handles all data transactions with the client
-  bool mbInitialized;        ///< Has the map been initialized? Some operations shouldn't be carried out before map has fully initialized because client won't have the same data as server.
+  bool mbInitializedByClient;        ///< Some operations shouldn't be carried out before map has fully initialized because client won't have the same data as server.
 };
 
 #endif

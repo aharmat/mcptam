@@ -5,7 +5,7 @@
     <rosparam command="load" file="$(find mcptam)/groups/$(arg group_name).yaml" />
     
     <param name="get_pose_separately" type="bool" value="false" />
-    <param name="mm_init_point_mode" type="string" value="stereo" /> 
+    <param name="mm_init_point_mode" type="string" value="idp" /> 
     
     <!--
     <param name="camera_pose_file" type="string" value="$(find mcptam)/poses/poses.dat" />
@@ -21,8 +21,9 @@
     <param name="image_transport" type="string" value="compressed"/> 
     <param name="kf_distance_mean_diff_fraction" type="double" value="0.5" /> 
   </node>
- 
-<node pkg="tf" type="static_transform_publisher" name="world_tf" args="0 0 0 -0.5 0.5 -0.5 0.5 world vision_world 100" />
 
+<!-- 
+<node pkg="tf" type="static_transform_publisher" name="world_tf" args="0 0 0 -0.5 0.5 -0.5 0.5 world vision_world 100" />
+-->
 </launch>
 

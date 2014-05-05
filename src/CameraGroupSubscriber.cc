@@ -36,6 +36,13 @@
 
 #include <mcptam/CameraGroupSubscriber.h>
 
+// Static members
+bool CameraGroupSubscriber::sbDynamicSync = false;
+std::string CameraGroupSubscriber::sImageTopic = "image_raw";
+std::string CameraGroupSubscriber::sInfoTopic = "camera_info";
+std::string CameraGroupSubscriber::sPoseTopic = "pose";
+std::string CameraGroupSubscriber::sCameraPrefix = "";
+
 CameraGroupSubscriber::CameraGroupSubscriber(std::vector<std::string> vCameraNames, bool bGetPoseSeparately)
 : mNodeHandlePriv("~")
 , mpSync(new message_filters::Synchronizer<ApproxTimePolicy>(ApproxTimePolicy(5)))  // queue size of 5
@@ -46,18 +53,6 @@ CameraGroupSubscriber::CameraGroupSubscriber(std::vector<std::string> vCameraNam
   mpImageTransport = new image_transport::ImageTransport(mNodeHandle);
   
   mvCameraNames = vCameraNames;
-  
-  std::string imageTopic;
-  std::string infoTopic;                 
-  std::string poseTopic;
-  std::string cameraPrefix;
-  
-  mNodeHandlePriv.param<std::string>("image_topic", imageTopic ,"image_raw"); 
-  mNodeHandlePriv.param<std::string>("info_topic", infoTopic ,"camera_info"); 
-  mNodeHandlePriv.param<std::string>("pose_topic", poseTopic ,"pose"); 
-  mNodeHandlePriv.param<std::string>("camera_prefix", cameraPrefix ,""); 
-  mNodeHandlePriv.param<bool>("dynamic_sync", mbDynamicSync, false);
-  
   mNumCams = mvCameraNames.size();
   
   ROS_INFO_STREAM("CameraGroupSubscriber: Loading "<<mNumCams<<" cameras");
@@ -101,7 +96,7 @@ CameraGroupSubscriber::CameraGroupSubscriber(std::vector<std::string> vCameraNam
   {
     // Subscribe to the appropriate image topic
     mvpImageSubs[i] = new image_transport::SubscriberFilter();
-    mvpImageSubs[i]->subscribe(*mpImageTransport, std::string(cameraPrefix + "/" + mvCameraNames[i] + "/" + imageTopic), 2); 
+    mvpImageSubs[i]->subscribe(*mpImageTransport, std::string(sCameraPrefix + "/" + mvCameraNames[i] + "/" + sImageTopic), 2); 
   }
   
   // Connect the synchronizer to the subscribers
@@ -175,10 +170,10 @@ CameraGroupSubscriber::CameraGroupSubscriber(std::vector<std::string> vCameraNam
   
   for(unsigned i=0; i < mNumCams; ++i)
   {
-    mvInfoSubs[i] = mNodeHandle.subscribe<sensor_msgs::CameraInfo>(std::string(cameraPrefix + "/" + mvCameraNames[i] + "/" + infoTopic), 1, boost::bind(&CameraGroupSubscriber::InfoCallback, this, _1, mvCameraNames[i])); 
+    mvInfoSubs[i] = mNodeHandle.subscribe<sensor_msgs::CameraInfo>(std::string(sCameraPrefix + "/" + mvCameraNames[i] + "/" + sInfoTopic), 1, boost::bind(&CameraGroupSubscriber::InfoCallback, this, _1, mvCameraNames[i])); 
     
     if(bGetPoseSeparately)
-      mvPoseSubs[i] = mNodeHandle.subscribe<geometry_msgs::Pose>(std::string(cameraPrefix + "/" + mvCameraNames[i] + "/" + poseTopic), 1, boost::bind(&CameraGroupSubscriber::PoseCallback, this, _1, mvCameraNames[i])); 
+      mvPoseSubs[i] = mNodeHandle.subscribe<geometry_msgs::Pose>(std::string(sCameraPrefix + "/" + mvCameraNames[i] + "/" + sPoseTopic), 1, boost::bind(&CameraGroupSubscriber::PoseCallback, this, _1, mvCameraNames[i])); 
   }
   
   ROS_INFO_STREAM("CameraGroupSubscriber: Waiting for camera info" << (bGetPoseSeparately ? " and separate pose" : "") << " from all cameras");
@@ -301,7 +296,7 @@ void CameraGroupSubscriber::ImageCallback(const sensor_msgs::ImageConstPtr& msg1
     currTimestamp = ros::Time(dStamp / mmLastImages.size());
   }
   
-  if(mbDynamicSync && !mLastTimestamp.isZero())
+  if(sbDynamicSync && !mLastTimestamp.isZero() && (currTimestamp - mLastTimestamp).toSec() > 0)
   {
     ApproxTimePolicy* policy = dynamic_cast<ApproxTimePolicy*>( mpSync->getPolicy() );
     for(unsigned i=0; i < 8; ++i)
@@ -316,10 +311,13 @@ ImagePtrMap CameraGroupSubscriber::GetNewImage(bool* bActive)
 {
   mmLastImages.clear();
   
+  ros::WallRate rate(200);
+  
   // Wait until mmLastImages has been filled and we don't want to bail
   while(mmLastImages.size() < mNumCams && ros::ok() && *bActive)
   {
     mCallbackQueue.callAvailable();   // This will trigger any waiting callbacks
+    rate.sleep();
   }
   
   if(mmLastImages.size() < mNumCams)

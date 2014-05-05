@@ -81,6 +81,7 @@ std::string Tracker::sMEstimatorName = "Tukey";
 double Tracker::sdTrackingQualityGood = 0.3;
 double Tracker::sdTrackingQualityBad = 0.13;
 int Tracker::snLostFrameThresh = 3;
+bool Tracker::sbCollectAllPoints = true;
 
 // The constructor mostly sets up interal reference variables
 // to the other classes..
@@ -466,7 +467,7 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
       
       static gvar3<int> gvnAddingMKFs("AddingMKFs", 1, HIDDEN|SILENT);
       // Heuristics to check if a key-frame should be added to the map:
-      if(mbAddNext || mMapMaker.Initializing() ||
+      if(mbAddNext || //mMapMaker.Initializing() ||
          (*gvnAddingMKFs &&
           mOverallTrackingQuality == GOOD &&
           mnLostFrames == 0 &&
@@ -1262,8 +1263,9 @@ void Tracker::RecordMeasurements()
       KeyFrame& kf = *mpCurrentMKF->mmpKeyFrames[camName];
       MapPoint& point = td.mPoint;
       
-      kf.mmpMeasurements[&point] = pMeas;
-      point.mMMData.spMeasurementKFs.insert(&kf);
+      kf.AddMeasurement(&point, pMeas);
+      //kf.mmpMeasurements[&point] = pMeas;
+      //point.mMMData.spMeasurementKFs.insert(&kf);
       
     }
   }
@@ -1780,56 +1782,69 @@ void Tracker::CopySceneDepths(MultiKeyFrame& mkf)
 // Find the points "nearest" to the current keyframe
 void Tracker::CollectNearestPoints(KeyFrame& kf, std::set<MapPoint*>& spNearestPoints)
 {
-  // This version just gets all map points
-  spNearestPoints.clear();
-  for(MapPointPtrList::iterator it = mMap.mlpPoints.begin(); it != mMap.mlpPoints.end(); ++it)
+  if(Tracker::sbCollectAllPoints)
   {
-    spNearestPoints.insert(*it);
-  }
-  
-  /*
-  // This version finds the 3 nearest keyframes and collects the map points seen by those keyframes
-  std::vector<KeyFrame*> vpNearest = mMapMaker.NClosestKeyFrames(kf, 3);
-  
-  spNearestPoints.clear();
-  // Go through the collected nearby KFs
-  for(unsigned i=0; i < vpNearest.size(); ++i)
-  {
-    KeyFrame& kfOther = *(vpNearest[i]);
-    for(MeasPtrMap::iterator meas_it = kfOther.mmpMeasurements.begin(); meas_it != kfOther.mmpMeasurements.end(); ++meas_it)
+    // This version just gets all map points
+    spNearestPoints.clear();
+    for(MapPointPtrList::iterator it = mMap.mlpPoints.begin(); it != mMap.mlpPoints.end(); ++it)
     {
-      MapPoint& point = *(meas_it->first);
-      spNearestPoints.insert(&point);
+      spNearestPoints.insert(*it);
     }
   }
-  */
-  /*
-   
-  // This version gets the map points seen by the closest keyframe, then looks for keyframes that see those points, and collects
-  // all other points also seen by those keyframes
-  KeyFrame* pNearestKF = mMapMaker.ClosestKeyFrame(kf);  // region flag doesn't make a difference since kf not in map
-  std::set<KeyFrame*> spNearestNeighborKFs;
-  
-  // Go through nearest KF's measurements
-  for(MeasPtrMap::iterator meas_it = pNearestKF->mmpMeasurements.begin(); meas_it != pNearestKF->mmpMeasurements.end(); ++meas_it)
+  else
   {
-    // For each measured point
-    MapPoint& point = *(meas_it->first);  
-    // Collect all KF's that measure this point
-    spNearestNeighborKFs.insert(point.mMMData.spMeasurementKFs.begin(), point.mMMData.spMeasurementKFs.end());  
-  }
-  
-  spNearestPoints.clear();
-  // Go through the collected nearby KFs
-  for(std::set<KeyFrame*>::iterator kf_it = spNearestNeighborKFs.begin(); kf_it != spNearestNeighborKFs.end(); ++kf_it)
-  {
-    KeyFrame& kfOther = *(*kf_it);
-    for(MeasPtrMap::iterator meas_it = kfOther.mmpMeasurements.begin(); meas_it != kfOther.mmpMeasurements.end(); ++meas_it)
+    /*
+    // This version finds the 3 nearest keyframes and collects the map points seen by those keyframes
+    std::vector<KeyFrame*> vpNearest = mMapMaker.NClosestKeyFrames(kf, 3);
+    
+    spNearestPoints.clear();
+    // Go through the collected nearby KFs
+    for(unsigned i=0; i < vpNearest.size(); ++i)
     {
-      MapPoint& point = *(meas_it->first);
-      spNearestPoints.insert(&point);
+      KeyFrame& kfOther = *(vpNearest[i]);
+      
+      boost::mutex::scoped_lock lock(kfOther.mMeasMutex);
+       
+      for(MeasPtrMap::iterator meas_it = kfOther.mmpMeasurements.begin(); meas_it != kfOther.mmpMeasurements.end(); ++meas_it)
+      {
+        MapPoint& point = *(meas_it->first);
+        spNearestPoints.insert(&point);
+      }
+    }
+    */
+    
+    // This version gets the map points seen by the closest keyframe, then looks for keyframes that see those points, and collects
+    // all other points also seen by those keyframes
+    KeyFrame* pNearestKF = mMapMaker.ClosestKeyFrame(kf);  // region flag doesn't make a difference since kf not in map
+    std::set<KeyFrame*> spNearestNeighborKFs;
+     
+    boost::mutex::scoped_lock lockNearest(pNearestKF->mMeasMutex);
+    
+    // Go through nearest KF's measurements
+    for(MeasPtrMap::iterator meas_it = pNearestKF->mmpMeasurements.begin(); meas_it != pNearestKF->mmpMeasurements.end(); ++meas_it)
+    {
+      // For each measured point
+      MapPoint& point = *(meas_it->first);  
+      // Collect all KF's that measure this point
+      spNearestNeighborKFs.insert(point.mMMData.spMeasurementKFs.begin(), point.mMMData.spMeasurementKFs.end());  
+    }
+     
+    lockNearest.unlock();
+    
+    spNearestPoints.clear();
+    // Go through the collected nearby KFs
+    for(std::set<KeyFrame*>::iterator kf_it = spNearestNeighborKFs.begin(); kf_it != spNearestNeighborKFs.end(); ++kf_it)
+    {
+      KeyFrame& kfOther = *(*kf_it);
+      
+      boost::mutex::scoped_lock lock(kfOther.mMeasMutex);
+      
+      for(MeasPtrMap::iterator meas_it = kfOther.mmpMeasurements.begin(); meas_it != kfOther.mmpMeasurements.end(); ++meas_it)
+      {
+        MapPoint& point = *(meas_it->first);
+        spNearestPoints.insert(&point);
+      }
     }
   }
-  */
 }
 

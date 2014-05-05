@@ -103,6 +103,13 @@ public:
     return std::find(mvCameraNames.begin(), mvCameraNames.end(), camName) != mvCameraNames.end();
   }
   
+  // static members
+  static bool sbDynamicSync;              ///< Dynamically set the inter message lower bound of the synchronizer based on observed framerate?
+  static std::string sImageTopic;         ///< The image topic for each camera
+  static std::string sInfoTopic;          ///< The info topic for each camera
+  static std::string sPoseTopic;          ///< The pose topic for eah camera (only to support old bag files where camera pose was separate topic)
+  static std::string sCameraPrefix;       ///< Prefix added on to each camera name
+  
 protected:
 
   /** @brief This will be called by the ROS subscriber whenever images from all the cameras are received
@@ -145,7 +152,6 @@ protected:
   
   unsigned mNumCams;                       ///< The number of cameras in this group
   std::vector<std::string> mvCameraNames;   ///< Vector of camera names in this group
-  bool mbDynamicSync;                      ///< Dynamically set the inter message lower bound of the synchronizer based on observed framerate?
   
   message_filters::Synchronizer<ApproxTimePolicy>* mpSync;   ///< The message synchronizer, using the ApproxTimePolicy we defined 
   std::vector< image_transport::SubscriberFilter* > mvpImageSubs;   ///< Vector of image subscribers (one per camera) as SubscriberFilter pointers so they can be chained with the synchronizer

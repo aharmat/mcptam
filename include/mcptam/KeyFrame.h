@@ -72,8 +72,10 @@
 #include <cvd/byte.h>
 #include <vector>
 #include <map>
+#include <list>
 #include <atomic>
 #include <boost/circular_buffer.hpp>
+#include <boost/thread/mutex.hpp>
 
 class MapPoint;
 class SmallBlurryImage;
@@ -97,10 +99,15 @@ struct Candidate
 /// A 2D image measurement of a map point, each keyframe stores a bunch of these.
 struct Measurement
 {  
+  inline Measurement()
+  : bTransferred(false)
+  { }
+  
   int nLevel;                 ///< Which image level?
   bool bSubPix;               ///< Has this measurement been refined to sub-pixel level?
   TooN::Vector<2> v2RootPos;  ///< Position of the measurement at level zero
   enum Src {SRC_TRACKER, SRC_REFIND, SRC_ROOT, SRC_TRAIL, SRC_EPIPOLAR} eSource; ///< Where has this measurement come from?
+  bool bTransferred;          ///< Has this measurement been transferred over the network? Meaningless in standalone application
   
   int nID;  ///< Debugging ID
   
@@ -221,8 +228,14 @@ public:
   /// Erase all measurements
   void ClearMeasurements();
   
+  void AddMeasurement(MapPoint* pPoint, Measurement* pMeas);
+  
   /// Make the small blurry image
   void MakeSBI();
+  
+  bool NoImage();
+  
+  void RemoveImage();
   
   // Variables
   static double sdDistanceMeanDiffFraction;  ///< fraction of distance between mean scene depth points that is used in overall distance computation
@@ -238,6 +251,11 @@ public:
 
   Level maLevels[LEVELS];  ///< Images, corners, etc lives in this array of pyramid levels
   MeasPtrMap mmpMeasurements;   ///< All the measurements associated with the keyframe as a map of MapPoint pointers to Measurement pointers  
+  //MeasPtrMap mmpDeletedMeas;  ///< Queue of deleted measurements' map points, used to send information in client/server mode
+  //MeasPtrMap mmpClearedMeas;
+  //MeasPtrMap mmpMeasurementsPerma;
+  
+  boost::mutex mMeasMutex;   ///< To allow multi-threaded operation safely
   
   //testing
   //MeasPtrMap mmpBlobMeasurements;
@@ -308,6 +326,10 @@ public:
   
   /// Returns the number of measurements of all owned KeyFrames
   int NumMeasurements();
+  
+  bool NoImages();
+  
+  void RemoveImages();
   
   // Variables
   TooN::SE3<> mse3BaseFromWorld;  ///< The current pose in the world reference frame

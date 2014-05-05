@@ -80,9 +80,21 @@ KeyFrame::KeyFrame(MultiKeyFrame* pMKF, std::string name)
   mdSceneDepthSigma = MAX_SIGMA;
 }
 
+void KeyFrame::AddMeasurement(MapPoint* pPoint, Measurement* pMeas)
+{
+  ROS_ASSERT(!mmpMeasurements.count(pPoint));
+  
+  boost::mutex::scoped_lock lock(mMeasMutex);
+  
+  mmpMeasurements[pPoint] = pMeas;
+  pPoint->mMMData.spMeasurementKFs.insert(this);
+}
+
 // Erase all measurements
 void KeyFrame::ClearMeasurements()
 {
+  boost::mutex::scoped_lock lock(mMeasMutex);
+  
   for(MeasPtrMap::iterator it = mmpMeasurements.begin(); it != mmpMeasurements.end(); ++it)
   {
     delete it->second;  // delete the measurement pointers
@@ -110,6 +122,22 @@ void KeyFrame::SetMask(CVD::Image<CVD::byte> &m)
     Level &lev = maLevels[i];
     lev.mask.resize(maLevels[i-1].mask.size() / 2);
     CVD::halfSample(maLevels[i-1].mask, lev.mask);
+  }
+}
+
+bool KeyFrame::NoImage()
+{
+  return maLevels[0].image.totalsize() == 0;
+}
+
+void KeyFrame::RemoveImage()
+{
+  for(int i=0; i<LEVELS; i++)
+  {
+    Level &lev = maLevels[i];
+    
+    lev.image = CVD::Image<CVD::byte>();
+    lev.mask = CVD::Image<CVD::byte>();
   }
 }
 
@@ -721,11 +749,12 @@ double KeyFrame::Distance(KeyFrame &other)
 // Erase the measurement object corresponding to its argument and remove it from the map of measurements
 void KeyFrame::EraseMeasurementOfPoint(MapPoint* pPoint)
 {
+  boost::mutex::scoped_lock lock(mMeasMutex);
+  
   MeasPtrMap::iterator it = mmpMeasurements.find(pPoint);
   ROS_ASSERT(it != mmpMeasurements.end());
   
-  Measurement* pMeas = it->second;
-  delete pMeas; 
+  delete it->second;
   mmpMeasurements.erase(it);
 }
 
@@ -741,7 +770,9 @@ void KeyFrame::EraseBackLinksFromPoints()
     // lose it. Alternatively, could transfer the role of source KF to another one in 
     // spMeasurementKFs, but that would need to be implemented and tested
     if(point.mpPatchSourceKF == this)
+    {
       point.mbBad = true;
+    }
   }
   
 }
@@ -765,9 +796,8 @@ MultiKeyFrame::~MultiKeyFrame()
   }
   
   mmpKeyFrames.clear();
-  
-  
 }
+
 // Call ClearMeasurements on all owned KeyFrames
 void MultiKeyFrame::ClearMeasurements()
 {
@@ -787,6 +817,25 @@ int MultiKeyFrame::NumMeasurements()
   }
   
   return nNumMeas;
+}
+
+bool MultiKeyFrame::NoImages()
+{
+  for(KeyFramePtrMap::iterator it = mmpKeyFrames.begin(); it != mmpKeyFrames.end(); ++it)
+  {      
+    if(!it->second->NoImage())
+      return false;
+  }
+  
+  return true;
+}
+
+void MultiKeyFrame::RemoveImages()
+{
+  for(KeyFramePtrMap::iterator it = mmpKeyFrames.begin(); it != mmpKeyFrames.end(); ++it)
+  {      
+    it->second->RemoveImage();
+  }
 }
 
 // Call EraseBackLinksFromPoints on all owned KeyFrames
