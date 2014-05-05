@@ -55,8 +55,6 @@
 #include <mcptam/SystemInfo.h>
 #include <ros/ros.h>
 #include <message_filters/subscriber.h>
-#include <message_filters/synchronizer.h>
-#include <message_filters/sync_policies/exact_time.h>
 #include <image_transport/image_transport.h>
 #include <image_transport/subscriber_filter.h>
 #include <sensor_msgs/Image.h>
@@ -94,8 +92,11 @@ protected:
   void TrackerStateCallback(const mcptam::TrackerStateConstPtr& stateMsg);
   
   /// Callback called when a new small preview image is received
-  void TrackerSmallImageCallback(const sensor_msgs::ImageConstPtr& imageMsg, const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& pointMsg);
+  void TrackerSmallImageCallback(const sensor_msgs::ImageConstPtr& imageMsg);
   
+  /// Callback called when a new small preview image point set is received
+  void TrackerSmallImagePointsCallback(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& pointMsg);
+    
   /// Callback called when a new system info message received
   void SystemInfoCallback(const mcptam::SystemInfoConstPtr& infoMsg);
  
@@ -122,15 +123,10 @@ protected:
   ros::ServiceClient mResetSystemClient;   ///< Used to call reset on client
   ros::Subscriber mTrackerStateSub;        ///< Subscribe to tracker state messages
   ros::Subscriber mSystemInfoSub;          ///< Subscribe to system info messages
-  
-  //image_transport::Subscriber mTrackerSmallImageSub;  ///< Subscribe to small preview image messages
-  
+    
   image_transport::ImageTransport mImageTransport;    ///< Image transport for the image messages
-  image_transport::SubscriberFilter mSmallImageSub; 
-  message_filters::Subscriber<pcl::PointCloud<pcl::PointXYZ> > mSmallImagePointsSub;
-  
-  typedef message_filters::sync_policies::ExactTime<sensor_msgs::Image, pcl::PointCloud<pcl::PointXYZ> > ExactTimePolicy;  
-  message_filters::Synchronizer<ExactTimePolicy> mSync;
+  image_transport::Subscriber mSmallImageSub; 
+  ros::Subscriber mSmallImagePointsSub;
   
 };
 

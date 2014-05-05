@@ -56,7 +56,6 @@ using namespace TooN;
 SystemServer::SystemServer()
 : SystemBase("mcptam_server", true, true)
 , mImageTransport(mNodeHandle)
-, mSync(ExactTimePolicy(5))
 { 
   // Register some commands with GVars, these commands will be triggered
   // by button presses and will result in GUICommandCallBack being called
@@ -116,11 +115,8 @@ SystemServer::SystemServer()
   mTrackerStateSub = mNodeHandle.subscribe("tracker_state", 1, &SystemServer::TrackerStateCallback, this);
   //mTrackerSmallImageSub = mImageTransport.subscribe("tracker_small_image", 1, &SystemServer::TrackerSmallImageCallback, this);
   
-  mSmallImageSub.subscribe(mImageTransport, "tracker_small_image", 1); 
-  mSmallImagePointsSub.subscribe(mNodeHandle, "tracker_small_image_points", 1);
-  
-  mSync.connectInput(mSmallImageSub, mSmallImagePointsSub);
-  mSync.registerCallback(&SystemServer::TrackerSmallImageCallback, this);
+  mSmallImageSub = mImageTransport.subscribe("tracker_small_image", 1, &SystemServer::TrackerSmallImageCallback, this); 
+  mSmallImagePointsSub = mNodeHandle.subscribe("tracker_small_image_points", 1, &SystemServer::TrackerSmallImagePointsCallback, this);
   
   mpBundleAdjuster = new BundleAdjusterMulti(*mpMap, mmCameraModels);
   mpMapMakerServer = new MapMakerServer(*mpMap, mmCameraModels, *mpBundleAdjuster);
@@ -353,7 +349,7 @@ void SystemServer::TrackerStateCallback(const mcptam::TrackerStateConstPtr& stat
 }
 
 // Callback called when a new small preview image is received
-void SystemServer::TrackerSmallImageCallback(const sensor_msgs::ImageConstPtr& imageMsg, const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& pointMsg)
+void SystemServer::TrackerSmallImageCallback(const sensor_msgs::ImageConstPtr& imageMsg)
 {
   ROS_DEBUG("In TrackerSmallImageCallback!");
   
@@ -370,6 +366,11 @@ void SystemServer::TrackerSmallImageCallback(const sensor_msgs::ImageConstPtr& i
     return;
   }
   
-  util::ConversionRGB(cvPtr->image, mTrackerSmallImage);
+  util::ConversionRGB(cvPtr->image, mTrackerSmallImage);  
+}
+
+// Callback called when a new small preview image point set is received
+void SystemServer::TrackerSmallImagePointsCallback(const pcl::PointCloud<pcl::PointXYZ>::ConstPtr& pointMsg)
+{
   mTrackerSmallImagePoints = *pointMsg;
 }
