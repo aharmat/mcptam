@@ -27,6 +27,7 @@
   <param name="mm_outlier_multiplier" type="double" value="1.1" />
   
   <param name="small_image_level" type="int" value="1" />
+  <param name="level_zero_points" type="bool" value="true" />
   
   <!-- For no GUI, set headless:=true -->
   <param name="headless" type="bool" value="$(arg headless)" />

@@ -1436,9 +1436,9 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
   
   // The TooN WLSCholesky class handles reweighted least squares.
   // It just needs errors and jacobians.
-  WLS<6> wls, wls_noweight;
+  WLS<6> wls; //, wls_noweight;
   wls.add_prior(100.0); // Stabilising prior
-  wls_noweight.add_prior(100);
+  //wls_noweight.add_prior(100);
   mnNumInliers = 0;
   
   for(unsigned i=0; i < mvCurrCamNames.size(); ++i)
@@ -1466,8 +1466,8 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
       else 
         dWeight= Huber::Weight(dErrorSq, dSigmaSquared);
       
-      wls_noweight.add_mJ(v2Error[0], td.mdSqrtInvNoise * td.mm26Jacobian[0], 1); // These two lines are currently
-      wls_noweight.add_mJ(v2Error[1], td.mdSqrtInvNoise * td.mm26Jacobian[1], 1); // the slowest bit of poseits
+      //wls_noweight.add_mJ(v2Error[0], td.mdSqrtInvNoise * td.mm26Jacobian[0], 1); // These two lines are currently
+      //wls_noweight.add_mJ(v2Error[1], td.mdSqrtInvNoise * td.mm26Jacobian[1], 1); // the slowest bit of poseits
       
       // Inlier/outlier accounting, only really works for cut-off estimators such as Tukey.
       if(dWeight == 0.0)
@@ -1499,8 +1499,8 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
   {
 		mm6PoseCovariance = TooN::SVD<6>(wls.get_C_inv()).get_pinv();   // from ethzasl_ptam
     
-    wls_noweight.compute();
-    mm6PoseCovarianceNoOutliers = TooN::SVD<6>(wls_noweight.get_C_inv()).get_pinv();   // from ethzasl_ptam
+    //wls_noweight.compute();
+    //mm6PoseCovarianceNoOutliers = TooN::SVD<6>(wls_noweight.get_C_inv()).get_pinv();   // from ethzasl_ptam
   }
   
   //std::cout<<"CalcPoseUpdate: "<<wls.get_mu()<<std::endl;

@@ -421,7 +421,7 @@ protected:
   ros::Time mLastProcessTime;           ///< Time that the previous image processing step began
   ros::Duration mLastProcessDur;        ///< Time since the previous image processing step start
   TooN::Matrix<6>	mm6PoseCovariance;		///< covariance of current converged pose estimate
-  TooN::Matrix<6>	mm6PoseCovarianceNoOutliers;  ///< covariance of current pose estimate with outliers removed
+  //TooN::Matrix<6>	mm6PoseCovarianceNoOutliers;  ///< covariance of current pose estimate with outliers removed
   int mnTotalFound;                 ///< Number of features found by the tracker in the current frame
   int mnTotalAttempted;             ///< Number of features attempted to find by the tracker
   int mnNumInliers;                 ///< Number of measurement inliers for the tracking
