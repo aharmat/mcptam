@@ -257,8 +257,9 @@ void MapMaker::run()
         
         if(mState == MM_INITIALIZING && (mdMaxCov < MapMakerServerBase::sdInitCovThresh || mbStopInit)) 
         {
-          ROS_INFO_STREAM("INITIALIZING, Max cov "<<mdMaxCov<<" below threshold "<<MapMakerServerBase::sdInitCovThresh<<", switching to JUST_FINISHED_INIT");
-          mState = MM_JUST_FINISHED_INIT;
+          ROS_INFO_STREAM("INITIALIZING, Max cov "<<mdMaxCov<<" below threshold "<<MapMakerServerBase::sdInitCovThresh<<", switching to MM_RUNNING");
+          mState = MM_RUNNING;
+          ClearIncomingQueue();
           mbStopInit = false;
         }
       }
@@ -304,14 +305,22 @@ void MapMaker::AddMultiKeyFrame(MultiKeyFrame*& pMKF_Incoming)
   
   ProcessIncomingKeyFrames(*pMKF);
   
+  ROS_INFO("MKF contains: ");
   for(KeyFramePtrMap::iterator it = pMKF->mmpKeyFrames.begin(); it != pMKF->mmpKeyFrames.end(); it++)
   {
     KeyFrame& kf = *(it->second);
+    ROS_INFO_STREAM(kf.mCamName);
     if(kf.mpSBI)
     {
       delete kf.mpSBI; // Mapmaker uses a different SBI than the tracker, so will re-gen its own
       kf.mpSBI = NULL;
     }
+  }
+  
+  if(mState == MM_INITIALIZING)
+  {
+    ROS_INFO("============== REMOVING IMAGES ===========");
+    pMKF->RemoveImages();   // don't need images when in initializing state
   }
   
   boost::mutex::scoped_lock lock(mQueueMutex);
@@ -356,7 +365,6 @@ void MapMaker::AddMultiKeyFrameFromTopOfQueue()
     return;
   
   MultiKeyFrame *pMKF = mqpMultiKeyFramesFromTracker.front();
-  mqpMultiKeyFramesFromTracker.pop_front(); 
   lock.unlock();  // important!!
   
   for(KeyFramePtrMap::iterator it = pMKF->mmpKeyFrames.begin(); it != pMKF->mmpKeyFrames.end(); it++)
@@ -394,33 +402,33 @@ void MapMaker::AddMultiKeyFrameFromTopOfQueue()
   
   if(mState == MM_RUNNING)
   {
-    ROS_INFO("MM_RUNNING: Trying to add MKF and create points");
-    bool bSuccess = AddMultiKeyFrameAndCreatePoints(pMKF);   // from MapMakerServerBase
-    if(!bSuccess)
+    if(pMKF->NoImages()) // leftovers from Tracker, don't bother adding these
     {
+      ROS_INFO("MM_RUNNING: Got an MKF with no image, ignoring");
       pMKF->EraseBackLinksFromPoints();
       delete pMKF;
     }
-  }
-  else if(mState == MM_JUST_FINISHED_INIT)
-  {
-    ROS_INFO("MM_JUST_FINISHED_INIT: Trying to add MKF and mark last as bad, switching to running");
-    AddMultiKeyFrameAndMarkLastDeleted(pMKF, true);
-    mMap.MoveDeletedMultiKeyFramesToTrash();
-    
-    mState = MM_RUNNING;
-    
-    ClearIncomingQueue();
+    else
+    {
+      ROS_INFO("MM_RUNNING: Trying to add MKF and create points");
+      bool bSuccess = AddMultiKeyFrameAndCreatePoints(pMKF);   // from MapMakerServerBase
+      if(!bSuccess)
+      {
+        pMKF->EraseBackLinksFromPoints();
+        delete pMKF;
+      }
+    }
   }
   else  // INITIALIZING
   {
-    // Simulate effect of removing images on client side
-    pMKF->RemoveImages();
-    
     ROS_INFO("MM_INITIALIZING: Trying to add MKF and mark last as bad");
     AddMultiKeyFrameAndMarkLastDeleted(pMKF, false);
     mMap.MoveDeletedMultiKeyFramesToTrash();
   }
+  
+  lock.lock();
+  mqpMultiKeyFramesFromTracker.pop_front(); 
+  lock.unlock();
 
 }
 

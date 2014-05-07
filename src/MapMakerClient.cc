@@ -151,6 +151,12 @@ void MapMakerClient::AddMultiKeyFrame(MultiKeyFrame*& pMKF_Incoming)
     }
   }
   
+  if(mState == MM_INITIALIZING)
+  {
+    ROS_INFO("============== REMOVING IMAGES ===========");
+    pMKF->RemoveImages();   // don't need images when in initializing state
+  }
+  
   boost::mutex::scoped_lock lock(mQueueMutex);
   mqpMultiKeyFramesFromTracker.push_back(pMKF);
   lock.unlock();
@@ -229,20 +235,18 @@ void MapMakerClient::AddMultiKeyFrameFromTopOfQueue()
       
     }
   
-    kf.MakeSBI();  // only needed for relocalizer
+    if(!kf.NoImage())
+      kf.MakeSBI();  // only needed for relocalizer
   }
   
   // When initializing, we don't need to send or keep images for the 2nd MKF,
   // so strip out images before sending/saving
   if(mState == MM_INITIALIZING)
   {
-    if(mMap.mlpMultiKeyFrames.size() > 0)
-      pMKF->RemoveImages();
     
     if(mMap.mlpMultiKeyFrames.size() > 1)
     {
       // Get rid of MKF at back of map
-      //mNetworkManager.RemoveFromDictionary(mMap.mlpMultiKeyFrames.back());
       mMap.mlpMultiKeyFrames.back()->mbDeleted = true;
       mMap.MoveDeletedMultiKeyFramesToTrash();
     }
@@ -312,8 +316,15 @@ void MapMakerClient::DeleteCallback(std::set<MultiKeyFrame*> spMultiKeyFrames, s
 // Function that mNetworkManger calls when a "state" message from the server is processed
 void MapMakerClient::StateCallback(MapMakerBase::State state, double dMaxCov)
 {
-  if(mState == MM_JUST_FINISHED_INIT && state == MM_RUNNING)
+  // just switched to running state
+  if(mState == MM_INITIALIZING && state == MM_RUNNING)
     ClearIncomingQueue();
+    
+  if(mState == MM_RUNNING && state == MM_INITIALIZING)
+  {
+    ROS_ERROR("MapMakerClient: We were RUNNING, and server is telling us we are INITIALIZING! Should be impossible");
+    ROS_BREAK();
+  }
   
   mState = state;
   mdMaxCov = dMaxCov;

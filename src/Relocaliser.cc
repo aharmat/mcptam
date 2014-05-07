@@ -102,6 +102,12 @@ void Relocaliser::ScoreKFs(KeyFrame &kfCurrent)
       KeyFrame& kf = *(jit->second);
       if(kfCurrent.mCamName != kf.mCamName)  // only look at same camera
         continue;
+        
+      if(!kf.mpSBI)
+      {
+        ROS_WARN("KF doesn't have small blurry image! Skipping ...");
+        continue;
+      }
       
       double dSSD = kfCurrent.mpSBI->ZMSSD(*(kf.mpSBI));
       if(dSSD < mdBestScore)

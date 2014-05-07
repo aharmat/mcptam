@@ -60,6 +60,7 @@ int MapMakerServerBase::snMaxInitPointsLevelZero = 100;
 double MapMakerServerBase::sdInitDepth = 3.0;
 std::string MapMakerServerBase::ssInitPointMode = "both";  // options: "stereo", "idp", "both"
 double MapMakerServerBase::sdInitCovThresh = 1.0;
+bool MapMakerServerBase::sbLargePointTest = true;
 
 MapMakerServerBase::MapMakerServerBase(Map& map, TaylorCameraMap &cameras, BundleAdjusterBase& bundleAdjuster)
   : MapMakerBase(map, true)  // This will be skipped since inheritance is virtual!
@@ -369,13 +370,14 @@ bool MapMakerServerBase::AddMultiKeyFrameAndCreatePoints(MultiKeyFrame *pMKF)
   
   static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN|SILENT);
   
-  if(nLargePointsAdded > 0)  // ok, new MKF good
+  if(!MapMakerServerBase::sbLargePointTest || nLargePointsAdded > 0)  // ok, new MKF good
   {
     AddStereoMapPoints(*pMKF, 1, std::numeric_limits<int>::max(), -1.0, KF_ONLY_OTHER);
     if(*gvnLevelZeroPoints)
       AddStereoMapPoints(*pMKF, 0, std::numeric_limits<int>::max(), -1.0, KF_ONLY_OTHER);
   
     mMap.mlpMultiKeyFrames.push_back(pMKF);
+    ROS_INFO("Just added MKF to map");
   
     if(pMKF->mmpKeyFrames.size() > 1)  // we have some siblings
     {

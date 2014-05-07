@@ -731,7 +731,7 @@ double KeyFrame::Distance(KeyFrame &other)
    
   // The final distance is a weighted combination of these two Euclidean distances
   double dDist = sqrt(v3Diff * v3Diff) + sqrt(v3MeanDiff * v3MeanDiff) * KeyFrame::sdDistanceMeanDiffFraction;
-  if(!std::isfinite(dDist))
+  if(!std::isfinite(dDist) || dDist > 1e10)
   {
     ROS_FATAL_STREAM("dDist: "<<dDist);
     ROS_FATAL_STREAM("v3Diff: "<<v3Diff);

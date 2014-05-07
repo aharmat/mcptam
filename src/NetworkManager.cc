@@ -102,7 +102,7 @@ void NetworkManager::Initialize()
   mNodeHandle.setCallbackQueue(&mCallbackQueue);
   mNodeHandlePriv.setCallbackQueue(&mCallbackQueue);
   
-  mModifyMapClient = mNodeHandle.serviceClient<mcptam::ModifyMap>("modify_map"); // This will need to be remapped in a launch file
+  mModifyMapClient = mNodeHandle.serviceClient<mcptam::ModifyMap>("modify_map", true); // This will need to be remapped in a launch file
   mModifyMapServer = mNodeHandlePriv.advertiseService("modify_map", &NetworkManager::ModifyMapCallback, this);
   
   while(!mModifyMapClient.waitForExistence(ros::Duration(5)) && ros::ok())
@@ -121,6 +121,9 @@ NetworkManager::~NetworkManager()
   ROS_DEBUG("NetworkManager: Waiting for run thread to die");
   join(); // CVD::Thread function
   ROS_DEBUG("NetworkManager: Run thread has died.");
+  
+  mModifyMapServer.shutdown();
+  mModifyMapClient.shutdown();
 }
 
 void NetworkManager::Spinning(ros::Rate rate)
@@ -156,12 +159,18 @@ void NetworkManager::CallReset()
 {
   mcptam::ModifyMap reset;
   reset.request.action = reset.request.RESET;
-
-  while(!mModifyMapClient.call(reset) && ros::ok()) // problem with connection
+  
+  while(!mModifyMapClient.call(reset) && ros::ok())
   {
     ROS_ERROR_STREAM("NetworkManager ("<<mRole<<"): Failed calling reset! Trying again...");
-    ros::Duration(0.5).sleep();
+    mModifyMapClient = mNodeHandle.serviceClient<mcptam::ModifyMap>("modify_map", true); 
+    while(!mModifyMapClient.waitForExistence(ros::Duration(1)) && ros::ok())
+    {
+      ROS_WARN_STREAM("NetworkManager: Waiting for modify_map service to reconnect...");
+    }
   }
+  
+  ROS_ASSERT(reset.response.success);
   
   // Resetting ourselves needs to be done once the other network manager has been reset
   // otherwise it might send us a new message in the interval between clearing 
@@ -209,10 +218,12 @@ bool NetworkManager::ModifyMapCallback(mcptam::ModifyMap::Request &request, mcpt
     {
       ROS_FATAL("NetworkManager: Got an INIT request but no Init callback function specified");
       ros::shutdown();
-      return false;
+      response.success = false;
     }
-    
-    return mInitCallbackWrapper(pMKF);
+    else
+    {
+      response.success = mInitCallbackWrapper(pMKF);
+    }
   }
   else if(request.action == request.RESET)  // Don't push to incoming queue, call callback immediately
   {
@@ -220,13 +231,14 @@ bool NetworkManager::ModifyMapCallback(mcptam::ModifyMap::Request &request, mcpt
     {
       ROS_FATAL("NetworkManager: Got a RESET request but no Reset callback function specified");
       ros::shutdown();
-      return false;
+      response.success = false;
     }
-    
-    mResetCallbackWrapper();  // call the reset callback first (this will wait for map maker to reset)
-    Reset();   // Then reset ourselves
-    
-    return true;
+    else
+    {
+      mResetCallbackWrapper();  // call the reset callback first (this will wait for map maker to reset)
+      Reset();   // Then reset ourselves
+      response.success = true;
+    }
   }
   else
   {
@@ -244,8 +256,10 @@ bool NetworkManager::ModifyMapCallback(mcptam::ModifyMap::Request &request, mcpt
     if(pReq->action == pReq->ADD && !mNewAddCallbackWrapper.empty())
       mNewAddCallbackWrapper();
       
-    return true;
+    response.success = true;
   }
+  
+  return true;
 }
 
 // Pops a message off the outgoing queue, and tries to send it until it succeeds
@@ -272,8 +286,14 @@ void NetworkManager::HandleNextOutgoing()
   while(!mModifyMapClient.call(*pReq, res) && ros::ok())
   {
     ROS_WARN("NetworkManager: Couldn't send request, trying again...");
-    ros::Duration(0.5).sleep();
+    mModifyMapClient = mNodeHandle.serviceClient<mcptam::ModifyMap>("modify_map", true);
+    while(!mModifyMapClient.waitForExistence(ros::Duration(1)) && ros::ok())
+    {
+      ROS_WARN_STREAM("NetworkManager: Waiting for modify_map service to reconnect...");
+    }
   }
+  
+  ROS_ASSERT(res.success);
   
   if(pReq->action == pReq->ADD)
     ROS_INFO("NetworkManager: Just sent ADD message");
@@ -380,7 +400,17 @@ bool NetworkManager::CallInit(MultiKeyFrame* pMKF)
   
   ROS_DEBUG_STREAM("NetworkManager: In CallInit, sending MKF with id: "<<init.request.mvMultiKeyFrames[0].mId);
   
-  return mModifyMapClient.call(init);
+  while(!mModifyMapClient.call(init) && ros::ok())
+  {
+    ROS_WARN("NetworkManager: Couldn't call init, trying again...");
+    mModifyMapClient = mNodeHandle.serviceClient<mcptam::ModifyMap>("modify_map", true); 
+    while(!mModifyMapClient.waitForExistence(ros::Duration(1)) && ros::ok())
+    {
+      ROS_WARN_STREAM("NetworkManager: Waiting for modify_map service to reconnect...");
+    }
+  }
+  
+  return init.response.success;
 }
 
 // Send a MultiKeyFrame as an ADD message
@@ -683,8 +713,7 @@ void NetworkManager::AddMsg_To_KeyFrame(mcptam::NetworkKeyFrame &kf_msg, KeyFram
     
     if(pPoint) // if NULL, then map point was deleted while the KeyFrame message was in transit, so don't build a measurement for it
     {
-      //printNetworkMeasurement(meas_msg, kf_msg.mCamName, kf_msg.mParentId, mnSeqReceived);
-      printNetworkMeasurement(meas_msg, kf_msg.mParentId, &kf, pPoint, mnSeqReceived);
+      //printNetworkMeasurement(meas_msg, kf_msg.mParentId, &kf, pPoint, mnSeqReceived);
       
       Measurement* pMeas = new Measurement;
       
@@ -754,8 +783,7 @@ void NetworkManager::KeyFrame_To_AddMsg(KeyFrame &kf, mcptam::NetworkKeyFrame &k
     kf_msg.mvMeasurements[i].v2RootPos[1] = meas.v2RootPos[1];
     kf_msg.mvMeasurements[i].mapPointId = mMapPointDict.PtrToId(&point, false);  // map point should have id from when it was received
     
-    //printNetworkMeasurement(kf_msg.mvMeasurements[i], kf_msg.mCamName, kf_msg.mParentId, mnSeqSend);
-    printNetworkMeasurement(kf_msg.mvMeasurements[i], kf_msg.mParentId, &kf, &point, mnSeqSend);
+    //printNetworkMeasurement(kf_msg.mvMeasurements[i], kf_msg.mParentId, &kf, &point, mnSeqSend);
     
     // Add message should only be generated for a new MKF addition, so none of the measurements should
     // have been transferred yet
@@ -812,8 +840,7 @@ void NetworkManager::KeyFrame_To_UpdateMsg(KeyFrame &kf, mcptam::NetworkKeyFrame
     meas_msg.v2RootPos[0] = meas.v2RootPos[0];
     meas_msg.v2RootPos[1] = meas.v2RootPos[1];
     
-    //printNetworkMeasurement(meas_msg, kf_msg.mCamName, kf_msg.mParentId, mnSeqSend);
-    printNetworkMeasurement(meas_msg, kf_msg.mParentId, &kf, &point, mnSeqSend);
+    //printNetworkMeasurement(meas_msg, kf_msg.mParentId, &kf, &point, mnSeqSend);
   /*  
     if(mmMeasDebugReceivedAdd.count(std::make_tuple(&kf, meas_msg.mapPointId, meas.nLevel)))
     {
@@ -890,8 +917,7 @@ void NetworkManager::UpdateMsg_ApplyTo_KeyFrame(mcptam::NetworkKeyFrame &kf_msg)
     
     if(pPoint) // if NULL, then map point was deleted while the KeyFrame message was in transit, so don't build a measurement for it
     {
-      //printNetworkMeasurement(meas_msg, kf_msg.mCamName, kf_msg.mParentId, mnSeqReceived);
-      printNetworkMeasurement(meas_msg, kf_msg.mParentId, &kf, pPoint, mnSeqReceived);
+      //printNetworkMeasurement(meas_msg, kf_msg.mParentId, &kf, pPoint, mnSeqReceived);
       /*
       if(msMeasDebugUnaccounted.count(std::make_tuple(&kf, meas_msg.mapPointId, meas_msg.nLevel)))
       {
@@ -960,7 +986,7 @@ void NetworkManager::MapPoint_To_AddMsg(MapPoint& point, mcptam::NetworkMapPoint
 {
   point_msg.mId = mMapPointDict.PtrToId(&point, true);
   
-  printNetworkMapPoint(point_msg, &point, mnSeqSend, "SENDING ADD");
+  //printNetworkMapPoint(point_msg, &point, mnSeqSend, "SENDING ADD");
   
   point_msg.mbFixed = point.mbFixed;
   point_msg.mbOptimized = point.mbOptimized;
@@ -1011,7 +1037,7 @@ void NetworkManager::MapPoint_To_DeleteMsg(MapPoint& point, mcptam::NetworkMapPo
 {
   point_msg.mId = mMapPointDict.PtrToId(&point, false);
   
-  printNetworkMapPoint(point_msg, &point, mnSeqSend, "SENDING DELETE");
+  //printNetworkMapPoint(point_msg, &point, mnSeqSend, "SENDING DELETE");
   
   mMapPointDict.Remove(&point, mRole);
 }
@@ -1021,7 +1047,7 @@ MapPoint* NetworkManager::AddMsg_To_MapPoint(mcptam::NetworkMapPoint &point_msg)
 {
   MapPoint* pPoint = mMapPointDict.IdToPtr(point_msg.mId, true);
   
-  printNetworkMapPoint(point_msg, pPoint, mnSeqReceived, "RECEIVING ADD");
+  //printNetworkMapPoint(point_msg, pPoint, mnSeqReceived, "RECEIVING ADD");
   
   ROS_ASSERT(pPoint);
   pPoint->mbFixed = point_msg.mbFixed;
@@ -1069,7 +1095,7 @@ MapPoint* NetworkManager::DeleteMsg_To_MapPoint(mcptam::NetworkMapPoint &point_m
   
   if(pPoint)
   {
-    printNetworkMapPoint(point_msg, pPoint, mnSeqReceived, "RECEIVING DELETE");
+    //printNetworkMapPoint(point_msg, pPoint, mnSeqReceived, "RECEIVING DELETE");
     
     // Need to find sender's role
     std::string remover;
@@ -1096,7 +1122,7 @@ void NetworkManager::Outlier_To_OutlierMsg(std::pair<KeyFrame*, MapPoint*>& outl
   outlier_msg.mCamName = pKF->mCamName;
   outlier_msg.mapPointId = mMapPointDict.PtrToId(pPoint, false);
   
-  printNetworkOutlier(outlier_msg, pKF, pPoint, mnSeqSend, "SENDING OUTLIER");
+  //printNetworkOutlier(outlier_msg, pKF, pPoint, mnSeqSend, "SENDING OUTLIER");
 }
 
 void NetworkManager::OutliersMsg_ApplyTo_Affected(mcptam::NetworkOutlier& outlier_msg)
@@ -1117,7 +1143,7 @@ void NetworkManager::OutliersMsg_ApplyTo_Affected(mcptam::NetworkOutlier& outlie
   if(pPoint->mbBad)  // MapPoint labeled bad on client side, no point doing anything more since it'll be deleted soon
     return;
     
-  printNetworkOutlier(outlier_msg, &kf, pPoint, mnSeqReceived, "RECEIVED OUTLIER");
+  //printNetworkOutlier(outlier_msg, &kf, pPoint, mnSeqReceived, "RECEIVED OUTLIER");
     
   if(!kf.mmpMeasurements.count(pPoint))
   {

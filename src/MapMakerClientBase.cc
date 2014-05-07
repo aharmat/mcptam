@@ -116,7 +116,7 @@ bool MapMakerClientBase::NeedNewMultiKeyFrame(MultiKeyFrame &mkf)
     return false;
   }
     
-  if(mState == MM_INITIALIZING || mState == MM_JUST_FINISHED_INIT)  // always need the new MKF when initializing or just finished
+  if(mState == MM_INITIALIZING)  // always need the new MKF when initializing or just finished
   {
     ROS_DEBUG("NeedNewMultiKeyFrame: initializing, returning true");
     return true;
@@ -187,6 +187,10 @@ bool MapMakerClientBase::NeedNewKeyFrame(KeyFrame &kf, bool bSameCamName)
   }
   
   KeyFrame *pClosestKF = ClosestKeyFrame(kf, KF_ALL, bSameCamName);
+  
+  if(pClosestKF == NULL)
+    return false;
+  
   double dDist = kf.Distance(*pClosestKF);
   dDist *= (1.0 / kf.mdSceneDepthMean); // scale by depth
   
@@ -210,6 +214,10 @@ bool MapMakerClientBase::IsDistanceToNearestMultiKeyFrameExcessive(MultiKeyFrame
 bool MapMakerClientBase::IsDistanceToNearestKeyFrameExcessive(KeyFrame &kf)
 {
    KeyFrame *pClosestKF = ClosestKeyFrame(kf, KF_ALL);
+   
+   if(pClosestKF == NULL)
+    return true;
+   
    double dDist = kf.Distance(*pClosestKF);
    dDist *= (1.0 / pClosestKF->mdSceneDepthMean);  // scale by depth
    

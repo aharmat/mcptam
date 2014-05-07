@@ -70,6 +70,7 @@ void LoadStaticParamsServer()
   nh_priv.getParam("mm_init_depth", MapMakerServerBase::sdInitDepth);
   nh_priv.getParam("mm_init_point_mode", MapMakerServerBase::ssInitPointMode);  // options: "stereo", "idp", "both"
   nh_priv.getParam("mm_init_cov_thresh", MapMakerServerBase::sdInitCovThresh);
+  nh_priv.getParam("mm_large_point_test", MapMakerServerBase::sbLargePointTest);
 }
 
 

@@ -1816,6 +1816,9 @@ void Tracker::CollectNearestPoints(KeyFrame& kf, std::set<MapPoint*>& spNearestP
     // This version gets the map points seen by the closest keyframe, then looks for keyframes that see those points, and collects
     // all other points also seen by those keyframes
     KeyFrame* pNearestKF = mMapMaker.ClosestKeyFrame(kf);  // region flag doesn't make a difference since kf not in map
+    
+    ROS_ASSERT(pNearestKF != NULL);
+    
     std::set<KeyFrame*> spNearestNeighborKFs;
      
     boost::mutex::scoped_lock lockNearest(pNearestKF->mMeasMutex);

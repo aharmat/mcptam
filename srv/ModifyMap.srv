@@ -14,4 +14,4 @@ uint8 INIT=5
 uint8 RESET=6
 uint8 STATE=7
 ---
-# No response other than the true/false returned from the call
+bool success
