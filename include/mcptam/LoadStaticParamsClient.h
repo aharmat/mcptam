@@ -73,6 +73,7 @@ void LoadStaticParamsClient()
   nh_priv.getParam("tracker_mestimator", Tracker::sMEstimatorName);
   nh_priv.getParam("tracker_quality_good", Tracker::sdTrackingQualityGood);
   nh_priv.getParam("tracker_quality_bad", Tracker::sdTrackingQualityBad);
+  nh_priv.getParam("tracker_collect_all_points", Tracker::sbCollectAllPoints);
 
   nh_priv.getParam("reloc_max_score", Relocaliser::sdRecoveryMaxScore);
 }
