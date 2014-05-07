@@ -47,6 +47,8 @@
 
 using namespace TooN;
 
+bool SystemBase::sbLevelZeroPoints = false;
+
 SystemBase::SystemBase(std::string windowName, bool bFullSize, bool bDrawWindow)
 : mNodeHandlePriv("~")
 , mpVideoSourceMulti(InitVideoSource())

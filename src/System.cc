@@ -123,6 +123,9 @@ System::System()
     GUI.ParseLine("AddingMKFs=1");
     GUI.ParseLine("CrossCamera=1");
     
+    static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN|SILENT);
+    *gvnLevelZeroPoints = SystemBase::sbLevelZeroPoints;
+    
     // Main Menu
     GUI.ParseLine("Menu.AddMenuButton Root Reset Reset Root");
     GUI.ParseLine("Menu.AddMenuButton Root Init InitTracker Root");

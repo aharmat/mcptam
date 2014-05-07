@@ -30,6 +30,8 @@
   <param name="mm_outlier_multiplier" type="double" value="1.1" />
   <param name="mm_init_cov_thresh" type="double" value="1.0" />
   
+  <param name="level_zero_points" type="bool" value="true" />
+  
   <!-- For no GUI, set headless:=true -->
   <param name="headless" type="bool" value="$(arg headless)" />
 </node>
