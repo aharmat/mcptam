@@ -47,7 +47,6 @@
 
 #include <mcptam/MapMakerClientBase.h>
 #include <mcptam/Tracker.h>
-#include <mcptam/SystemBase.h>
 #include <ros/ros.h>
 
 /// Load static parameters from the ROS parameter server for the client items
@@ -77,8 +76,6 @@ void LoadStaticParamsClient()
   nh_priv.getParam("tracker_collect_all_points", Tracker::sbCollectAllPoints);
 
   nh_priv.getParam("reloc_max_score", Relocaliser::sdRecoveryMaxScore);
-  
-  nh_priv.getParam("level_zero_points", SystemBase::sbLevelZeroPoints);
 }
 
 

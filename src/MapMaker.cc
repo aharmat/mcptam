@@ -387,7 +387,8 @@ void MapMaker::AddMultiKeyFrameFromTopOfQueue()
       }
     }
     
-    kf.MakeSBI();  // only needed for relocalizer
+    if(!kf.NoImage())
+      kf.MakeSBI();  // only needed for relocalizer
   }
   
 /*

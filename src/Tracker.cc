@@ -388,7 +388,7 @@ void Tracker::TrackFrameSetup(ImageBWMap& imFrames, ros::Time timestamp, bool bD
     
     if(dMaxPointCov > 0)
     {
-      double dRedFrac = dMaxPointCov/1e3;
+      double dRedFrac = dMaxPointCov/10;
       if(dRedFrac > 1)
         dRedFrac = 1.0;
       double dGreenFac = 1-dRedFrac;

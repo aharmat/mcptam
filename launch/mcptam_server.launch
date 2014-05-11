@@ -1,5 +1,8 @@
 <launch>
 
+<arg name="separate_pose" default="false" />
+<arg name="init_mode" default="stereo" />
+
 <arg name="debug" default="false" />
 <arg name="debug_prefix" value="gdb --args" if="$(arg debug)"/>
 <arg name="debug_prefix" value="" unless="$(arg debug)"/>
@@ -8,8 +11,10 @@
 <node name="mcptam_server" pkg="mcptam" type="mcptam_server" clear_params="true" output="screen" launch-prefix="$(arg debug_prefix)">
   <rosparam command="load" file="$(find mcptam)/groups/$(arg group_name).yaml" />
 
-  <param name="get_pose_separately" type="bool" value="false" />
-  <param name="mm_init_point_mode" type="string" value="stereo" /> 
+  <param name="get_pose_separately" type="bool" value="$(arg separate_pose)" />
+  <param name="mm_init_point_mode" type="string" value="$(arg init_mode)" /> 
+  
+  <param name="mm_init_point_max_num" type="int" value="200" />
 
   <!--
   <param name="camera_pose_file" type="string" value="$(find mcptam)/poses/poses.dat" />
@@ -24,6 +29,11 @@
   <remap from="system_info" to="mcptam_client/system_info" />
   <param name="image_transport" type="string" value="compressed"/> 
   <param name="kf_distance_mean_diff_fraction" type="double" value="0.5" /> 
+  <param name="mm_init_cov_thresh" type="double" value="0.01" />
+  <param name="mm_max_scaled_mkf_dist" type="double" value="0.3" />
+  <param name="mm_outlier_multiplier" type="double" value="1.1" />
+  
+  <param name="level_zero_points" type="bool" value="true" />
 </node>
 
 <!-- 

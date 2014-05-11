@@ -88,12 +88,17 @@ SystemServer::SystemServer()
   GUI.ParseLine("DrawTrackerMeas=1");
   GUI.ParseLine("DrawCandidates=0");
   GUI.ParseLine("DrawLevel=0");
+  GUI.ParseLine("LevelZeroPoints=0");
+  
+  static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN|SILENT);
+  *gvnLevelZeroPoints = SystemBase::sbLevelZeroPoints;
   
   // Main Menu
   GUI.ParseLine("Menu.AddMenuButton Root Reset Reset Root");
   GUI.ParseLine("Menu.AddMenuButton Root Init InitTracker Root");
   GUI.ParseLine("Menu.AddMenuToggle Root \"LiveMeas\" DrawTrackerMeas Root");
   GUI.ParseLine("Menu.AddMenuButton Root \"Keyframes...\" \"\" View");
+  GUI.ParseLine("Menu.AddMenuToggle Root \"Level0 Pts\" LevelZeroPoints Root");
 
   // View Keyframes
   GUI.ParseLine("Menu.AddMenuButton View \"< Back\" \"\" Root");
@@ -192,6 +197,22 @@ void SystemServer::Run()
         }
         
         glEnd();
+      }
+      
+      double dMaxPointCov = mpMapMakerServer->GetMaxCov();
+      
+      if(dMaxPointCov > 0)
+      {
+        double dRedFrac = dMaxPointCov/10;
+        if(dRedFrac > 1)
+          dRedFrac = 1.0;
+        double dGreenFac = 1-dRedFrac;
+        std::stringstream sscov;
+        sscov<<"Max cov: "<<dMaxPointCov;
+        std::string covstring = sscov.str();
+      
+        glColor3f(dRedFrac,dGreenFac,0);
+        mpGLWindow->PrintString(CVD::ImageRef(10,80), covstring, 15);
       }
       
     }

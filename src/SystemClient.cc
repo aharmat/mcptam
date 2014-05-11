@@ -84,10 +84,6 @@ SystemClient::SystemClient()
     GUI.ParseLine("DrawOnlyLevel=0");
     GUI.ParseLine("DrawLevel=0");
     GUI.ParseLine("GlareMasking=0");
-    GUI.ParseLine("LevelZeroPoints=0");
-    
-    static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN|SILENT);
-    *gvnLevelZeroPoints = SystemBase::sbLevelZeroPoints;
     
     // Main Menu
     GUI.ParseLine("Menu.AddMenuButton Root Reset Reset Root");
@@ -98,7 +94,6 @@ SystemClient::SystemClient()
 
     // Images Menu
     GUI.ParseLine("Menu.AddMenuButton Images \"< Back\" \"\" Root");
-    GUI.ParseLine("Menu.AddMenuToggle Images \"Level0 Pts\" LevelZeroPoints Images");
     GUI.ParseLine("Menu.AddMenuToggle Images \"Draw Masks\" DrawMasks Images");
     GUI.ParseLine("Menu.AddMenuToggle Images \"Glare Mask\" GlareMasking Images");
   }

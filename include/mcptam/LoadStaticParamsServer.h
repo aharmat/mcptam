@@ -48,6 +48,7 @@
 #include <mcptam/MapMakerServerBase.h>
 #include <mcptam/BundleAdjusterBase.h>
 #include <mcptam/ChainBundle.h>
+#include <mcptam/SystemBase.h>
 #include <ros/ros.h>
 
 /// Load static parameters from the ROS parameter server for the server module
@@ -68,9 +69,12 @@ void LoadStaticParamsServer()
   nh_priv.getParam("mm_max_consecutive_failed_ba", MapMakerServerBase::snMaxConsecutiveFailedBA);
   nh_priv.getParam("mm_max_triangulation_kfs", MapMakerServerBase::snMaxTriangulationKFs);
   nh_priv.getParam("mm_init_depth", MapMakerServerBase::sdInitDepth);
+  nh_priv.getParam("mm_init_point_max_num", MapMakerServerBase::snMaxInitPointsLevelZero);
   nh_priv.getParam("mm_init_point_mode", MapMakerServerBase::ssInitPointMode);  // options: "stereo", "idp", "both"
   nh_priv.getParam("mm_init_cov_thresh", MapMakerServerBase::sdInitCovThresh);
   nh_priv.getParam("mm_large_point_test", MapMakerServerBase::sbLargePointTest);
+  
+  nh_priv.getParam("level_zero_points", SystemBase::sbLevelZeroPoints);
 }
 
 

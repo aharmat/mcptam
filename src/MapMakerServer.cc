@@ -251,9 +251,27 @@ void MapMakerServer::SendUpdate(std::set<MultiKeyFrame*> spAdjustedFrames, std::
 {  
   if(mbInitializedByClient) // only do this if initialized because otherwise client might not have same data yet
   {
+    // Take out any MKFs that have no images. This happens during initialization, but can also happen for a short
+    // time after switching to RUNNING if the map hasn't yet converged and BA happens again before we start receiving
+    // MKFs with images intact from the client
+    
     if(mState == MM_INITIALIZING)  // don't send updates for MKF since client will already have deleted it
     {
       spAdjustedFrames.clear();
+    }
+    else
+    {
+      std::set<MultiKeyFrame*> spAdjustedFramesWithImages;
+      for(std::set<MultiKeyFrame*>::iterator mkf_it = spAdjustedFrames.begin(); mkf_it != spAdjustedFrames.end(); ++mkf_it)
+      {
+        MultiKeyFrame* pMKF = *mkf_it;
+        if(!pMKF->NoImages())
+        {
+          spAdjustedFramesWithImages.insert(pMKF);
+        }
+      }
+      
+      spAdjustedFrames.swap(spAdjustedFramesWithImages);
     }
     
     ROS_DEBUG_STREAM("MapMakerServer: sending updates of "<<spAdjustedFrames.size()<<" MKFs and "<<spAdjustedPoints.size()<<" points");
