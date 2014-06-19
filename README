@@ -28,8 +28,8 @@
 
 MCPTAM is a set of ROS nodes for running Real-time 3D Visual Simultaneous Localization and Mapping (SLAM) using Multi-Camera Clusters. It includes tools for calibrating both the intrinsic and extrinsic parameters of the individual cameras within the rigid camera rig.
 
-Visit the MCPTAM website (https://ncfrn.mcgill.ca/redmine/projects/mcptam).
+Visit the MCPTAM website (https://github.com/aharmat/mcptam).
 
-For more information, refer to the MCPTAM Wiki (https://ncfrn.mcgill.ca/redmine/projects/mcptam/wiki).
+For more information, refer to the MCPTAM Wiki (https://github.com/aharmat/mcptam/wiki).
 
 A Getting-Started Guide is available on the Wiki, or a snapshot can be found in the file Getting-Started.pdf.
