@@ -68,7 +68,7 @@ int BundleAdjusterSingle::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std
     return 0;
   }
   
-  ChainBundle singleBundle(mmCameraModels, mbUseRobust, mbUseTukey, false);
+  ChainBundle singleBundle(mmCameraModels, mbUseRobust, mbUseTukey, mbUseMarginalized, false);
   mbBundleRunning = true;
   mbBundleRunningIsRecent = bRecent;
   

@@ -111,6 +111,9 @@ public:
    *  @return Should this MultiKeyFrame be added? */
   bool NeedNewMultiKeyFrame(MultiKeyFrame &mkf, int nNumMeas);
   
+  // TESTING
+  bool NeedNewMultiKeyFrame(TooN::Matrix<6> m6Cov);
+  
   /// Checks to see if the given KeyFrame is a candidate to be added to the Map
   /** @param kf The KeyFrame to check
    *  @return Should this KeyFrame be added? */           

@@ -130,6 +130,7 @@ protected:
   ros::Publisher mStatePub;   ///< Publisher for tracker state information
   ros::Publisher mPoseArrayPub;   ///< Publisher for tracker pose (array of cameras)
   ros::Publisher mPoseWithCovPub; ///< Publisher for tracker pose with covariance
+  ros::Publisher mPoseCovNormPub; ///< Norm of tracker pose covariance matrix
   
 };
 

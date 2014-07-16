@@ -103,7 +103,7 @@ public:
    *  @param bUseRobust Should we do robustification of errors during optimization? Uses Huber M-estimator.
    *  @param bUseTukey Should we do a round of Tukey robustification AFTER optimization? If you want to generate outliers, you have to do this.
    *  @param bVerbose Verbose flag for the g2o optimizer */
-  ChainBundle(TaylorCameraMap& cameraModels, bool bUseRobust, bool bUseTukey, bool bVerbose);   
+  ChainBundle(TaylorCameraMap& cameraModels, bool bUseRobust, bool bUseTukey, bool bUseMarginalized, bool bVerbose);   
   
   /// Destructor
   ~ChainBundle();
@@ -150,12 +150,22 @@ public:
   /// Get point position after adjustment
   /** @param n The index of the point
    *  @return The position of the point (in the parent camera frame!) */
-  TooN::Vector<3> GetPoint(int n);       
+  TooN::Vector<3> GetPoint(int n);  
+  
+  /// Get the point covariance after adjustment
+  /** @param n The index of the point
+   *  @return The 3x3 covariance matrix of the point. This is the covariance in cartesian coordinates, in the parent frame of the point */
+  TooN::Matrix<3> GetPointCov(int n);     
   
   /// Get pose after adjustment
   /** @param n The index of the pose
    *  @return The pose */
-  TooN::SE3<> GetPose(int n);      
+  TooN::SE3<> GetPose(int n);     
+  
+  /// Get the pose covariance after adjustment
+  /** @param n The index of the pose
+   *  @return The 6x6 covariance matrix of the pose */
+   TooN::Matrix<6> GetPoseCov(int n); 
     
   /** @brief Get measurements flagged as outliers
    * 
@@ -209,6 +219,7 @@ protected:
   int mnCurrId;   ///< Used to give IDs to poses and points, incremented each time AddPose() or AddPoint() is called
   bool mbUseRobust; ///< Use robustification of errors?
   bool mbUseTukey;  ///< Use the Tukey test for outliers
+  bool mbUseMarginalized;
   bool mbVerbose;   ///< Print lots of stuff?
   
 };

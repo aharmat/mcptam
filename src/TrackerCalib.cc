@@ -162,7 +162,7 @@ void TrackerCalib::DrawStatusBorder()
 // Optimize the pose computed by the calibration image using bundle adjustment
 void TrackerCalib::OptimizeCalibImagePose()
 {
-  ChainBundle tempBundle(mmCameraModels, false, false, false);
+  ChainBundle tempBundle(mmCameraModels, false, false, false, false);
 
   int nWorldID = tempBundle.AddPose(TooN::SE3<>(), true);  // dummy pose so we can insert points fixed in the world frame
   int nCamID = tempBundle.AddPose(mpCalibImage->mse3CamFromWorld, false);

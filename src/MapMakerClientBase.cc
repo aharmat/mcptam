@@ -107,6 +107,26 @@ void MapMakerClientBase::MarkDanglersAsBad()
   }
 }
 
+bool MapMakerClientBase::NeedNewMultiKeyFrame(TooN::Matrix<6> m6Cov)
+{
+  if(TrackerQueueSize() > 0)
+  {
+    ROS_WARN("MapMakerClientBase::NeedNewMultiKeyFrame: Queue size too large, returning false");
+    return false;
+  }
+    
+  if(mState == MM_INITIALIZING)  // always need the new MKF when initializing or just finished
+  {
+    ROS_INFO("NeedNewMultiKeyFrame: initializing, returning true");
+    return true;
+  }
+  
+  double dCovMag = TooN::norm_fro(m6Cov);
+  ROS_INFO_STREAM("NeedNewMultiKeyFrame: cov mag: "<<dCovMag);
+  
+  return dCovMag > 1e-4;
+}
+
 // Checks to see if the given MultiKeyFrame is a candidate to be added to the Map
 bool MapMakerClientBase::NeedNewMultiKeyFrame(MultiKeyFrame &mkf)
 {

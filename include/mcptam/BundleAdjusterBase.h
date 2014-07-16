@@ -101,6 +101,8 @@ public:
   void UseTwoStep(bool bUse){ mbUseTwoStep = bUse; }
   /// Tell the adjuster whether to use robustification on measurements
   void UseRobust(bool bUse){ mbUseRobust = bUse; }
+  /// Tell the adjuster whether to use marginalized points (Schur complement) or directly solve for everything
+  void UseMarginalized(bool bUse){ mbUseMarginalized = bUse; }
 
   /** @brief Adjust all the MapPoints and MultiKeyFrames in the Map
    *  @param [out] vOutliers The vector of outlier measurements found, encoded as KeyFrame,MapPoints pairs
@@ -151,6 +153,7 @@ protected:
   bool mbUseTukey;                ///< Use the Tukey test to eliminate outliers
   bool mbUseTwoStep;              ///< Stop optimization early to initialize new points quickly, then continue
   bool mbUseRobust;               ///< Use robustification on measurements
+  bool mbUseMarginalized;
   
   TaylorCameraMap mmCameraModels;  ///< The camera models
   

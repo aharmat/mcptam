@@ -126,7 +126,7 @@ void MapMaker::Reset()
 void MapMaker::run()
 {
   ros::WallRate loopRate(500);
-  ros::Rate publishRate(10);
+  ros::Rate publishRate(1);
   ros::Duration publishDur = publishRate.expectedCycleTime();
   ros::Time lastPublishTime = ros::Time::now();
   
@@ -168,6 +168,7 @@ void MapMaker::run()
     if(ros::Time::now() - lastPublishTime > publishDur)
     {
       PublishMapInfo();
+      PublishMapVisualization();
       lastPublishTime = ros::Time::now();
     }
     
@@ -188,6 +189,7 @@ void MapMaker::run()
       
       mBundleAdjuster.UseTukey((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2));
       mBundleAdjuster.UseTwoStep((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2));
+      mBundleAdjuster.UseMarginalized(false);
       
       int nAccepted = mBundleAdjuster.BundleAdjustRecent(vOutliers);
       //mdMaxCov = mBundleAdjuster.GetMaxCov();
@@ -232,6 +234,7 @@ void MapMaker::run()
       
       mBundleAdjuster.UseTukey(mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2);
       mBundleAdjuster.UseTwoStep((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2));
+      mBundleAdjuster.UseMarginalized(false);
       
       int nAccepted = mBundleAdjuster.BundleAdjustAll(vOutliers);
       mdMaxCov = mBundleAdjuster.GetMaxCov();

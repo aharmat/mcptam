@@ -44,6 +44,7 @@
 #include <mcptam/LevelHelpers.h>
 #include <mcptam/Utility.h>
 #include <mcptam/MapPoint.h>
+#include <TooN/SymEigen.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <ros/common.h>
 #include <pcl_ros/point_cloud.h>
@@ -58,6 +59,7 @@ MapMakerBase::MapMakerBase(Map& map, bool bAdvertise)
   {
     mMapInfoPub = mNodeHandlePriv.advertise<mcptam::MapInfo>("map_info", 1, true);
     mMapPointsPub = mNodeHandlePriv.advertise<pcl::PointCloud<pcl::PointXYZRGB> >("map_points", 1,true);
+    mMapPointsCovPub = mNodeHandlePriv.advertise<visualization_msgs::MarkerArray>("map_points_cov", 1,true);
     mMapMKFsPub = mNodeHandlePriv.advertise<visualization_msgs::MarkerArray>("map_mkfs_array", 1,true);
   }
   
@@ -359,27 +361,37 @@ void MapMakerBase::PublishMapPoints()
 {
   if(!mMapPointsPub)
     mMapPointsPub = mNodeHandlePriv.advertise<pcl::PointCloud<pcl::PointXYZRGB> >("map_points", 1,true);
-  
+    
+  if(!mMapPointsCovPub)
+    mMapPointsCovPub = mNodeHandlePriv.advertise<visualization_msgs::MarkerArray>("map_points_cov", 1,true);
+    
   pcl::PointCloud<pcl::PointXYZRGB>::Ptr pointMsg (new pcl::PointCloud<pcl::PointXYZRGB>());
+  visualization_msgs::MarkerArray pointCovMsg;
   
   boost::mutex::scoped_lock lock(mMap.mMutex);
   
+  ros::Time nowTime = ros::Time::now();
+  
+  // Fill in header stuff for PCL message
   pointMsg->header.frame_id = "vision_world";
   pointMsg->width = mMap.mlpPoints.size();
   pointMsg->height = 1;
   pointMsg->is_dense = false;
   
 #if ROS_VERSION_MINIMUM(1, 9, 54)   // Hydro or above, uses new PCL library
-  pointMsg->header.stamp = ros::Time::now().toNSec();
+  pointMsg->header.stamp = nowTime.toNSec();
 #else
-  pointMsg->header.stamp = ros::Time::now();
+  pointMsg->header.stamp = nowTime;
 #endif
+
+  TooN::Matrix<3> m3Zeros = TooN::Zeros;   // for testing covariance matrix
   
   for(MapPointPtrList::iterator point_it = mMap.mlpPoints.begin(); point_it != mMap.mlpPoints.end(); ++point_it)
   {
     MapPoint& point = *(*point_it);
     TooN::Vector<3> v3Color = gavLevelColors[point.mnSourceLevel];
     
+    // ------ PCL message ------------
     pcl::PointXYZRGB pclPoint;
     pclPoint.x = point.mv3WorldPos[0];
     pclPoint.y = point.mv3WorldPos[1];
@@ -393,9 +405,63 @@ void MapMakerBase::PublishMapPoints()
     pclPoint.rgb = *reinterpret_cast<float*>(&rgb);
      
     pointMsg->points.push_back(pclPoint);
-  }
+    
+    // ------- Marker Array message -----------
+    TooN::SO3<> so3Rot = TooN::SO3<>();
+    TooN::Vector<3> v3Scale = TooN::makeVector(0.05, 0.05, 0.05);
+    bool bUseSphere = false;
+    
+    if(point.mm3WorldCov != m3Zeros)
+    {
+      TooN::SymEigen<3> eigCov(point.mm3WorldCov);
+      TooN::Matrix<3> m3EVectors = eigCov.get_evectors().T();
+      
+      if(fabs((m3EVectors[0] ^ m3EVectors[1]) * m3EVectors[2]) > 1e-10)  // eigen vectors are not degenerate config
+      {
+        bUseSphere = true;
+      
+        if((m3EVectors[0] ^ m3EVectors[1]) * m3EVectors[2] < 0)  // need to flip direction of first row
+        {
+          m3EVectors.T()[0] *= -1;
+        }
+          
+        so3Rot = TooN::SO3<>(m3EVectors);
+        v3Scale += eigCov.get_evalues();
+      }
+    }
+    
+    visualization_msgs::Marker pointMarker;
+    
+    pointMarker.header.stamp = nowTime;
+    pointMarker.header.frame_id = "vision_world";
+    
+    if(bUseSphere)
+      pointMarker.type = visualization_msgs::Marker::SPHERE;
+    else
+      pointMarker.type = visualization_msgs::Marker::CUBE;
+      
+    pointMarker.action = visualization_msgs::Marker::ADD;
+    pointMarker.ns = "map";
+    pointMarker.id = reinterpret_cast<uint64_t>(&point);
+    pointMarker.pose.position.x = point.mv3WorldPos[0];
+    pointMarker.pose.position.y = point.mv3WorldPos[1];
+    pointMarker.pose.position.z = point.mv3WorldPos[2];
+    pointMarker.pose.orientation = util::SO3ToQuaternionMsg(so3Rot);
+    pointMarker.scale.x = v3Scale[0];
+    pointMarker.scale.y = v3Scale[1];
+    pointMarker.scale.z = v3Scale[2];
+    pointMarker.color.a = 1.0;
+    pointMarker.color.r = v3Color[0];
+    pointMarker.color.g = v3Color[1];
+    pointMarker.color.b = v3Color[2];
+    pointMarker.lifetime = ros::Duration(0);
+    
+    pointCovMsg.markers.push_back(pointMarker);
+    
+  }  // end loop over map points
   
   mMapPointsPub.publish(pointMsg);
+  mMapPointsCovPub.publish(pointCovMsg);
 }
 
 // Publish MKFs as a marker array

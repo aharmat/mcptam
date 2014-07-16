@@ -45,6 +45,7 @@
 #include <mcptam/Utility.h>
 #include <mcptam/LevelHelpers.h>
 #include <sensor_msgs/Image.h>
+#include <std_msgs/Float64.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <geometry_msgs/PoseArray.h>
 #include <tf/transform_datatypes.h>
@@ -88,6 +89,8 @@ SystemFrontendBase::SystemFrontendBase(std::string windowName, bool bFullSize)
   mPoseArrayPub = mNodeHandlePriv.advertise<geometry_msgs::PoseArray>("tracker_pose_array", 1);
   mSmallImagePointsPub = mNodeHandlePriv.advertise<pcl::PointCloud<pcl::PointXYZ> >("tracker_small_image_points", 1);
   mSmallImagePub = mImageTransport.advertise("tracker_small_image", 1);
+  
+  mPoseCovNormPub = mNodeHandlePriv.advertise<std_msgs::Float64>("tracker_pose_cov_norm", 1);
   
   mNodeHandlePriv.param<int>("small_image_level", mnSmallImageLevel, 2);
   if(mnSmallImageLevel < 0)
@@ -173,6 +176,11 @@ void SystemFrontendBase::PublishPose()
   SE3<> pose = mpTracker->GetCurrentPose().inverse();
   Matrix<3> rot = pose.get_rotation().get_matrix();
   TooN::Matrix<6> cov = mpTracker->GetCurrentCovariance();
+  
+  // debug:
+  std_msgs::Float64 cov_norm_msg;
+  cov_norm_msg.data = TooN::norm_fro(cov);
+  mPoseCovNormPub.publish(cov_norm_msg);
   
   // clear cross correlation
   cov.slice<0,3,3,3>() = TooN::Zeros;

@@ -104,6 +104,7 @@ public:
     mnMEstimatorInlierCount = 1;
     //mtCreationTime = ros::Time::now();
     mpPatchSourceKF = NULL;
+    mm3WorldCov = TooN::Zeros;
   };
   
   /// Delete owned TrackerData pointers
@@ -123,6 +124,7 @@ public:
   void RefreshPixelVectors();      
   
   TooN::Vector<3> mv3WorldPos; ///< Current position relative to the world
+  TooN::Matrix<3> mm3WorldCov; ///< Current covariance in world frame
   
   bool mbBad;  ///< Is it a dud? In that case it'll be moved to the trash soon.
   bool mbDeleted; ///< Similar to mbBad, but used only in client/server code to allow immediate deletion of received points

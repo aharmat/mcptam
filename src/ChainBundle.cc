@@ -72,6 +72,7 @@ class VertexPoseSE3 : public g2o::BaseVertex<6, TooN::SE3<> >
     {
       setToOrigin();
       _nID = poseID++;
+      _m6Cov = TooN::Zeros;
     }
 
     virtual void setToOriginImpl() 
@@ -107,6 +108,7 @@ class VertexPoseSE3 : public g2o::BaseVertex<6, TooN::SE3<> >
     }
     
     int _nID;
+    TooN::Matrix<6> _m6Cov;
 
 };
 
@@ -228,6 +230,7 @@ class VertexRelPoint : public g2o::BaseVertex<3, TooN::Vector<3> >
       setToOrigin();
       _nID = pointID++;
       _pPoseChainHelper = NULL;
+      _m3CartesianCov = TooN::Zeros;
     }
   
     virtual void setToOriginImpl() {
@@ -236,6 +239,9 @@ class VertexRelPoint : public g2o::BaseVertex<3, TooN::Vector<3> >
 
     virtual void oplusImpl(const double* update)
     {
+      _estimate += TooN::makeVector(update[0], update[1], update[2]);
+      return;
+      
       // The update is specified in a coordinate frame where the _estimate
       // vector is first rotated to align with the z axis. This is done because
       // then we don't have to deal with singularities arising from
@@ -243,8 +249,10 @@ class VertexRelPoint : public g2o::BaseVertex<3, TooN::Vector<3> >
       // that the size of the update vector is small enough to stay away from
       // these areas, which should be the case)
       
-      TooN::Vector<3> v3PointInCamDir = _estimate;
-      TooN::normalize(v3PointInCamDir);
+      double dDistBefore = TooN::norm(_estimate);
+      double dRhoBefore = 1.0/dDistBefore;
+      TooN::Vector<3> v3PointInCamDir = _estimate / dDistBefore;
+      //TooN::normalize(v3PointInCamDir);
       
       // Get the axis of rotation between the the point direction and the z axis
       TooN::Vector<3> v3Axis = v3PointInCamDir ^ TooN::makeVector(0,0,1);
@@ -261,16 +269,16 @@ class VertexRelPoint : public g2o::BaseVertex<3, TooN::Vector<3> >
       double d_rho = update[2];   // displacement along z axis
       
       // To update the estimate, first rotate it to align with z axis, apply rotation update, rotate back, then apply scaling update
-      _estimate = (1/(1+d_rho)) * (Rp.inverse() * TooN::SO3<>::exp(TooN::makeVector(d_beta,d_alpha,0)) * Rp * _estimate);
+      _estimate = (1/(dRhoBefore + d_rho)) * (Rp.inverse() * TooN::SO3<>::exp(TooN::makeVector(d_beta,d_alpha,0)) * Rp * v3PointInCamDir);
       
       // If the point is poorly constrained, the estimate can run away easily, making it hard the optimize properly
       // when the next round of optimization is done (potentially with more/better constraints)
-      double dDist = TooN::norm(_estimate);
-      if(dDist > 1e5)
-        _estimate *= 1e5/dDist;
-      if(dDist < 1e-5)
-        _estimate *= 1e-5/dDist;
-
+      double dDistAfter = TooN::norm(_estimate);
+      if(dDistAfter > 1e5)
+        _estimate *= 1e5/dDistAfter;
+      if(dDistAfter < 1e-5)
+        _estimate *= 1e-5/dDistAfter;
+      
     }
     
     // The current point estimate transformed into global cartesian coordinates
@@ -312,6 +320,8 @@ class VertexRelPoint : public g2o::BaseVertex<3, TooN::Vector<3> >
     
     int _nID;
     PoseChainHelper* _pPoseChainHelper;  // stores the chain of poses that defines the source pose of the point
+    TooN::Matrix<3> _m3SphericalToCartesianJac;   // temporary. holds the jacobian of the transformation from spherical to cartesian coordinates in the parent frame
+    TooN::Matrix<3> _m3CartesianCov;
 };
 
 //debugging
@@ -435,7 +445,7 @@ class EdgeChainMeas : public g2o::BaseMultiEdge<2, TooN::Vector<2> >
       // Option 2:
       std::vector<JacobianType, g2o::aligned_allocator<JacobianType> >& _jacobianOplusTemp = _jacobianOplus;
       
-      const VertexRelPoint* pPointVertex = dynamic_cast<const VertexRelPoint*>(_vertices.back());
+      VertexRelPoint* pPointVertex = dynamic_cast<VertexRelPoint*>(_vertices.back());
       ROS_ASSERT(pPointVertex);
       ROS_ASSERT(_pPoseChainHelper);
     
@@ -559,8 +569,10 @@ class EdgeChainMeas : public g2o::BaseMultiEdge<2, TooN::Vector<2> >
           
         // The following computations are the same as in VertexRelPoint::oplusImpl
         TooN::Vector<3> v3PointInCam = pPointVertex->estimate();
-        TooN::Vector<3> v3PointInCamDir = v3PointInCam;
-        TooN::normalize(v3PointInCamDir);
+        double dLength = TooN::norm(v3PointInCam);
+        double dRho = 1.0/dLength;
+        TooN::Vector<3> v3PointInCamDir = v3PointInCam * dRho ;
+        //TooN::normalize(v3PointInCamDir);
         
         TooN::Vector<3> v3Axis = v3PointInCamDir ^ TooN::makeVector(0,0,1);
         double angle = asin(TooN::norm(v3Axis));
@@ -574,7 +586,7 @@ class EdgeChainMeas : public g2o::BaseMultiEdge<2, TooN::Vector<2> >
         // as would be done with a call to VertexRelPoint::oplusImpl
         
         TooN::Matrix<3> m3Jac;
-        
+        /*
         // d_beta, rotation about x axis
         m3Jac.T()[0] = Rp.inverse() * (TooN::SO3<>::generator_field(0,Rp*v3PointInCam));
         
@@ -582,7 +594,11 @@ class EdgeChainMeas : public g2o::BaseMultiEdge<2, TooN::Vector<2> >
         m3Jac.T()[1] = Rp.inverse() * (TooN::SO3<>::generator_field(1,Rp*v3PointInCam));
         
         // d_rho, change in inverse depth
-        m3Jac.T()[2] = -1*v3PointInCam;
+        m3Jac.T()[2] = -1*v3PointInCam / dRho;
+         */
+        m3Jac = TooN::Identity;
+        
+        pPointVertex->_m3SphericalToCartesianJac = m3Jac;
         
         // At this point, we have 3 motion vectors for each of the 3 perturbation dimensions. However,
         // they are defined in the point's source frame. We are interested in the 3 motion vectors in the
@@ -1047,10 +1063,11 @@ double ChainBundle::sdUpdateRMSConvergenceLimit = 1e-10; // 1e-10
 double ChainBundle::sdMinMEstimatorSigma = 0.5;//0.4;
 
 // Constructor takes camera models
-ChainBundle::ChainBundle(TaylorCameraMap& cameraModels, bool bUseRobust, bool bUseTukey, bool bVerbose)
+ChainBundle::ChainBundle(TaylorCameraMap& cameraModels, bool bUseRobust, bool bUseTukey, bool bUseMarginalized, bool bVerbose)
 : mmCameraModels(cameraModels)
 , mbUseRobust(bUseRobust)
 , mbUseTukey(bUseTukey)
+, mbUseMarginalized(bUseMarginalized)
 , mbVerbose(bVerbose)
 {
   mnCurrId = 1;
@@ -1062,11 +1079,20 @@ ChainBundle::ChainBundle(TaylorCameraMap& cameraModels, bool bUseRobust, bool bU
   // (all points fixed, all poses fixed, getting the point covariance)
   // So use BlockSolverX and non-marginalized points for now
   
-  //BlockSolver_6_3::LinearSolverType* pLinearSolver = new LinearSolverCholmod<BlockSolver_6_3::PoseMatrixType>();
-  //BlockSolver_6_3* pSolver = new BlockSolver_6_3(pLinearSolver);
-  BlockSolverX::LinearSolverType* pLinearSolver = new LinearSolverCholmod<BlockSolverX::PoseMatrixType>();
-  BlockSolverX* pSolver = new BlockSolverX(pLinearSolver);
-  OptimizationAlgorithmLevenberg* pAlgorithm = new OptimizationAlgorithmLevenberg(pSolver);
+  OptimizationAlgorithmLevenberg* pAlgorithm;
+  
+  if(mbUseMarginalized)
+  {
+    BlockSolver_6_3::LinearSolverType* pLinearSolver = new LinearSolverCholmod<BlockSolver_6_3::PoseMatrixType>();
+    BlockSolver_6_3* pSolver = new BlockSolver_6_3(pLinearSolver);
+    pAlgorithm = new OptimizationAlgorithmLevenberg(pSolver);
+  }
+  else
+  {
+    BlockSolverX::LinearSolverType* pLinearSolver = new LinearSolverCholmod<BlockSolverX::PoseMatrixType>();
+    BlockSolverX* pSolver = new BlockSolverX(pLinearSolver);
+    pAlgorithm = new OptimizationAlgorithmLevenberg(pSolver);
+  }
   
   pAlgorithm->setMaxTrialsAfterFailure(ChainBundle::snMaxTrialsAfterFailure);
   mpOptimizer->setAlgorithm(pAlgorithm);
@@ -1123,7 +1149,8 @@ int ChainBundle::AddPoint(Vector<3> v3PointInCam, std::vector<int> vCams, bool b
   pPointVertex->setId(mnCurrId++);
   pPointVertex->setEstimate(v3PointInCam);
   pPointVertex->setFixed(bFixed);
-  pPointVertex->setMarginalized(false);  // see comment in ChainBundle constructor about marginalization
+  
+  pPointVertex->setMarginalized(mbUseMarginalized);  // see comment in ChainBundle constructor about marginalization
   
   if(!mmHelpers.count(vCams)) // helper not found, so make a new one
     mmHelpers.insert(std::make_pair(vCams, new PoseChainHelper));
@@ -1302,63 +1329,113 @@ int ChainBundle::Compute(bool *pAbortSignal, int nNumIter, double dUserLambda)
   
   // Now we're goint to get the max covariance of the point depths
   // Gather the point vertices
-  g2o::OptimizableGraph::VertexContainer vPointVertices;
-  for(g2o::OptimizableGraph::VertexContainer::const_iterator vertex_it = mpOptimizer->activeVertices().begin(); vertex_it != mpOptimizer->activeVertices().end(); vertex_it++)
+  if(!mbUseMarginalized)
   {
-    if((*vertex_it)->fixed())
-      continue;
-    
-    int dim = (*vertex_it)->dimension();
-    if(dim == 3)
-      vPointVertices.push_back(*vertex_it);
-  }
-  
-  SparseBlockMatrix<MatrixXd> spinv;  // This will hold the covariance matrices
-  
-  if(mpOptimizer->computeMarginals(spinv, vPointVertices))
-  {
-    ROS_INFO("computeMarginals() success!");
-    std::vector<double> vCov22;
-    
-    for(unsigned i = 0; i < vPointVertices.size(); ++i)
+    g2o::OptimizableGraph::VertexContainer vAllVertices;
+    for(g2o::OptimizableGraph::VertexContainer::const_iterator vertex_it = mpOptimizer->activeVertices().begin(); vertex_it != mpOptimizer->activeVertices().end(); vertex_it++)
     {
-      // Look at the (2,2) entry of each covariance matrix, which indicates
-      // sensitivity in radial direction
-      vCov22.push_back(spinv.block(i,i)->col(2)(2));
+      if((*vertex_it)->fixed())
+        continue;
+      
+      //int dim = (*vertex_it)->dimension();
+      //if(dim == 3)
+      vAllVertices.push_back(*vertex_it);
     }
     
-    if(vCov22.size() > 0)
+    SparseBlockMatrix<MatrixXd> spinv;  // This will hold the covariance matrices
+    
+    if(mpOptimizer->computeMarginals(spinv, vAllVertices))
     {
-      std::sort(vCov22.begin(), vCov22.end());
-      double median = vCov22[vCov22.size()/2];
-      ROS_INFO_STREAM("Point Cov 2,2 min: "<<*vCov22.begin()<<" max: "<<*vCov22.rbegin()<<" median: "<<median);
-      mdLastMaxCov = median;
+      ROS_INFO("computeMarginals() success!");
+      
+      //spinv.writeOctave("vertex_covariance.dat", false);
+      
+      std::vector<double> vCov22;
+      
+      bool bPrinted = false;
+      for(unsigned i = 0; i < vAllVertices.size(); ++i)
+      {
+        if(vAllVertices[i]->dimension() == 3)
+        {
+          // Look at the (2,2) entry of each covariance matrix, which indicates
+          // sensitivity in radial direction
+          vCov22.push_back(spinv.block(i,i)->col(2)(2));
+          
+          // Eigen stores in column major format by default. wrapMatrix function expects row major format.
+          Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> mBlock = *(spinv.block(i,i));
+          double* pData = mBlock.data();
+          TooN::Matrix<3,3,double> m3Cov = TooN::wrapMatrix<3,3,double>(pData);
+          
+          VertexRelPoint* pPointVertex = dynamic_cast<VertexRelPoint*>(vAllVertices[i]);
+          
+          pPointVertex->_m3CartesianCov = pPointVertex->_m3SphericalToCartesianJac * m3Cov * pPointVertex->_m3SphericalToCartesianJac.T(); 
+          
+          if(!bPrinted)
+          {
+            bPrinted = true;
+            std::cout<<"Cov from g2o: "<<std::endl<<m3Cov<<std::endl;
+            std::cout<<"Spherical to cartesian jac: "<<std::endl<<pPointVertex->_m3SphericalToCartesianJac<<std::endl;
+            std::cout<<"Cartesian cov: "<<std::endl<<pPointVertex->_m3CartesianCov<<std::endl;
+          }
+        }
+        
+        if(vAllVertices[i]->dimension() == 6)
+        {
+          // Eigen stores in column major format by default. wrapMatrix function expects row major format.
+          Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> mBlock = *(spinv.block(i,i));
+          double* pData = mBlock.data();
+          TooN::Matrix<6,6,double> m6Cov = TooN::wrapMatrix<6,6,double>(pData);
+          
+          VertexPoseSE3* pPoseVertex = dynamic_cast<VertexPoseSE3*>(vAllVertices[i]);
+          pPoseVertex->_m6Cov = m6Cov;
+        }
+      }  // end loop over vertices
+      
+      if(vCov22.size() > 0)
+      {
+        std::sort(vCov22.begin(), vCov22.end());
+        double median = vCov22[vCov22.size()/2];
+        ROS_INFO_STREAM("Point Cov 2,2 min: "<<*vCov22.begin()<<" max: "<<*vCov22.rbegin()<<" median: "<<median);
+        mdLastMaxCov = median;
+      }
+      else
+      {
+        ROS_WARN("Point Cov: none found because all fixed");
+        mdLastMaxCov = std::numeric_limits<double>::max();
+      }
     }
     else
     {
-      ROS_WARN("Point Cov: none found because all fixed");
+      ROS_WARN("computeMarginals() failed!");
       mdLastMaxCov = std::numeric_limits<double>::max();
     }
-  }
-  else
-  {
-    ROS_WARN("computeMarginals() failed!");
-    mdLastMaxCov = std::numeric_limits<double>::max();
-  }
+  } // end if not marginalized
     
   return nCounter;
 }
 
-Vector<3> ChainBundle::GetPoint(int n)
+TooN::Vector<3> ChainBundle::GetPoint(int n)
 {
   const VertexRelPoint* pPointVertex = dynamic_cast<const VertexRelPoint*>(mpOptimizer->vertex(n));
   return pPointVertex->estimate();
 }
 
-SE3<> ChainBundle::GetPose(int n)
+TooN::Matrix<3> ChainBundle::GetPointCov(int n)
+{
+  const VertexRelPoint* pPointVertex = dynamic_cast<const VertexRelPoint*>(mpOptimizer->vertex(n));
+  return pPointVertex->_m3CartesianCov;
+}
+
+TooN::SE3<> ChainBundle::GetPose(int n)
 {
   const VertexPoseSE3* pPoseVertex = dynamic_cast<const VertexPoseSE3*>(mpOptimizer->vertex(n));
   return pPoseVertex->estimate();
+}
+
+TooN::Matrix<6> ChainBundle::GetPoseCov(int n)
+{
+  const VertexPoseSE3* pPoseVertex = dynamic_cast<const VertexPoseSE3*>(mpOptimizer->vertex(n));
+  return pPoseVertex->_m6Cov;
 }
 
 std::vector<std::tuple<int, int, std::string> > ChainBundle::GetOutlierMeasurements()

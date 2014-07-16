@@ -154,6 +154,29 @@ inline TooN::SE3<> PoseMsgToSE3(geometry_msgs::Pose pose)
   return se3Transform;
 }
 
+/** @brief Convert a TooN::SO3<> message into geometry_msgs::Quaternion
+ *  @param so3Rot The SO3 rotation to convert
+ *  @return The same rotation in geometry_msg format */
+inline geometry_msgs::Quaternion SO3ToQuaternionMsg(TooN::SO3<> so3Rot)
+{
+  TooN::Matrix<3> m3Rot = so3Rot.get_matrix();
+  
+  // Initialize 3x3 matrix directly from TooN 3-matrix
+  tf::Matrix3x3 btMat(m3Rot(0,0),m3Rot(0,1),m3Rot(0,2),m3Rot(1,0),m3Rot(1,1),m3Rot(1,2),m3Rot(2,0),m3Rot(2,1),m3Rot(2,2));
+  tf::Quaternion btQuat;
+  btMat.getRotation(btQuat);
+  
+  geometry_msgs::Quaternion orientation;
+
+  // Get quaternion values from Bullet quat
+  orientation.x = btQuat.x();
+  orientation.y = btQuat.y();
+  orientation.z = btQuat.z();
+  orientation.w = btQuat.w();
+  
+  return orientation;
+}
+
 /** @brief Convert a TooN::SE3<> message into geometry_msgs::Pose
  *  @param se3Transform The SE3 pose to convert
  *  @return The same pose in geometry_msg format */

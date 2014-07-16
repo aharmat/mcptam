@@ -473,7 +473,8 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
           mnLostFrames == 0 &&
           ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.1) &&
           //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, CountMeasurements()))
-          mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF)))
+          //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF)
+          mMapMaker.NeedNewMultiKeyFrame(mm6PoseCovariance)))
       {
         if(mbAddNext)
           ROS_DEBUG("Adding MKF because add next was clicked");
@@ -801,6 +802,8 @@ Vector<6> Tracker::PoseUpdateStep(std::vector<TrackerDataPtrVector>& vIterationS
       
   // Calculate and apply the pose update...
   Vector<6> v6Update =  CalcPoseUpdate(vIterationSets, dOverrideSigma, bMarkOutliers);
+  //std::cout<<":::::::::::::::::: v6Update: "<<v6Update<<std::endl;
+  //std::cout<<"mm6PoseCovariance: "<<std::endl<<mm6PoseCovariance<<std::endl;
   mpCurrentMKF->mse3BaseFromWorld = SE3<>::exp(v6Update) * mpCurrentMKF->mse3BaseFromWorld;
   
   // Update the KeyFrame cam-from-world poses
@@ -827,6 +830,8 @@ Vector<6> Tracker::PoseUpdateStepLinear(std::vector<TrackerDataPtrVector>& vIter
       
   // Calculate and update pose;
   Vector<6> v6Update = 	CalcPoseUpdate(vIterationSets, dOverrideSigma, bMarkOutliers);
+  //std::cout<<"|||||||||||||||||||| v6Update: "<<v6Update<<std::endl;
+  //std::cout<<"mm6PoseCovariance: "<<std::endl<<mm6PoseCovariance<<std::endl;
   mpCurrentMKF->mse3BaseFromWorld = SE3<>::exp(v6Update) * mpCurrentMKF->mse3BaseFromWorld;
   
   // Update the KeyFrame cam-from-world poses
@@ -1409,7 +1414,8 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
       if(!td.mbFound)
         continue;
         
-      td.mv2Error_CovScaled = td.mdSqrtInvNoise * (td.mv2Found - td.mv2Image);
+      td.mv2Error = td.mv2Found - td.mv2Image;
+      td.mv2Error_CovScaled = td.mdSqrtInvNoise * td.mv2Error;
       vErrorSquared.push_back(td.mv2Error_CovScaled * td.mv2Error_CovScaled);
     }
   }
@@ -1437,13 +1443,13 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
   // The TooN WLSCholesky class handles reweighted least squares.
   // It just needs errors and jacobians.
   WLS<6> wls; //, wls_noweight;
-  wls.add_prior(100.0); // Stabilising prior
-  //wls_noweight.add_prior(100);
+  //wls.add_prior(100.0); // Stabilising prior
   mnNumInliers = 0;
+  
+  TooN::Matrix<3> m3Zeros = TooN::Zeros;   // for testing covariance matrix
   
   for(unsigned i=0; i < mvCurrCamNames.size(); ++i)
   {
-    
     for(unsigned int j=0; j < vIterationSets[i].size(); ++j)
     {
       TrackerData &td = *vIterationSets[i][j];
@@ -1455,8 +1461,8 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
         continue;
       }
       
-      Vector<2> &v2Error = td.mv2Error_CovScaled;
-      double dErrorSq = v2Error * v2Error;
+      //Vector<2> &v2Error = td.mv2Error_CovScaled;
+      double dErrorSq = td.mv2Error_CovScaled * td.mv2Error_CovScaled;
       double dWeight;
       
       if(nEstimator == 0)
@@ -1465,9 +1471,6 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
         dWeight= Cauchy::Weight(dErrorSq, dSigmaSquared);
       else 
         dWeight= Huber::Weight(dErrorSq, dSigmaSquared);
-      
-      //wls_noweight.add_mJ(v2Error[0], td.mdSqrtInvNoise * td.mm26Jacobian[0], 1); // These two lines are currently
-      //wls_noweight.add_mJ(v2Error[1], td.mdSqrtInvNoise * td.mm26Jacobian[1], 1); // the slowest bit of poseits
       
       // Inlier/outlier accounting, only really works for cut-off estimators such as Tukey.
       if(dWeight == 0.0)
@@ -1487,15 +1490,34 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
       }
       
       Matrix<2,6> &m26Jac = td.mm26Jacobian;
-      wls.add_mJ(v2Error[0], td.mdSqrtInvNoise * m26Jac[0], dWeight); // These two lines are currently
-      wls.add_mJ(v2Error[1], td.mdSqrtInvNoise * m26Jac[1], dWeight); // the slowest bit of poseits
+      Matrix<2,3> &m23Jac = td.mm23Jacobian;
+      Matrix<2> m2PixelCov = TooN::Identity * (1.0/td.mdSqrtInvNoise);
+      
+      Matrix<3> m3PointCov = td.mPoint.mm3WorldCov == m3Zeros ? TooN::Identity * 1e10 : td.mPoint.mm3WorldCov;
+    
+      Matrix<2> m2MeasCov = m23Jac * m3PointCov * m23Jac.T() + m26Jac * mm6PoseCovariance * m26Jac.T() + m2PixelCov;
+      /*
+      if(j == 0)
+      {
+        std::cerr<<"---------------------------------------"<<std::endl;
+        std::cerr<<"m26Jac: "<<std::endl<<m26Jac<<std::endl;
+        std::cerr<<"m23Jac: "<<std::endl<<m23Jac<<std::endl;
+        std::cerr<<"m2PixelCov: "<<std::endl<<m2PixelCov<<std::endl;
+        std::cerr<<"m3PointCov: "<<std::endl<<m3PointCov<<std::endl;
+        std::cerr<<"m2MeasCov: "<<std::endl<<m2MeasCov<<std::endl;
+      }
+      */
+      wls.add_mJ_rows(td.mv2Error, m26Jac, opts::M2Inverse(m2MeasCov) * dWeight);
+      
+      //wls.add_mJ(v2Error[0], td.mdSqrtInvNoise * m26Jac[0], dWeight); // These two lines are currently
+      //wls.add_mJ(v2Error[1], td.mdSqrtInvNoise * m26Jac[1], dWeight); // the slowest bit of poseits
     }
     
   }
   
   wls.compute();
   
-  if(bMarkOutliers)	
+  //if(bMarkOutliers)	
   {
 		mm6PoseCovariance = TooN::SVD<6>(wls.get_C_inv()).get_pinv();   // from ethzasl_ptam
     
@@ -1531,6 +1553,9 @@ void Tracker::ApplyMotionModel()
   
   // Need to do this last after base pose updated
   UpdateCamsFromWorld();
+  
+  // Should propagate old pose covariance forward instead of setting it to a large value each time
+  mm6PoseCovariance = TooN::Identity;  
 }
 
 // The motion model is updated after TrackMap has found a new pose

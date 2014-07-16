@@ -67,6 +67,7 @@ void BundleAdjusterBase::Reset()
   mbUseTukey = false;
   mbUseTwoStep = false;
   mbUseRobust = true;
+  mbUseMarginalized = false;
 }
 
 // Get a certain number of neighbors of a given MultiKeyFrame

@@ -163,7 +163,7 @@ System::System()
   }
   
   // Create the BundleAdjuster, MapMaker, and Tracker objects
-  mpBundleAdjuster = new BundleAdjusterMulti(*mpMap, mmCameraModels, true, false);
+  mpBundleAdjuster = new BundleAdjusterMulti(*mpMap, mmCameraModels, true, false, false);
   mpMapMaker = new MapMaker(*mpMap, mmCameraModels, *mpBundleAdjuster);
   mpTracker = new Tracker(*mpMap, *mpMapMaker, mmCameraModels, mmPoses, mmDrawOffsets, mpGLWindow);
   mpKeyFrameViewer = new KeyFrameViewer(*mpMap, *mpGLWindow, mmDrawOffsets, mpVideoSourceMulti->GetSizes());
@@ -252,6 +252,10 @@ void System::Run()
       PublishState();
       PublishPose();
       PublishSmallImage();
+      
+      // DEBUG
+      //if(mpTracker->GetTrackingQuality() != Tracker::NONE)
+      //  mbDone = true;
     }
     else
     {

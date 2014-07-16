@@ -388,6 +388,7 @@ protected:
   TaylorCameraMap mmCameraModelsSBI;          ///< Camera projection models again, their image sizes will be resized by SmallBlurryImage
   Relocaliser mRelocaliser;                   ///< Relocalisation module
   
+  TooN::Matrix<6>	mm6PoseCovariance;		///< covariance of current pose estimate
   TooN::SE3<> mse3StartPose;             ///< The pose of the system at the start of processing a new set of images
   TooN::Vector<6> mv6BaseVelocity;    ///< The 6-vector representation of pose differences between the current and previous poses, divided by the time step
   double mdMSDScaledVelocityMagnitude;  ///< Velocity magnitude of base
@@ -420,8 +421,7 @@ protected:
   
   ros::Time mLastProcessTime;           ///< Time that the previous image processing step began
   ros::Duration mLastProcessDur;        ///< Time since the previous image processing step start
-  TooN::Matrix<6>	mm6PoseCovariance;		///< covariance of current converged pose estimate
-  //TooN::Matrix<6>	mm6PoseCovarianceNoOutliers;  ///< covariance of current pose estimate with outliers removed
+  
   int mnTotalFound;                 ///< Number of features found by the tracker in the current frame
   int mnTotalAttempted;             ///< Number of features attempted to find by the tracker
   int mnNumInliers;                 ///< Number of measurement inliers for the tracking

@@ -72,7 +72,7 @@ public:
   /** @param map The map being adjusted
    *  @param cameras The camera models being used 
    *  @param bApplyUpdates Apply updates to map? */
-  BundleAdjusterMulti(Map &map, TaylorCameraMap& cameras, bool bApplyUpdates = true, bool bVerbose = false);
+  BundleAdjusterMulti(Map &map, TaylorCameraMap& cameras, bool bApplyUpdates = true, bool bVerbose = false, bool bUseRelativePoints = true);
   
   /// Destructor
   virtual ~BundleAdjusterMulti(){ };
@@ -104,6 +104,7 @@ protected:
    *  @return The number of good iterations of the ChainBundle, negative indicates error */
   int AdjustAndUpdate(ChainBundle& multiBundle, std::set<MultiKeyFrame*> spAdjustSet, std::set<MapPoint*> spMapPoints, int nIterations=-1);
     
+  bool mbUseRelativePoints;         ///< Use points in relative representation? If false, points will be fed to ChainBundle in global representation
   bool mbApplyUpdates;              ///< Will the Map be updated with adjusted positions? False only for debugging.
   bool mbVerbose;                   ///< Output extra debugging information from the ChainBundle calculations
   UpdateCallbackType mUpdateCallback;  ///< The callback function handle

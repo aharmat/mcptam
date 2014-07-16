@@ -90,8 +90,10 @@ public:
   CVD::ImageRef mirImageSize;  ///< The image size used to check for projection inliers
   
   // Stuff for pose update:
+  TooN::Vector<2> mv2Error;            ///< The projection error
   TooN::Vector<2> mv2Error_CovScaled;  ///< The projection error scaled by the inverse noise term
   TooN::Matrix<2,6> mm26Jacobian;   ///< Jacobian of projection with respect to camera position
+  TooN::Matrix<2,3> mm23Jacobian;   ///< Jacobian of projection with respect to point position
   
   /** @brief Project point into image given certain pose and camera.
    * 
@@ -151,12 +153,16 @@ public:
    */
   inline void CalcJacobian(const TooN::SE3<>& se3BaseFromWorld, const TooN::SE3<>& se3CamFromBase)
   {
-    const TooN::Vector<3> v3Cam = se3CamFromBase * se3BaseFromWorld * mPoint.mv3WorldPos;  // The point in the camera coordinate frame
+    const TooN::SE3<> se3CamFromWorld = se3CamFromBase * se3BaseFromWorld;
+    const TooN::Vector<3> v3Cam = se3CamFromWorld * mPoint.mv3WorldPos;  // The point in the camera coordinate frame
     const TooN::Vector<3> v3Base = se3BaseFromWorld * mPoint.mv3WorldPos;  // The point in the base (MultiKeyFrame) coordinate frame
     const TooN::Vector<4> v4Base = unproject(v3Base);  // The SE3 generator field function works on 4-vectors
     
     TooN::SE3<> se3CamFromBase_only_rot = se3CamFromBase;  // Only the rotational component of the camera-from-base transform is needed
     se3CamFromBase_only_rot.get_translation() = TooN::Zeros;
+    
+    TooN::Vector<3> v3_dTheta, v3_dPhi;
+    TaylorCamera::GetCamSphereDeriv(v3Cam, v3_dTheta, v3_dPhi);
     
     // For each of six degrees of freedom...
     for(int m=0; m<6; m++)
@@ -166,14 +172,27 @@ public:
       // Then the motion of the point in the camera frame only depends on the relative rotation between camera and base, not the translation
       const TooN::Vector<4> v4Motion_Cam = se3CamFromBase_only_rot * v4Motion_Base;  // CHECK!! GOOD
       
-      TooN::Vector<3> v3_dTheta, v3_dPhi;
-      TaylorCamera::GetCamSphereDeriv(v3Cam, v3_dTheta, v3_dPhi);
       TooN::Vector<2> v2CamSphereMotion;
       v2CamSphereMotion[0] = v3_dTheta * v4Motion_Cam.slice<0,3>();  // theta component
       v2CamSphereMotion[1] = v3_dPhi * v4Motion_Cam.slice<0,3>();  // phi component
     
       // The camera derivatives are motion of pixel relative to motion on unit sphere, so a multiplication gets the desired Jacobian entry
       mm26Jacobian.T()[m] = mm2CamDerivs * v2CamSphereMotion;
+    }
+    
+    // For each of three degrees of freedom...
+    for(int m=0;m<3;m++)
+    {
+      // Get the motion of the point in the camera frame when the position of the point changes by one of the degrees of freedom
+      const TooN::Vector<3> v3Motion = se3CamFromWorld.get_rotation().get_matrix().T()[m];  // CHECK!! GOOD
+      
+      // Convert to motion on the sphere
+      TooN::Vector<2> v2CamSphereMotion;
+      v2CamSphereMotion[0] = v3_dTheta * v3Motion;  // theta component
+      v2CamSphereMotion[1] = v3_dPhi * v3Motion;  // phi component
+      
+      // Convert to motion on the image
+      mm23Jacobian.T()[m] = mm2CamDerivs * v2CamSphereMotion;
     }
   }
   

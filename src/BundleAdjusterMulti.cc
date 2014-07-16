@@ -43,12 +43,13 @@
 #include <mcptam/MapPoint.h>
 #include <mcptam/KeyFrame.h>
 
-BundleAdjusterMulti::BundleAdjusterMulti(Map &map,  TaylorCameraMap& cameras, bool bApplyUpdates, bool bVerbose)
+BundleAdjusterMulti::BundleAdjusterMulti(Map &map,  TaylorCameraMap& cameras, bool bApplyUpdates, bool bVerbose, bool bUseRelativePoints)
 : BundleAdjusterBase(map, cameras)
+, mbUseRelativePoints(bUseRelativePoints)
 , mbApplyUpdates(bApplyUpdates)
 , mbVerbose(bVerbose)
 {
-  
+  std::cout<<"USE RELATIVE POINTS: "<<mbUseRelativePoints<<std::endl;
 }
 
 // Loads the given MultiKeyFrames and MapPoints into the underlying ChainBundleG2O, runs computation, extracts results and outliers
@@ -72,7 +73,7 @@ int BundleAdjusterMulti::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std:
   
   ROS_DEBUG_STREAM("BundleAdjusterMulti received: "<<spAdjustSet.size()<<" movable MKFs, "<<spFixedSet.size()<<" fixed MKFs, "<<spMapPoints.size()<<" points");
   
-  ChainBundle multiBundle(mmCameraModels, mbUseRobust, mbUseTukey, mbVerbose);
+  ChainBundle multiBundle(mmCameraModels, mbUseRobust, mbUseTukey, mbUseMarginalized, mbVerbose);
   mbBundleRunning = true;
   mbBundleRunningIsRecent = bRecent;
   
@@ -137,12 +138,12 @@ int BundleAdjusterMulti::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std:
   {
     MapPoint& point = *(*point_it);
     
-    ROS_ASSERT(point.mMMData.GoodMeasCount() >= 2); // checked for this in BundleAdjusterBase....
+    //ROS_ASSERT(point.mMMData.GoodMeasCount() >= 2); // checked for this in BundleAdjusterBase....
     
     TooN::Vector<3> v3Pos;
     std::vector<int> vPoses;
     
-    if(point.mbFixed)
+    if(point.mbFixed || !mbUseRelativePoints)
     {
       if(nWorldID == -1)  // not yet added
         nWorldID = multiBundle.AddPose(TooN::SE3<>(), true);
@@ -301,12 +302,21 @@ int BundleAdjusterMulti::AdjustAndUpdate(ChainBundle& multiBundle, std::set<Mult
     for(std::map<MapPoint*,int>::iterator point_it = mmPoint_BundleID.begin(); point_it!=mmPoint_BundleID.end(); ++point_it)
     {
       MapPoint& point = *(point_it->first);
-      TooN::Vector<3> v3Pos = multiBundle.GetPoint(point_it->second);
       
       if(point.mbFixed)
+        continue;
+      
+      TooN::Vector<3> v3Pos = multiBundle.GetPoint(point_it->second);
+      
+      if(!mbUseRelativePoints)
+      {
         point.mv3WorldPos = v3Pos;
+        point.mm3WorldCov = multiBundle.GetPointCov(point_it->second);
+      }
       else
+      {
         point.mv3WorldPos = point.mpPatchSourceKF->mse3CamFromWorld.inverse() * v3Pos;
+      }
         
       point.RefreshPixelVectors();
       point.mbOptimized = true;

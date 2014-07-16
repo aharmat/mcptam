@@ -194,6 +194,7 @@ protected:
   
   ros::Publisher mMapInfoPub;   ///< Publishes diagnostic messages about the map
   ros::Publisher mMapPointsPub;  ///< Publishes point markers
+  ros::Publisher mMapPointsCovPub;  ///< Publishes point markers using uncertainty ellipsoids
   ros::Publisher mMapMKFsPub;    ///< Publishes MKF visualization markers
   
   double mdMaxCov;              ///< Maximum covariance of the point feature positions
