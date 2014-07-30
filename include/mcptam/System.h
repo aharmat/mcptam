@@ -85,6 +85,8 @@ protected:
   ros::ServiceClient mBookmarkClient;
   ros::ServiceClient mRewindClient;
   
+  bool mbDoingTrials;
+  
 };
 
 #endif

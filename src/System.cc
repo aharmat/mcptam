@@ -175,6 +175,7 @@ System::System()
   mRewindClient = mNodeHandlePriv.serviceClient<std_srvs::Empty>("/rosbag/rewind");
     
   mbDone = false;
+  mbDoingTrials = false;
 }
 
 System::~System()
@@ -255,6 +256,20 @@ void System::Run()
       PublishState();
       PublishPose();
       PublishSmallImage();
+      
+      if(mpTracker->IsLost() && mbDoingTrials)
+      {
+        mpMapMaker->RequestRestoreMap();
+        
+        std_srvs::Empty srv;
+        if(!mRewindClient.call(srv))
+        {
+          ROS_FATAL("Could not call rewind service!");
+          ros::shutdown();
+        }
+        
+        mbDoingTrials = mpTracker->NextTrial();
+      }
       
       // DEBUG
       //if(mpTracker->GetTrackingQuality() != Tracker::NONE)
@@ -400,23 +415,14 @@ void System::GUICommandHandler(std::string command, std::string params)
       bool bSuccess = mBookmarkClient.call(srv);
       if(bSuccess)
       {
-        // Flash screen to indicate setting of bookmark
-        glClearColor(1,1,1,0.2);
-        glClear(GL_COLOR_BUFFER_BIT);
+        mpMapMaker->RequestBackupMap();
+        mpTracker->StartTrials(3);
+        
+        mbDoingTrials = true;
       }
       else
       {
         ROS_ERROR_STREAM("Could not call bookmark service!");
-      }
-    }
-    else if(params == ",")
-    {
-      std_srvs::Empty srv;
-      bool bSuccess = mRewindClient.call(srv);
-      
-      if(!bSuccess)
-      {
-        ROS_ERROR_STREAM("Could not call rewind service!");
       }
     }
     

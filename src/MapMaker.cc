@@ -108,6 +108,13 @@ void MapMaker::RequestBackupMap()
     mBundleAdjuster.RequestAbort();
     
   mbBackupMap = true; 
+  
+  // "run" thread will backup map and set mbBackupMap to false
+  while(mbBackupMap && ros::ok())
+  {
+    ROS_INFO("MapMaker: Waiting for map to be backed up...");
+    ros::Duration(0.1).sleep();
+  }
 }
 
 void MapMaker::RequestRestoreMap()
@@ -116,6 +123,13 @@ void MapMaker::RequestRestoreMap()
     mBundleAdjuster.RequestAbort();
     
   mbRestoreMap = true; 
+  
+  // "run" thread will restore map and set mbRestoreMap to false
+  while(mbRestoreMap && ros::ok())
+  {
+    ROS_INFO("MapMaker: Waiting for map to be restored...");
+    ros::Duration(0.1).sleep();
+  }
 }
 
 // Resets the parent classes

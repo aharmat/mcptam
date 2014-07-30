@@ -475,8 +475,8 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
             mnLostFrames == 0 &&
             ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.1) &&
             //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, CountMeasurements()))
-            //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF)
-            mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, mm6PoseCovariance)
+            mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF)
+            //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, mm6PoseCovariance)
             ))
         {
           if(mbAddNext)
@@ -1935,7 +1935,7 @@ bool Tracker::NextTrial()
   
   InitTrial();
   
-  if(mnTrialNumber == mnMaxTrials)
+  if(mnTrialNumber >= mnMaxTrials)
     mRunMode = NORMAL;
   
   return mRunMode == TRIALS;
