@@ -170,6 +170,9 @@ System::System()
   
   ImageBWMap masksMap = LoadMasks(); 
   mpTracker->SetMasks(masksMap);
+  
+  mBookmarkClient = mNodeHandlePriv.serviceClient<std_srvs::Empty>("/rosbag/bookmark");
+  mRewindClient = mNodeHandlePriv.serviceClient<std_srvs::Empty>("/rosbag/rewind");
     
   mbDone = false;
 }
@@ -391,6 +394,33 @@ void System::GUICommandHandler(std::string command, std::string params)
     {
       mpTracker->AddNext();
     }
+    else if(params == ".")
+    {
+      std_srvs::Empty srv;
+      bool bSuccess = mBookmarkClient.call(srv);
+      if(bSuccess)
+      {
+        // Flash screen to indicate setting of bookmark
+        glClearColor(1,1,1,0.2);
+        glClear(GL_COLOR_BUFFER_BIT);
+      }
+      else
+      {
+        ROS_ERROR_STREAM("Could not call bookmark service!");
+      }
+    }
+    else if(params == ",")
+    {
+      std_srvs::Empty srv;
+      bool bSuccess = mRewindClient.call(srv);
+      
+      if(!bSuccess)
+      {
+        ROS_ERROR_STREAM("Could not call rewind service!");
+      }
+    }
+    
+    std::cout<<"Keypress params: "<<params<<std::endl;
     
     return;
   }

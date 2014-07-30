@@ -102,6 +102,22 @@ void MapMaker::RequestStopInit()
   mbStopInit = true; 
 }
 
+void MapMaker::RequestBackupMap()
+{ 
+  if(mBundleAdjuster.Running()) 
+    mBundleAdjuster.RequestAbort();
+    
+  mbBackupMap = true; 
+}
+
+void MapMaker::RequestRestoreMap()
+{ 
+  if(mBundleAdjuster.Running()) 
+    mBundleAdjuster.RequestAbort();
+    
+  mbRestoreMap = true; 
+}
+
 // Resets the parent classes
 void MapMaker::Reset()
 {
@@ -121,6 +137,9 @@ void MapMaker::Reset()
   
   //testing 
   mbStopInit = false;
+  
+  mbBackupMap = false;
+  mbRestoreMap = false;
 }
 
 void MapMaker::run()
@@ -160,6 +179,28 @@ void MapMaker::run()
       ROS_INFO_STREAM("------------- Dumping file to "<<mDumpFileName);
       DumpToFile(mDumpFileName);
       mbFileDump = false;
+    }
+    
+    if(mbBackupMap)
+    {
+      ROS_INFO_STREAM("------------- BACKING UP MAP -----------");
+      
+      ClearIncomingQueue();  // from MapMakerClientBase
+      ClearInternalQueues(); // from MapMakerServerBase
+      
+      mMap.MakeSnapshot();
+      mbBackupMap = false;
+    }
+    
+    if(mbRestoreMap)
+    {
+      ROS_INFO_STREAM("------------- RESTORING MAP -----------");
+      
+      ClearIncomingQueue();  // from MapMakerClientBase
+      ClearInternalQueues(); // from MapMakerServerBase
+      
+      mMap.Restore();
+      mbRestoreMap = false;
     }
     
     if(ResetRequested()) {Reset(); continue;}

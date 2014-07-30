@@ -107,9 +107,9 @@ void MapMakerClientBase::MarkDanglersAsBad()
   }
 }
 
-bool MapMakerClientBase::NeedNewMultiKeyFrame(TooN::Matrix<6> m6Cov)
+bool MapMakerClientBase::NeedNewMultiKeyFrame(MultiKeyFrame &mkf, TooN::Matrix<6> m6Cov)
 {
-  if(TrackerQueueSize() > 0)
+  if(TrackerQueueSize() > 2)
   {
     ROS_WARN("MapMakerClientBase::NeedNewMultiKeyFrame: Queue size too large, returning false");
     return false;
@@ -121,10 +121,29 @@ bool MapMakerClientBase::NeedNewMultiKeyFrame(TooN::Matrix<6> m6Cov)
     return true;
   }
   
+  // See if there's anything close in the queue
+  MultiKeyFrame *pClosestMKFInQueue = ClosestMultiKeyFrameInQueue(mkf);
+  if(pClosestMKFInQueue)
+  {
+    double dDistInQueue = mkf.Distance(*pClosestMKFInQueue);
+    ROS_DEBUG_STREAM("Closest dist in queue: "<<dDistInQueue);
+    dDistInQueue *= (1.0 / mkf.mdTotalDepthMean);  // scale by depth
+    
+    int nEffectiveSize = mMap.mlpMultiKeyFrames.size();
+    if(nEffectiveSize == 2)
+      nEffectiveSize = 1;
+    
+    double dMapSizeFactor = 1.0 - (1.0 / (0.5 + nEffectiveSize));
+    double dThresh = MapMakerClientBase::sdMaxScaledMKFDist * dMapSizeFactor;
+    
+    if(dDistInQueue < dThresh)
+      return false;
+  }
+  
   double dCovMag = TooN::norm_fro(m6Cov);
   ROS_INFO_STREAM("NeedNewMultiKeyFrame: cov mag: "<<dCovMag);
   
-  return dCovMag > 1e-4;
+  return dCovMag > 1e-5;
 }
 
 // Checks to see if the given MultiKeyFrame is a candidate to be added to the Map

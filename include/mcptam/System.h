@@ -82,6 +82,9 @@ protected:
   BundleAdjusterMulti* mpBundleAdjuster;  ///< Pointer to the BundleAdjuster
   KeyFrameViewer *mpKeyFrameViewer;       ///< Pointer to the KeyFrameViewer
   
+  ros::ServiceClient mBookmarkClient;
+  ros::ServiceClient mRewindClient;
+  
 };
 
 #endif

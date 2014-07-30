@@ -467,26 +467,67 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
       
       static gvar3<int> gvnAddingMKFs("AddingMKFs", 1, HIDDEN|SILENT);
       // Heuristics to check if a key-frame should be added to the map:
-      if(mbAddNext || //mMapMaker.Initializing() ||
-         (*gvnAddingMKFs &&
-          mOverallTrackingQuality == GOOD &&
-          mnLostFrames == 0 &&
-          ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.1) &&
-          //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, CountMeasurements()))
-          //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF)
-          mMapMaker.NeedNewMultiKeyFrame(mm6PoseCovariance)))
+      if(mRunMode == NORMAL)
       {
-        if(mbAddNext)
-          ROS_DEBUG("Adding MKF because add next was clicked");
-          
-        if(mMapMaker.Initializing())
-          ROS_DEBUG("Adding MKF because map is initializing");
-          
-        mMessageForUser << " SHOULD BE Adding MultiKeyFrame to Map";
-        RecordMeasurements();  // We've decided to add, so make measurements
-        AddNewKeyFrame(); 
-        mbAddNext = false;
+        if(mbAddNext || //mMapMaker.Initializing() ||
+           (*gvnAddingMKFs &&
+            mOverallTrackingQuality == GOOD &&
+            mnLostFrames == 0 &&
+            ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.1) &&
+            //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, CountMeasurements()))
+            //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF)
+            mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, mm6PoseCovariance)
+            ))
+        {
+          if(mbAddNext)
+            ROS_DEBUG("Adding MKF because add next was clicked");
+            
+          if(mMapMaker.Initializing())
+            ROS_DEBUG("Adding MKF because map is initializing");
+            
+          mMessageForUser << " SHOULD BE Adding MultiKeyFrame to Map";
+          RecordMeasurements();  // We've decided to add, so make measurements
+          AddNewKeyFrame(); 
+          mbAddNext = false;
+        }
       }
+      else  // in trials mode
+      {
+        bool bNeedNew = false;
+        
+        if(mbTrialAdding)  // we're in the adding phase, so evaluate map maker's functions
+        {
+          if(mnTrialNumber == 0)
+          {
+            bNeedNew = mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF);
+          }
+          else if(mnTrialNumber == 1)
+          {
+            bNeedNew = mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, CountMeasurements());
+          }
+          else if(mnTrialNumber == 2)
+          {
+            bNeedNew = mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, mm6PoseCovariance);
+          }
+          else
+          {
+            ROS_BREAK();
+          }
+        }
+        
+        if( bNeedNew && 
+            mOverallTrackingQuality == GOOD &&
+            mnLostFrames == 0 &&
+            ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.1) )
+        {
+          mMessageForUser << " SHOULD BE Adding MultiKeyFrame to Map";
+          RecordMeasurements();  // We've decided to add, so make measurements
+          AddNewKeyFrame(); 
+          mbTrialAdding = false;
+          mbAddNext = false;
+        }
+      }
+      
       timingMsg.add = (ros::WallTime::now() - startTime).toSec();
       
       ReleasePointLock();  // Important! Do this whenever tracking step has finished
@@ -1876,3 +1917,35 @@ void Tracker::CollectNearestPoints(KeyFrame& kf, std::set<MapPoint*>& spNearestP
   }
 }
 
+void Tracker::StartTrials(int nMaxTrials)
+{
+  ROS_ASSERT(mRunMode == NORMAL);
+  mRunMode = TRIALS;
+  mnTrialNumber = 0;
+  mnMaxTrials = nMaxTrials;
+  mse3SavedPose = mpCurrentMKF->mse3BaseFromWorld;
+  InitTrial();
+}
+  
+// Returns true if we're still in trials mode, false otherwise
+bool Tracker::NextTrial()
+{
+  ROS_ASSERT(mRunMode == TRIALS);
+  mnTrialNumber++;
+  
+  InitTrial();
+  
+  if(mnTrialNumber == mnMaxTrials)
+    mRunMode = NORMAL;
+  
+  return mRunMode == TRIALS;
+}
+
+void Tracker::InitTrial()
+{
+  ROS_ASSERT(mRunMode == TRIALS);
+  mnFrame = 0;
+  mbTrialAdding = true;
+  mpCurrentMKF->mse3BaseFromWorld = mse3SavedPose;
+  UpdateCamsFromWorld();
+}

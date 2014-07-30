@@ -119,6 +119,8 @@ public:
 
   enum TrackingQuality{NONE, BAD, DODGY, GOOD};
   
+  enum RunMode{NORMAL, TRIALS};
+  
   /** @param map The Map
    *  @param mapmaker One of MapMaker or MapMakerClient, which share the MapMakerClientBase parent class
    *  @param cameras All camera models in the system
@@ -195,6 +197,10 @@ public:
   /// Set the addnext flag to true if map is good and we are not lost, will add subsequent MKF to map
   /// regardless of other metrics
   void AddNext();
+  
+  void StartTrials(int nMaxTrials);
+  
+  bool NextTrial();
   
   // Static members
   static double sdRotationEstimatorBlur; ///< Amount of blur when constructing SmallBlurryImage
@@ -377,6 +383,8 @@ protected:
   // Drawing functions
   /// Draws the reference grid at z=0 as an overlay
   void RenderGrid(); 
+  
+  void InitTrial();
          
   
   MultiKeyFrame* mpCurrentMKF;       ///< The current processing space as a MultiKeyFrame
@@ -446,6 +454,12 @@ protected:
   
   //testing
   bool mbAddNext;   ///< Add the next MKF now
+  
+  RunMode mRunMode;
+  int mnTrialNumber;
+  int mnMaxTrials;
+  TooN::SE3<> mse3SavedPose;
+  bool mbTrialAdding;
   
 };
 

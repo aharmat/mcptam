@@ -305,6 +305,8 @@ void GLWindow2::on_key_down(GLWindow&, int k)
     case XK_space:  s="Space"; break;
     case XK_BackSpace:  s="BackSpace"; break;
     case XK_Escape:  s="Escape"; break;
+    case XK_comma:   s=","; break;
+    case XK_period:  s="."; break;
     default: ;
   }
 

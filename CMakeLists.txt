@@ -38,7 +38,7 @@ generate_messages(DEPENDENCIES std_msgs sensor_msgs)
 
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES ${PROJECT_NAME}
+  LIBRARIES taylor_camera
   CATKIN_DEPENDS roscpp image_transport sensor_msgs cv_bridge geometry_msgs tf message_filters std_msgs std_srvs 
                  visualization_msgs dynamic_reconfigure pcl_ros message_runtime
   DEPENDS SuiteSparse CVD OpenGL GVars3)
@@ -83,6 +83,9 @@ add_executable(pose_calibrator src/MainPoseCalibrator.cc src/GLWindow2.cc src/GL
 add_dependencies(pose_calibrator ${PROJECT_NAME}_gencpp)
 target_link_libraries(pose_calibrator ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${GVars3_LIBRARIES}
                                      ${G2O_STUFF_LIBRARY} ${G2O_CORE_LIBRARY} ${G2O_SOLVER_CHOLMOD})
+                     
+add_library(taylor_camera src/TaylorCamera.cc)
+target_link_libraries(taylor_camera ${catkin_LIBRARIES} ${SUITESPARSE_LIBRARIES})
                              
 # Start of test and/or experimental programs
 #~ add_executable(bundle_test_file_2 experimental/tests/BundleTestFile2.cc src/TaylorCamera.cc src/Map.cc src/KeyFrame.cc src/MapPoint.cc

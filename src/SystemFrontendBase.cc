@@ -166,8 +166,8 @@ void SystemFrontendBase::PublishPose()
 {
   ROS_ASSERT(mpTracker);
   
-  if(mpTracker->GetTrackingQuality() == Tracker::NONE || mpTracker->IsLost())
-    return;
+  //if(mpTracker->GetTrackingQuality() == Tracker::NONE || mpTracker->IsLost())
+  //  return;
   
   geometry_msgs::PoseWithCovarianceStamped pose_cov_msg;
   pose_cov_msg.header.stamp = mpTracker->GetCurrentTimestamp();

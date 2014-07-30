@@ -126,7 +126,7 @@ struct Level
 //  , bImsphereCornersCached(false)
   { }
   
-  // Disable the assignment operator to make sure Levels aren't copied
+  // Disable the assignment operator to make sure Levels aren't copied accidentally
   Level& operator=(const Level &rhs) = delete;
   
   CVD::Image<CVD::byte> lastMask;          ///< Used to draw last combined internal + glare mask by Tracker

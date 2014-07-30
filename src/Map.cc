@@ -41,6 +41,16 @@
 #include <mcptam/MapPoint.h>
 #include <mcptam/KeyFrame.h>
 
+KeyFrame* translateKF(std::map<MultiKeyFrame*, MultiKeyFrame*>& MKFTranslator, KeyFrame* pKF)
+{
+  ROS_ASSERT(MKFTranslator.count(pKF->mpParent));
+  MultiKeyFrame* pMKFTranslated = MKFTranslator[pKF->mpParent];
+  
+  ROS_ASSERT(pMKFTranslated->mmpKeyFrames.count(pKF->mCamName));
+  return pMKFTranslated->mmpKeyFrames[pKF->mCamName];
+}
+
+
 Map::Map()
 {
   Reset();
@@ -219,6 +229,194 @@ void Map::EmptyTrash()
       ++mkf_it;
   }
   
+}
+
+void Map::MakeSnapshot()
+{
+  // Make a copy of all points and MKFs in both live map and trash, put them in the appropriate
+  // snapshot variables
+  
+  // Erase snapshot variables first
+  // Don't need to lock mutex yet since nobody is using the snapshots
+  
+  for(MapPointPtrList::iterator point_it = mlpPointsSnapshot.begin(); point_it != mlpPointsSnapshot.end(); ++point_it)
+  {
+    MapPoint& point = *(*point_it);
+    ROS_ASSERT(point.mnUsing == 0);  // nobody should be using the snapshots
+    delete (*point_it);
+  }
+    
+  mlpPointsSnapshot.clear();
+    
+  for(MultiKeyFramePtrList::iterator mkf_it = mlpMultiKeyFramesSnapshot.begin(); mkf_it != mlpMultiKeyFramesSnapshot.end(); ++mkf_it)
+  {
+    MultiKeyFrame& mkf = *(*mkf_it);
+    ROS_ASSERT(mkf.mnUsing == 0);  // nobody should be using the snapshots
+    delete (*mkf_it);
+  }
+  
+  mlpMultiKeyFramesSnapshot.clear();
+  
+  // Empty the trash, so we don't have to deal with saving anything from there
+  while( !(mlpMultiKeyFramesTrash.empty() && mlpPointsTrash.empty()) )
+  {
+    EmptyTrash();
+    ros::Duration(0.01).sleep();
+  }
+  
+  
+  // Now we can actually make copies of the live map
+  // so lock mutex
+  boost::mutex::scoped_lock lock(mMutex);
+  
+  // Sequence of actions:
+  // 1. Make copies of MKF data (not the measurements, they require Points)
+  // 2. Make copies of Point data (fill in with new MKF-related pointers)
+  // 3. Make copies of measurements (fill in with new Point related pointers)
+  
+  // Need to store live->snapshot translation maps for this to work
+  
+  std::map<MultiKeyFrame*, MultiKeyFrame*> MKFTranslator;
+  std::map<MapPoint*, MapPoint*> PointTranslator;
+  
+  // Creat the new MKFs
+  for(MultiKeyFramePtrList::iterator mkf_it = mlpMultiKeyFrames.begin(); mkf_it != mlpMultiKeyFrames.end(); ++mkf_it)
+  {
+    MultiKeyFrame& mkf = *(*mkf_it);
+    MultiKeyFrame* pMKFSnapshot = new MultiKeyFrame;
+    
+    pMKFSnapshot->mse3BaseFromWorld = mkf.mse3BaseFromWorld;
+    pMKFSnapshot->mdTotalDepthMean = mkf.mdTotalDepthMean;
+    pMKFSnapshot->mnID = mkf.mnID;
+    pMKFSnapshot->mbFixed = mkf.mbFixed;
+    pMKFSnapshot->mbBad = mkf.mbBad;
+    pMKFSnapshot->mbDeleted = mkf.mbDeleted;
+    
+    for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
+    {
+      std::string camName = kf_it->first;
+      KeyFrame& kf = *(kf_it->second);
+      KeyFrame* pKFSnapshot = new KeyFrame(pMKFSnapshot, camName);
+      pMKFSnapshot->mmpKeyFrames[camName] = pKFSnapshot;
+      
+      pKFSnapshot->mse3CamFromBase = kf.mse3CamFromBase;
+      pKFSnapshot->mse3CamFromWorld = kf.mse3CamFromWorld;
+      pKFSnapshot->mdSceneDepthMean = kf.mdSceneDepthMean;
+      pKFSnapshot->mdSceneDepthSigma = kf.mdSceneDepthSigma;
+      pKFSnapshot->mbActive = kf.mbActive;
+      
+      for(int i=0; i < LEVELS; ++i)
+      {
+        Level& level = kf.maLevels[i]; 
+        Level& levelSnapshot = pKFSnapshot->maLevels[i];
+        
+        levelSnapshot.lastMask = level.lastMask;
+        levelSnapshot.mask = level.mask;
+        levelSnapshot.image = level.image;
+        levelSnapshot.vCorners = level.vCorners;
+        levelSnapshot.vCornerRowLUT = level.vCornerRowLUT;
+        levelSnapshot.vCandidates = level.vCandidates;
+        levelSnapshot.vScoresAndMaxCorners = level.vScoresAndMaxCorners;
+        levelSnapshot.vFastFrequency = level.vFastFrequency;
+        levelSnapshot.nFastThresh = level.nFastThresh;
+        levelSnapshot.imagePrev = level.imagePrev;
+        levelSnapshot.vCornersPrev = level.vCornersPrev; 
+      }      
+    }
+  
+    mlpMultiKeyFramesSnapshot.push_back(pMKFSnapshot);
+    MKFTranslator[&mkf] = pMKFSnapshot;
+  }
+  
+  // Create the new points, with correct linking to the new MKFs/KFs
+  for(MapPointPtrList::iterator point_it = mlpPoints.begin(); point_it != mlpPoints.end(); ++point_it)
+  {
+    MapPoint& point = *(*point_it);
+    MapPoint* pPointSnapshot = new MapPoint;
+    
+    pPointSnapshot->mv3WorldPos = point.mv3WorldPos;
+    pPointSnapshot->mm3WorldCov = point.mm3WorldCov;
+    pPointSnapshot->mbBad = point.mbBad;
+    pPointSnapshot->mbDeleted = point.mbDeleted;
+    pPointSnapshot->mbFixed = point.mbFixed;
+    pPointSnapshot->mbOptimized = point.mbOptimized;
+    pPointSnapshot->mpPatchSourceKF = translateKF(MKFTranslator, point.mpPatchSourceKF);
+    pPointSnapshot->mnSourceLevel = point.mnSourceLevel;
+    pPointSnapshot->mirCenter = point.mirCenter;
+    pPointSnapshot->mv3Center_NC = point.mv3Center_NC;
+    pPointSnapshot->mv3OneDownFromCenter_NC = point.mv3OneDownFromCenter_NC;
+    pPointSnapshot->mv3OneRightFromCenter_NC = point.mv3OneRightFromCenter_NC;
+    pPointSnapshot->mv3Normal_NC = point.mv3Normal_NC;
+    pPointSnapshot->mv3PixelDown_W = point.mv3PixelDown_W;
+    pPointSnapshot->mv3PixelRight_W = point.mv3PixelRight_W;
+
+    for(std::set<KeyFrame*>::iterator kf_it = point.mMMData.spMeasurementKFs.begin(); kf_it != point.mMMData.spMeasurementKFs.end(); ++kf_it)
+    {
+      pPointSnapshot->mMMData.spMeasurementKFs.insert(translateKF(MKFTranslator, *kf_it));
+    }
+    
+    for(std::set<KeyFrame*>::iterator kf_it = point.mMMData.spNeverRetryKFs.begin(); kf_it != point.mMMData.spNeverRetryKFs.end(); ++kf_it)
+    {
+      pPointSnapshot->mMMData.spNeverRetryKFs.insert(translateKF(MKFTranslator, *kf_it));
+    }
+    
+    pPointSnapshot->mnMEstimatorOutlierCount = point.mnMEstimatorOutlierCount;
+    pPointSnapshot->mnMEstimatorInlierCount = point.mnMEstimatorInlierCount;
+    pPointSnapshot->mnID = point.mnID;
+    
+    mlpPointsSnapshot.push_back(pPointSnapshot);
+    PointTranslator[&point] = pPointSnapshot;
+  }
+  
+  // Create the new measurements, linking to the correct new points
+  for(MultiKeyFramePtrList::iterator mkf_it = mlpMultiKeyFrames.begin(); mkf_it != mlpMultiKeyFrames.end(); ++mkf_it)
+  {
+    MultiKeyFrame& mkf = *(*mkf_it);
+    MultiKeyFrame* pMKFSnapshot = MKFTranslator[&mkf];
+  
+    for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
+    {
+      std::string camName = kf_it->first;
+      KeyFrame& kf = *(kf_it->second);
+      KeyFrame* pKFSnapshot = pMKFSnapshot->mmpKeyFrames[camName];
+      
+      for(MeasPtrMap::iterator meas_it = kf.mmpMeasurements.begin(); meas_it != kf.mmpMeasurements.end(); ++meas_it)
+      {
+        MapPoint& point = *(meas_it->first);
+        Measurement& meas = *(meas_it->second);
+        
+        ROS_ASSERT(PointTranslator.count(&point));
+        MapPoint* pPointSnapshot = PointTranslator[&point];
+        Measurement* pMeasSnapshot = new Measurement;
+        
+        pMeasSnapshot->nLevel = meas.nLevel;
+        pMeasSnapshot->bSubPix = meas.bSubPix;
+        pMeasSnapshot->v2RootPos = meas.v2RootPos;
+        pMeasSnapshot->eSource = meas.eSource;
+        pMeasSnapshot->bTransferred = meas.bTransferred;
+        pMeasSnapshot->nID = meas.nID;
+        
+        pKFSnapshot->mmpMeasurements[pPointSnapshot] = pMeasSnapshot;
+      }
+    }
+  }
+  
+}
+
+void Map::Restore()
+{
+  ROS_ASSERT(!mlpPointsSnapshot.empty() && !mlpMultiKeyFramesSnapshot.empty());
+  
+  boost::mutex::scoped_lock lock(mMutex);
+  
+  mlpPoints.swap(mlpPointsSnapshot);
+  mlpMultiKeyFrames.swap(mlpMultiKeyFramesSnapshot);   
+  
+  lock.unlock();  // MakeSnapshot will try to lock mutex
+  
+  // Need to overwrite the new stuff in the "snapshot" variables with copies
+  // of the restored map
+  MakeSnapshot();
 }
 
 

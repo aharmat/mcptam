@@ -1263,3 +1263,9 @@ void MapMakerServerBase::EraseBadEntitiesFromQueues()
       ++jit;
   }
 }
+
+void MapMakerServerBase::ClearInternalQueues()
+{
+  mlFailureQueue.clear();
+  mlpNewQueue.clear();
+}

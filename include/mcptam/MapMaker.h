@@ -107,6 +107,12 @@ public:
   
   /// Request that the initialization phase is completed early
   void RequestStopInit();
+  
+  /// Request that the map be backed up
+  void RequestBackupMap();
+  
+  /// Request that the map be restored from a previously made backup
+  void RequestRestoreMap();
 
 protected:
   
@@ -136,6 +142,9 @@ protected:
   
   //testing 
   bool mbStopInit;  ///< End of initialization phase requested
+  
+  bool mbBackupMap;
+  bool mbRestoreMap;
   
 };
 

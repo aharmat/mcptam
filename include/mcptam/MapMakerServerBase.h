@@ -243,6 +243,9 @@ protected:
   /** @brief Points marked bad are removed from the internal queues. Call this function before emptying the Map trash to ensure no pointers to MapPoints are left hanging around. */
   void EraseBadEntitiesFromQueues();
   
+  /** @brief Clear internal queues, used when restoring map to a previous state */
+  void ClearInternalQueues();
+  
   std::list<std::pair<KeyFrame*, MapPoint*> > mlFailureQueue; ///< Queue of failed observations to re-find, implemented as a list
   std::list<MapPoint*> mlpNewQueue;   ///< Queue of newly-made map points to re-find in other KeyFrames, implemented as a list
   
