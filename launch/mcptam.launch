@@ -40,7 +40,9 @@
   <param name="headless" type="bool" value="$(arg headless)" />
 </node>
 
+<!--
 <node pkg="tf" type="static_transform_publisher" name="world_tf" args="0 0 0 0 0 3.14159 world vision_world 100" />
+-->
 
 </launch>
 
