@@ -141,6 +141,7 @@ void Tracker::Reset(bool bSavePose, bool bResetMap)
   mbPutPlaneAtOrigin = true;
   mbAddNext = false;
   mmSimpleMeas.clear();
+  mRunMode = NORMAL;
    
   mLastProcessTime = ros::Time::now();
   mse3StartPose = SE3<>();  
@@ -337,6 +338,7 @@ void Tracker::TrackFrameSetup(ImageBWMap& imFrames, ros::Time timestamp, bool bD
   static gvar3<int> gvnDrawMasks("DrawMasks", 0, HIDDEN|SILENT);
   
   double dMaxPointCov = mMapMaker.GetMaxCov();
+  bool bInitializing = mMapMaker.Initializing();
   
   if(mbDraw)  // Draw the camera images and optionally the FAST corners
   {
@@ -388,15 +390,15 @@ void Tracker::TrackFrameSetup(ImageBWMap& imFrames, ros::Time timestamp, bool bD
     
     if(dMaxPointCov > 0)
     {
-      double dRedFrac = dMaxPointCov/10;
-      if(dRedFrac > 1)
-        dRedFrac = 1.0;
-      double dGreenFac = 1-dRedFrac;
       std::stringstream sscov;
       sscov<<"Max cov: "<<dMaxPointCov;
       std::string covstring = sscov.str();
     
-      glColor3f(dRedFrac,dGreenFac,0);
+      if(bInitializing)
+        glColor3f(1,1,0);
+      else
+        glColor3f(0,1,0);
+        
       mpGLWindow->PrintString(CVD::ImageRef(10,80), covstring, 15);
     }
   }
@@ -1114,6 +1116,8 @@ void Tracker::TrackMap()
     else                                                                      // iterations is for M-Estimator convergence rather than 
       v6LastUpdate = PoseUpdateStepLinear(mvIterationSets, v6LastUpdate, iter, 16.0, iter==9);   // linearisation effects.
       
+    std::cout<<":::::::::::::::::: v6LastUpdate: "<<v6LastUpdate<<std::endl;
+    std::cout<<"mpCurrentMKF->mse3BaseFromWorld: "<<std::endl<<mpCurrentMKF->mse3BaseFromWorld<<std::endl;
   }
   
   
@@ -1244,6 +1248,12 @@ void Tracker::RefreshSceneDepth(std::vector<TrackerDataPtrVector>& vIterationSet
       
       // Calculate the weight the same way as KeyFrame's internal scene depth calculator
       double weight = point.mnMEstimatorInlierCount / (double)(point.mnMEstimatorInlierCount + point.mnMEstimatorOutlierCount);
+      
+      if(!std::isfinite(norm(td.mv3Cam)))
+      {
+        std::cout<<"td.mv3Cam: "<<td.mv3Cam<<std::endl;
+        ROS_BREAK();
+      }
       
       vDepthsAndWeights.push_back(std::make_pair(norm(td.mv3Cam), weight));
     }
@@ -1461,8 +1471,10 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
     }
   }
   
+  std::cout<<"Got "<<vErrorSquared.size()<<" valid measurements for pose update"<<std::endl;
+  
   // No valid measurements? Return null update.
-  if(vErrorSquared.size() == 0)
+  if(vErrorSquared.size() < 4)
     return makeVector(0,0,0,0,0,0);
   
   // Find the sigma squared that will be used in assigning weights
@@ -1548,10 +1560,10 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
         std::cerr<<"m2MeasCov: "<<std::endl<<m2MeasCov<<std::endl;
       }
       */
-      wls.add_mJ_rows(td.mv2Error, m26Jac, opts::M2Inverse(m2MeasCov) * dWeight);
+      //wls.add_mJ_rows(td.mv2Error, m26Jac, opts::M2Inverse(m2MeasCov) * dWeight);
       
-      //wls.add_mJ(v2Error[0], td.mdSqrtInvNoise * m26Jac[0], dWeight); // These two lines are currently
-      //wls.add_mJ(v2Error[1], td.mdSqrtInvNoise * m26Jac[1], dWeight); // the slowest bit of poseits
+      wls.add_mJ(td.mv2Error[0], td.mdSqrtInvNoise * m26Jac[0], dWeight); // These two lines are currently
+      wls.add_mJ(td.mv2Error[1], td.mdSqrtInvNoise * m26Jac[1], dWeight); // the slowest bit of poseits
     }
     
   }

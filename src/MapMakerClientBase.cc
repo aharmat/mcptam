@@ -87,10 +87,12 @@ void MapMakerClientBase::MarkOutliersAsBad()
     }
   }
   
+  /*
   if(nMarkedBad > 0)
   {
     ROS_INFO_STREAM("======== Handle outlier based on tracker marked "<<nMarkedBad<<" points as bad");
   }
+  */
 }
 
 // Points that have fewer than two measurements are marked as outliers. If the point is fixed, one measurement is enough

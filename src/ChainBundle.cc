@@ -72,7 +72,7 @@ class VertexPoseSE3 : public g2o::BaseVertex<6, TooN::SE3<> >
     {
       setToOrigin();
       _nID = poseID++;
-      _m6Cov = TooN::Zeros;
+      _m6Cov = TooN::Identity * 1e10;
     }
 
     virtual void setToOriginImpl() 
@@ -230,7 +230,7 @@ class VertexRelPoint : public g2o::BaseVertex<3, TooN::Vector<3> >
       setToOrigin();
       _nID = pointID++;
       _pPoseChainHelper = NULL;
-      _m3CartesianCov = TooN::Zeros;
+      _m3CartesianCov = TooN::Identity * 1e10;
     }
   
     virtual void setToOriginImpl() {

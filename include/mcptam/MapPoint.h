@@ -104,7 +104,7 @@ public:
     mnMEstimatorInlierCount = 1;
     //mtCreationTime = ros::Time::now();
     mpPatchSourceKF = NULL;
-    mm3WorldCov = TooN::Zeros;
+    mm3WorldCov = TooN::Identity * 1e10;
   };
   
   /// Delete owned TrackerData pointers

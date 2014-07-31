@@ -227,6 +227,8 @@ void MapMaker::run()
       lastPublishTime = ros::Time::now();
     }
     
+    //std::cout<<"Map maker state: "<< (mState == MM_RUNNING ? "RUNNING" : "INITIALIZING") <<std::endl;
+    
     // From here on, mapmaker does various map-maintenance jobs in a certain priority
     // Hierarchy. For example, if there's a new key-frame to be added (IncomingQueueSize() is >0)
     // then that takes high priority.

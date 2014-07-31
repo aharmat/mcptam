@@ -105,6 +105,15 @@ public:
   {
     mbInImage = false;
     mv3Cam = se3CamFromWorld * mPoint.mv3WorldPos;
+    
+    if(!TooN::isfinite(mv3Cam))
+    {
+      std::cout<<"se3CamFromWorld: "<<std::endl<<se3CamFromWorld<<std::endl;
+      std::cout<<"mPoint.mv3WorldPos: "<<mPoint.mv3WorldPos<<std::endl;
+      std::cout<<"mv3Cam: "<<mv3Cam<<std::endl;
+      ROS_BREAK();
+    }
+    
     mv2Image = camera.Project(mv3Cam);
     
     if(camera.Invalid())

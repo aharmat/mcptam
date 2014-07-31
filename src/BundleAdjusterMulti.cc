@@ -311,7 +311,11 @@ int BundleAdjusterMulti::AdjustAndUpdate(ChainBundle& multiBundle, std::set<Mult
       if(!mbUseRelativePoints)
       {
         point.mv3WorldPos = v3Pos;
-        point.mm3WorldCov = multiBundle.GetPointCov(point_it->second);
+        
+        if(multiBundle.GetMaxCov() < std::numeric_limits<double>::max())
+        {
+          point.mm3WorldCov = multiBundle.GetPointCov(point_it->second);
+        }
       }
       else
       {
