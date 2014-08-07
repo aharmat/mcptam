@@ -86,6 +86,8 @@ protected:
   ros::ServiceClient mRewindClient;
   
   bool mbDoingTrials;
+  bool mbTrialInitialized;
+  TooN::SE3<> mse3SavedPose;  // temporary for debuggin
   
 };
 

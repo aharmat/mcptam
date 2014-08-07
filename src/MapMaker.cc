@@ -104,6 +104,9 @@ void MapMaker::RequestStopInit()
 
 void MapMaker::RequestBackupMap()
 { 
+  if(!mMap.mbGood)
+    return;
+  
   if(mBundleAdjuster.Running()) 
     mBundleAdjuster.RequestAbort();
     

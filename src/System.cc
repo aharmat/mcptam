@@ -176,6 +176,7 @@ System::System()
     
   mbDone = false;
   mbDoingTrials = false;
+  mbTrialInitialized = false;
 }
 
 System::~System()
@@ -257,18 +258,34 @@ void System::Run()
       PublishPose();
       PublishSmallImage();
       
-      if(mpTracker->IsLost() && mbDoingTrials)
+      if(mbDoingTrials && !mpTracker->IsLost())
       {
-        mpMapMaker->RequestRestoreMap();
-        
-        std_srvs::Empty srv;
-        if(!mRewindClient.call(srv))
+        mbTrialInitialized = true;
+      }
+      
+      if(mbDoingTrials && mpTracker->IsLost())
+      {
+        // Only reset and go to the next trial if the current one had a chance to be initialized
+        if(mbTrialInitialized)
         {
-          ROS_FATAL("Could not call rewind service!");
-          ros::shutdown();
+          mpMapMaker->RequestRestoreMap();
+          
+          std_srvs::Empty srv;
+          if(!mRewindClient.call(srv))
+          {
+            ROS_FATAL("Could not call rewind service!");
+            ros::shutdown();
+          }
+          else
+          {
+            mbDoingTrials = mpTracker->NextTrial();
+            mbTrialInitialized = false;
+          }
         }
-        
-        mbDoingTrials = mpTracker->NextTrial();
+        else
+        {
+          // Otherwise don't do anything, let the current trial relocalize itself first
+        }
       }
       
       // DEBUG
@@ -416,15 +433,32 @@ void System::GUICommandHandler(std::string command, std::string params)
       if(bSuccess)
       {
         mpMapMaker->RequestBackupMap();
+        //mse3SavedPose = mpTracker->GetCurrentPose();
         mpTracker->StartTrials(3);
-        
         mbDoingTrials = true;
+        mbTrialInitialized = false;
       }
       else
       {
         ROS_ERROR_STREAM("Could not call bookmark service!");
       }
     }
+    /*
+    else if(params == ",")
+    {
+      std_srvs::Empty srv;
+      if(!mRewindClient.call(srv))
+      {
+        ROS_FATAL("Could not call rewind service!");
+        ros::shutdown();
+      }
+      else
+      {
+        mpMapMaker->RequestRestoreMap();
+        mpTracker->SetCurrentPose(mse3SavedPose);
+      }
+    }
+    */
     
     std::cout<<"Keypress params: "<<params<<std::endl;
     

@@ -401,6 +401,33 @@ void Tracker::TrackFrameSetup(ImageBWMap& imFrames, ros::Time timestamp, bool bD
         
       mpGLWindow->PrintString(CVD::ImageRef(10,80), covstring, 15);
     }
+    
+    if(mRunMode == TRIALS)
+    {
+      std::stringstream ss;
+      ss<<"Trial "<<mnTrialNumber<<": ";
+      
+      if(mnTrialNumber == 0)
+      {
+        ss<<"Scene Depth";
+      }
+      else if(mnTrialNumber == 1)
+      {
+        ss<<"Common Measurements";
+      }
+      else if(mnTrialNumber == 2)
+      {
+        ss<<"Pose Covariance";
+      }
+      else
+      {
+        ss<<"I DO NOT KNOW";
+      }
+      
+      glColor3f(0,1,0);
+      mpGLWindow->PrintString(CVD::ImageRef(10,120), ss.str(), 12);
+      
+    }
   }
   
 }
@@ -1072,7 +1099,9 @@ void Tracker::TrackMap()
       mbDidCoarse = true;
       for(int iter = 0; iter<10 && mvCurrCamNames.size() > 0; iter++) // If so: do ten Gauss-Newton pose updates iterations.
       {
-        PoseUpdateStep(mvIterationSets, iter, 1.0, false);  // Don't mark outliers yet since we'll do more optimization later
+        TooN::Vector<6> v6LastUpdate = PoseUpdateStep(mvIterationSets, iter, 1.0, false);  // Don't mark outliers yet since we'll do more optimization later
+        //std::cout<<"==================== v6LastUpdate: "<<v6LastUpdate<<std::endl;
+        //std::cout<<"mpCurrentMKF->mse3BaseFromWorld: "<<std::endl<<mpCurrentMKF->mse3BaseFromWorld<<std::endl;
       }
     }
     else
@@ -1116,8 +1145,8 @@ void Tracker::TrackMap()
     else                                                                      // iterations is for M-Estimator convergence rather than 
       v6LastUpdate = PoseUpdateStepLinear(mvIterationSets, v6LastUpdate, iter, 16.0, iter==9);   // linearisation effects.
       
-    std::cout<<":::::::::::::::::: v6LastUpdate: "<<v6LastUpdate<<std::endl;
-    std::cout<<"mpCurrentMKF->mse3BaseFromWorld: "<<std::endl<<mpCurrentMKF->mse3BaseFromWorld<<std::endl;
+    //std::cout<<":::::::::::::::::: v6LastUpdate: "<<v6LastUpdate<<std::endl;
+    //std::cout<<"mpCurrentMKF->mse3BaseFromWorld: "<<std::endl<<mpCurrentMKF->mse3BaseFromWorld<<std::endl;
   }
   
   
@@ -1471,7 +1500,7 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
     }
   }
   
-  std::cout<<"Got "<<vErrorSquared.size()<<" valid measurements for pose update"<<std::endl;
+  //std::cout<<"Got "<<vErrorSquared.size()<<" valid measurements for pose update"<<std::endl;
   
   // No valid measurements? Return null update.
   if(vErrorSquared.size() < 4)
@@ -1496,8 +1525,9 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
   // The TooN WLSCholesky class handles reweighted least squares.
   // It just needs errors and jacobians.
   WLS<6> wls; //, wls_noweight;
-  //wls.add_prior(100.0); // Stabilising prior
+  wls.add_prior(100.0); // Stabilising prior
   mnNumInliers = 0;
+  int nNumAdded = 0;
   
   TooN::Matrix<3> m3Zeros = TooN::Zeros;   // for testing covariance matrix
   
@@ -1560,10 +1590,11 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
         std::cerr<<"m2MeasCov: "<<std::endl<<m2MeasCov<<std::endl;
       }
       */
-      //wls.add_mJ_rows(td.mv2Error, m26Jac, opts::M2Inverse(m2MeasCov) * dWeight);
+      wls.add_mJ_rows(td.mv2Error, m26Jac, opts::M2Inverse(m2MeasCov) * dWeight);
       
-      wls.add_mJ(td.mv2Error[0], td.mdSqrtInvNoise * m26Jac[0], dWeight); // These two lines are currently
-      wls.add_mJ(td.mv2Error[1], td.mdSqrtInvNoise * m26Jac[1], dWeight); // the slowest bit of poseits
+      nNumAdded++;
+      //wls.add_mJ(td.mv2Error_CovScaled[0], td.mdSqrtInvNoise * m26Jac[0], dWeight); // These two lines are currently
+      //wls.add_mJ(td.mv2Error_CovScaled[1], td.mdSqrtInvNoise * m26Jac[1], dWeight); // the slowest bit of poseits
     }
     
   }
@@ -1579,6 +1610,15 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
   }
   
   //std::cout<<"CalcPoseUpdate: "<<wls.get_mu()<<std::endl;
+  
+  if(!TooN::isfinite(wls.get_mu()))
+  {
+    std::cout<<"wls.get_mu(): "<<wls.get_mu()<<std::endl;
+    std::cout<<"nNumAdded: "<<nNumAdded<<std::endl;
+    std::cout<<"dSigmaSquared: "<<dSigmaSquared<<std::endl;
+    std::cout<<"dOverrideSigma: "<<dOverrideSigma<<std::endl;
+    ROS_BREAK();
+  }
   
   return wls.get_mu();
 }
@@ -1960,4 +2000,18 @@ void Tracker::InitTrial()
   mbTrialAdding = true;
   mpCurrentMKF->mse3BaseFromWorld = mse3SavedPose;
   UpdateCamsFromWorld();
+  
+  mv6BaseVelocity = Zeros;
+  mdMSDScaledVelocityMagnitude = 0;
+  mbJustRecoveredSoUseCoarse = true;
+}
+
+void Tracker::SetCurrentPose(TooN::SE3<> se3Pose)
+{
+  mpCurrentMKF->mse3BaseFromWorld = se3Pose;
+  UpdateCamsFromWorld();
+  
+  mv6BaseVelocity = Zeros;
+  mdMSDScaledVelocityMagnitude = 0;
+  mbJustRecoveredSoUseCoarse = true;
 }

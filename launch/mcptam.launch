@@ -32,9 +32,11 @@
   <param name="kf_distance_mean_diff_fraction" type="double" value="0.5" /> 
   <param name="mm_max_scaled_mkf_dist" type="double" value="0.3" />
   <param name="mm_outlier_multiplier" type="double" value="1.1" />
-  <param name="mm_init_cov_thresh" type="double" value="0.01" />
+  <param name="mm_init_cov_thresh" type="double" value="0.1" />
   
-  <param name="level_zero_points" type="bool" value="true" />
+  <param name="level_zero_points" type="bool" value="false" />
+  
+  <param name="tracker_mestimator" type="string" value="Huber" />
   
   <!-- For no GUI, set headless:=true -->
   <param name="headless" type="bool" value="$(arg headless)" />

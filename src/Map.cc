@@ -321,7 +321,12 @@ void Map::MakeSnapshot()
         levelSnapshot.nFastThresh = level.nFastThresh;
         levelSnapshot.imagePrev = level.imagePrev;
         levelSnapshot.vCornersPrev = level.vCornersPrev; 
-      }      
+      }
+      
+      // Only do this after the level 0 image has been filled in
+      // But only if the original KF had an SBI
+      if(kf.mpSBI)
+        pKFSnapshot->MakeSBI();      
     }
   
     mlpMultiKeyFramesSnapshot.push_back(pMKFSnapshot);

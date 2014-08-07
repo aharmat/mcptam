@@ -140,6 +140,8 @@ public:
   /// Set the feature extraction masks for the camera images
   void SetMasks(ImageBWMap& imMasks);
   
+  void SetCurrentPose(TooN::SE3<> se3Pose);
+  
   /// Get the current poses of the cameras
   SE3Map GetCurrentCameraPoses();
 

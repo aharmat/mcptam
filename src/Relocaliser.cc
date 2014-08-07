@@ -94,6 +94,9 @@ void Relocaliser::ScoreKFs(KeyFrame &kfCurrent)
   mdBestScore = std::numeric_limits<double>::max();
   mpBestKF = NULL;
   
+  int nNumWithoutSBI = 0;
+  int nNumTotal = 0;
+  
   for(MultiKeyFramePtrList::iterator it = mMap.mlpMultiKeyFrames.begin(); it != mMap.mlpMultiKeyFrames.end(); ++it)
   {
     MultiKeyFrame& mkf = *(*it);
@@ -103,9 +106,12 @@ void Relocaliser::ScoreKFs(KeyFrame &kfCurrent)
       if(kfCurrent.mCamName != kf.mCamName)  // only look at same camera
         continue;
         
+      nNumTotal++;
+        
       if(!kf.mpSBI)
       {
         ROS_WARN("KF doesn't have small blurry image! Skipping ...");
+        nNumWithoutSBI++;
         continue;
       }
       
@@ -117,5 +123,7 @@ void Relocaliser::ScoreKFs(KeyFrame &kfCurrent)
       }
     }
   }
+  
+  ROS_INFO_STREAM("Relocalizer looked at "<<nNumTotal<<" SBIs. "<<nNumWithoutSBI<<" KeyFrames didn't have SBIs.");
 }
 

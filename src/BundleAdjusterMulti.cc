@@ -303,23 +303,23 @@ int BundleAdjusterMulti::AdjustAndUpdate(ChainBundle& multiBundle, std::set<Mult
     {
       MapPoint& point = *(point_it->first);
       
-      if(point.mbFixed)
-        continue;
-      
-      TooN::Vector<3> v3Pos = multiBundle.GetPoint(point_it->second);
-      
-      if(!mbUseRelativePoints)
+      if(!point.mbFixed)
       {
-        point.mv3WorldPos = v3Pos;
+        TooN::Vector<3> v3Pos = multiBundle.GetPoint(point_it->second);
         
-        if(multiBundle.GetMaxCov() < std::numeric_limits<double>::max())
+        if(!mbUseRelativePoints)
         {
-          point.mm3WorldCov = multiBundle.GetPointCov(point_it->second);
+          point.mv3WorldPos = v3Pos;
+          
+          if(multiBundle.GetMaxCov() < std::numeric_limits<double>::max())
+          {
+            point.mm3WorldCov = multiBundle.GetPointCov(point_it->second);
+          }
         }
-      }
-      else
-      {
-        point.mv3WorldPos = point.mpPatchSourceKF->mse3CamFromWorld.inverse() * v3Pos;
+        else
+        {
+          point.mv3WorldPos = point.mpPatchSourceKF->mse3CamFromWorld.inverse() * v3Pos;
+        }
       }
         
       point.RefreshPixelVectors();
