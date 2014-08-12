@@ -504,8 +504,9 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
             mnLostFrames == 0 &&
             ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.1) &&
             //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, CountMeasurements()))
-            mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF)
+            //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF)
             //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, mm6PoseCovariance)
+            mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, CalcMAD())
             ))
         {
           if(mbAddNext)
@@ -1219,6 +1220,15 @@ void Tracker::TrackMap()
     
     glEnd();
     glDisable(GL_BLEND);
+    
+    //debug
+    double dMAD = CalcMAD();
+    std::stringstream ss;
+    ss<<"MAD: "<<dMAD;
+    
+    glColor3f(0,1,0);
+    mpGLWindow->PrintString(CVD::ImageRef(10,120), ss.str(), 12);
+    
   }
   
   // This is needed for testing the map to see if a new MultiKeyFrame is needed
@@ -1354,6 +1364,43 @@ void Tracker::RecordMeasurements()
       
     }
   }
+}
+
+// Calculate the mean absolute deviation
+double Tracker::CalcMAD()
+{
+  std::vector<double> vWeightedErrors;
+  
+  for(unsigned i=0; i < mvCurrCamNames.size(); ++i)
+  {
+    for(TrackerDataPtrVector::iterator td_it = mvIterationSets[i].begin(); td_it!= mvIterationSets[i].end(); ++td_it)
+    {
+      TrackerData& td = *(*td_it);
+      
+      if(!td.mbFound)
+        continue;
+     
+      vWeightedErrors.push_back(sqrt(td.mv2Error_CovScaled * td.mv2Error_CovScaled) * td.mdWeight);
+    }
+  }
+  
+  ROS_ASSERT(vWeightedErrors.size() > 0);
+  
+  std::sort(vWeightedErrors.begin(), vWeightedErrors.end()); 
+  double dMedian = vWeightedErrors[vWeightedErrors.size() / 2];
+  
+  //Subtract median from all weighted errors
+  
+  for(unsigned i=0; i < vWeightedErrors.size(); ++i)
+  {
+    vWeightedErrors[i] = fabs(vWeightedErrors[i] - dMedian);
+  }
+  
+  // sort again to get new median
+  std::sort(vWeightedErrors.begin(), vWeightedErrors.end()); 
+  dMedian = vWeightedErrors[vWeightedErrors.size() / 2];
+  
+  return dMedian;
 }
 
 // Count the number of potential measurements
@@ -1546,17 +1593,17 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
       
       //Vector<2> &v2Error = td.mv2Error_CovScaled;
       double dErrorSq = td.mv2Error_CovScaled * td.mv2Error_CovScaled;
-      double dWeight;
+      //double dWeight;
       
       if(nEstimator == 0)
-        dWeight= Tukey::Weight(dErrorSq, dSigmaSquared);
+        td.mdWeight= Tukey::Weight(dErrorSq, dSigmaSquared);
       else if(nEstimator == 1)
-        dWeight= Cauchy::Weight(dErrorSq, dSigmaSquared);
+        td.mdWeight= Cauchy::Weight(dErrorSq, dSigmaSquared);
       else 
-        dWeight= Huber::Weight(dErrorSq, dSigmaSquared);
+        td.mdWeight= Huber::Weight(dErrorSq, dSigmaSquared);
       
       // Inlier/outlier accounting, only really works for cut-off estimators such as Tukey.
-      if(dWeight == 0.0)
+      if(td.mdWeight == 0.0)
       {
         if(bMarkOutliers)
           td.mPoint.mnMEstimatorOutlierCount++;
@@ -1590,11 +1637,11 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
         std::cerr<<"m2MeasCov: "<<std::endl<<m2MeasCov<<std::endl;
       }
       */
-      wls.add_mJ_rows(td.mv2Error, m26Jac, opts::M2Inverse(m2MeasCov) * dWeight);
+      wls.add_mJ_rows(td.mv2Error, m26Jac, opts::M2Inverse(m2MeasCov) * td.mdWeight);
       
       nNumAdded++;
-      //wls.add_mJ(td.mv2Error_CovScaled[0], td.mdSqrtInvNoise * m26Jac[0], dWeight); // These two lines are currently
-      //wls.add_mJ(td.mv2Error_CovScaled[1], td.mdSqrtInvNoise * m26Jac[1], dWeight); // the slowest bit of poseits
+      //wls.add_mJ(td.mv2Error_CovScaled[0], td.mdSqrtInvNoise * m26Jac[0], td.mdWeight); // These two lines are currently
+      //wls.add_mJ(td.mv2Error_CovScaled[1], td.mdSqrtInvNoise * m26Jac[1], td.mdWeight); // the slowest bit of poseits
     }
     
   }

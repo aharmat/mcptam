@@ -387,6 +387,8 @@ protected:
   void RenderGrid(); 
   
   void InitTrial();
+  
+  double CalcMAD();
          
   
   MultiKeyFrame* mpCurrentMKF;       ///< The current processing space as a MultiKeyFrame

@@ -114,6 +114,9 @@ public:
   // TESTING
   bool NeedNewMultiKeyFrame(MultiKeyFrame &mkf, TooN::Matrix<6> m6Cov);
   
+  // testing
+  bool NeedNewMultiKeyFrame(MultiKeyFrame &mkf, double dMAD);
+  
   /// Checks to see if the given KeyFrame is a candidate to be added to the Map
   /** @param kf The KeyFrame to check
    *  @return Should this KeyFrame be added? */           

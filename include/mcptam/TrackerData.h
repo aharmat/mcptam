@@ -92,6 +92,7 @@ public:
   // Stuff for pose update:
   TooN::Vector<2> mv2Error;            ///< The projection error
   TooN::Vector<2> mv2Error_CovScaled;  ///< The projection error scaled by the inverse noise term
+  double mdWeight;
   TooN::Matrix<2,6> mm26Jacobian;   ///< Jacobian of projection with respect to camera position
   TooN::Matrix<2,3> mm23Jacobian;   ///< Jacobian of projection with respect to point position
   
