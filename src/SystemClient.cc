@@ -98,7 +98,7 @@ SystemClient::SystemClient()
     GUI.ParseLine("Menu.AddMenuToggle Images \"Glare Mask\" GlareMasking Images");
   }
   
-  mpMapMakerClient = new MapMakerClient(*mpMap);
+  mpMapMakerClient = new MapMakerClient(*mpMap, mmCameraModels);
   mpTracker = new Tracker(*mpMap, *mpMapMakerClient, mmCameraModels, mmPoses, mmDrawOffsets, mpGLWindow);
   
   ImageBWMap masksMap = LoadMasks(); 

@@ -249,7 +249,7 @@ protected:
   std::list<std::pair<KeyFrame*, MapPoint*> > mlFailureQueue; ///< Queue of failed observations to re-find, implemented as a list
   std::list<MapPoint*> mlpNewQueue;   ///< Queue of newly-made map points to re-find in other KeyFrames, implemented as a list
   
-  TaylorCameraMap mmCameraModels;          ///< The camera models used for projecting points
+  //TaylorCameraMap mmCameraModels;          ///< The camera models used for projecting points
   BundleAdjusterBase& mBundleAdjuster;     ///< The bundle adjuster used for map optimization
   
   int mnNumConsecutiveFailedBA;    ///< Number of consecutive failed bundle adjustments, if exceeds threshold map is considered corrupt and is reset

@@ -63,8 +63,7 @@ double MapMakerServerBase::sdInitCovThresh = 1.0;
 bool MapMakerServerBase::sbLargePointTest = true;
 
 MapMakerServerBase::MapMakerServerBase(Map& map, TaylorCameraMap &cameras, BundleAdjusterBase& bundleAdjuster)
-  : MapMakerBase(map, true)  // This will be skipped since inheritance is virtual!
-  , mmCameraModels(cameras)
+  : MapMakerBase(map, cameras, true)  // This will be skipped since inheritance is virtual!
   , mBundleAdjuster(bundleAdjuster)
 {
   // This needs to be remapped in the launch file

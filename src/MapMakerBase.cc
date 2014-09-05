@@ -51,8 +51,9 @@
 #include <pcl/point_types.h>
 #include <fstream>
 
-MapMakerBase::MapMakerBase(Map& map, bool bAdvertise)
+MapMakerBase::MapMakerBase(Map& map, TaylorCameraMap &cameras, bool bAdvertise)
   : mMap(map)
+  , mmCameraModels(cameras)
   , mNodeHandlePriv("~")
 {
   if(bAdvertise)

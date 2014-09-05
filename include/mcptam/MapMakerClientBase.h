@@ -63,11 +63,26 @@
 #define __MAP_MAKER_CLIENT_BASE_H
 
 #include <mcptam/MapMakerBase.h>
+#include <mcptam/ChainBundleIncrementalCovariance.h>
 #include <deque>
 #include <boost/thread/mutex.hpp>
 #include <ros/ros.h>
 #include <cvd/image.h>
 #include <TooN/se3.h>
+
+struct CovHelper
+{
+  CovHelper() : mpCovBundle(NULL) { }
+  ~CovHelper(){ 
+    if(mpCovBundle)
+      delete mpCovBundle;
+  }
+  
+  ChainBundleIncrementalCovariance* mpCovBundle;
+  std::map<MapPoint*, int> mmPoint_BundleID;      ///< %Map FROM MapPoint* TO point id
+  std::map<std::string, int> mmCamName_BundleID;  ///< %Map FROM camera name TO camera id
+  int mnTracker_BundleID;
+};
 
 
 /** @brief An abstract base class that specifies the interface used by the Tracker to interact with
@@ -82,7 +97,7 @@ public:
 
   /** @brief Need to call constructor with Map as argument
    *  @param map The Map being worked on */
-  MapMakerClientBase(Map &map);
+  MapMakerClientBase(Map &map, TaylorCameraMap &cameras);
   
   /// Destructor
   virtual ~MapMakerClientBase(){ };
@@ -116,6 +131,9 @@ public:
   
   // testing
   bool NeedNewMultiKeyFrame(MultiKeyFrame &mkf, double dMAD);
+  
+  // testing
+  TooN::Matrix<6> GetTrackerCov(MultiKeyFrame* pTrackerMKF);
   
   /// Checks to see if the given KeyFrame is a candidate to be added to the Map
   /** @param kf The KeyFrame to check
@@ -184,9 +202,15 @@ protected:
   
   /// Called when initialization phase has finished, clears incoming queue
   void ClearIncomingQueue();
+  
+  void LoadCovBundle();
    
   std::deque<MultiKeyFrame*> mqpMultiKeyFramesFromTracker;  ///< Queue of MultiKeyFrames from the tracker waiting to be processed
   boost::mutex mQueueMutex;     ///< Mutex to protect the MKF queue
+  
+  int mnCurrCov;
+  std::vector<CovHelper> mvCovHelpers;
+  boost::mutex mCovMutex;
 };
 
 #endif

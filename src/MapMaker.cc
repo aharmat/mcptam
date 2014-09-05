@@ -45,8 +45,8 @@
 #include <mcptam/BundleAdjusterBase.h>
 
 MapMaker::MapMaker(Map &map, TaylorCameraMap &cameras, BundleAdjusterBase &bundleAdjuster)
-: MapMakerBase(map, true)
-, MapMakerClientBase(map)
+: MapMakerBase(map, cameras, true)
+, MapMakerClientBase(map, cameras)
 , MapMakerServerBase(map, cameras, bundleAdjuster)
 {
   Reset();
@@ -58,7 +58,9 @@ MapMaker::~MapMaker()
   stop(); // CVD::Thread function, makes shouldStop() return true
   ROS_DEBUG("MapMaker: Waiting for run thread to die");
   join(); // CVD::Thread function
-  ROS_DEBUG("MapMaker: Run thread has died.");;
+  ROS_DEBUG("MapMaker: Run thread has died.");
+  
+  Reset();
 }
 
 // Requests an abort from the bundle adjuster and sets flags that signal a reset is waiting

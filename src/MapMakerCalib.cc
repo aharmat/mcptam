@@ -48,7 +48,7 @@
 using namespace TooN;
 
 MapMakerCalib::MapMakerCalib(Map& map, TaylorCameraMap& cameras, BundleAdjusterBase &bundleAdjuster)
-: MapMakerBase(map, true)
+: MapMakerBase(map, cameras, true)
 , MapMaker(map, cameras, bundleAdjuster)  // this will start parent's run thread
 {
   // Increase outlier limits to be more lenient

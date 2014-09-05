@@ -62,6 +62,7 @@
 #ifndef __MAP_MAKER_BASE_H
 #define __MAP_MAKER_BASE_H
 
+#include <mcptam/Types.h>
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
 
@@ -95,7 +96,7 @@ public:
   /** @brief Need to call constructor with Map as argument
    *  @param map The Map being worked on 
    *  @param bAdvertise Should we advertise various info topics right away? Useful if we're actually going to publish on them, confusing if we're not */
-  MapMakerBase(Map &map, bool bAdvertise);
+  MapMakerBase(Map &map, TaylorCameraMap &cameras, bool bAdvertise);
   
   /// Destructor
   virtual ~MapMakerBase(){ };
@@ -198,6 +199,8 @@ protected:
   ros::Publisher mMapMKFsPub;    ///< Publishes MKF visualization markers
   
   double mdMaxCov;              ///< Maximum covariance of the point feature positions
+  
+  TaylorCameraMap mmCameraModels;          ///< The camera models used for projecting points
   
 private:
   // Thread interaction signalling stuff, only want this accessed through appropriate functions

@@ -45,7 +45,7 @@
 #include <mcptam/BundleAdjusterMulti.h>
 
 MapMakerServer::MapMakerServer(Map &map, TaylorCameraMap &cameras, BundleAdjusterBase &bundleAdjuster)
-: MapMakerBase(map, true)
+: MapMakerBase(map, cameras, true)
 , MapMakerServerBase(map, cameras, bundleAdjuster)
  // The network manager needs to be bound to the appropriate callback functions
 , mNetworkManager(boost::bind(&MapMakerServer::InitCallback, this, _1), boost::bind(&MapMakerServer::AddCallback, this, _1, _2), 
