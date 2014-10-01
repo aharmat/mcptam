@@ -210,7 +210,7 @@ bool MapMakerClientBase::NeedNewMultiKeyFrame(MultiKeyFrame &mkf)
   double dThresh = MapMakerClientBase::sdMaxScaledMKFDist * dMapSizeFactor;
   bool bNeed = dDist > dThresh;
   
-  ROS_INFO_STREAM("NeedNewMultiKeyFrame: dist: "<<dDist<<" mean depth: "<<mkf.mdTotalDepthMean<<" thresh: "<< dThresh << " need: "<<(bNeed ? "yes" : "no"));
+  //ROS_INFO_STREAM("NeedNewMultiKeyFrame: dist: "<<dDist<<" mean depth: "<<mkf.mdTotalDepthMean<<" thresh: "<< dThresh << " need: "<<(bNeed ? "yes" : "no"));
   
   return bNeed;
 }
@@ -308,6 +308,8 @@ void MapMakerClientBase::ProcessIncomingKeyFrames(MultiKeyFrame &mkf)
       it++;
     }
   }
+  
+  ROS_ASSERT(!mkf.mmpKeyFrames.empty());
 }
 
 // Find the closest MKF in the internal queue to the supplied one
@@ -370,6 +372,8 @@ void MapMakerClientBase::ClearIncomingQueue()
 
 void MapMakerClientBase::LoadCovBundle()
 {
+  bool bUseRelativePoints = false;
+  
   CovHelper& helper = mvCovHelpers[1-mnCurrCov];
   
   if(helper.mpCovBundle != NULL)
@@ -454,7 +458,7 @@ void MapMakerClientBase::LoadCovBundle()
     TooN::Vector<3> v3Pos;
     std::vector<int> vPoses;
     
-    if(point.mbFixed)
+    if(point.mbFixed || !bUseRelativePoints)
     {
       if(nWorldID == -1)  // not yet added
         nWorldID = helper.mpCovBundle->AddPose(TooN::SE3<>(), true);
@@ -516,55 +520,348 @@ void MapMakerClientBase::LoadCovBundle()
   helper.mpCovBundle->Compute(&bAbortRequested, 0, 0);
   
   // Now add the tracker pose (incrementally)
-  helper.mnTracker_BundleID = helper.mpCovBundle->AddPoseIncrementally(TooN::SE3<>()); 
+  //helper.mnTracker_BundleID = helper.mpCovBundle->AddPoseIncrementally(TooN::SE3<>()); 
   
   // Swap current helper
   boost::mutex::scoped_lock lock(mCovMutex);
   mnCurrCov = 1-mnCurrCov;
 }
 
-TooN::Matrix<6> MapMakerClientBase::GetTrackerCov(MultiKeyFrame* pTrackerMKF)
+bool CompCrossCov(PointCrossCov* pXCov1, PointCrossCov* pXCov2) 
+{ 
+  return pXCov1->GetPriority() < pXCov2->GetPriority();
+}
+
+void UpdateCrossCovariances(std::set<MapPoint*> spParticipatingPoints, ros::Duration allowedDur)
+{
+  std::vector<PointCrossCov*> vCrossCov;
+  vCrossCov.reserve(spParticipatingPoints.size() * spParticipatingPoints.size() * 0.5);
+  
+  for(std::set<MapPoint*>::iterator point1_it = spParticipatingPoints.begin(); point1_it != spParticipatingPoints.end(); ++point1_it)
+  {
+    MapPoint pPoint1 = *point1_it;
+    
+    for(std::set<MapPoint*>::iterator point2_it = point1_it; point2_it != spParticipatingPoints.end(); ++point2_it)
+    {
+      if(point2_it == point1_it)
+        continue;
+        
+      MapPoint pPoint2 = *point2_it;
+      
+      CrossCovPtrMap::iterator x_it1 = pPoint1->mmpCrossCov.find(pPoint2);
+      if(x_it1 != pPoint1->mmpCrossCov.end())
+      {
+        vCrossCov.push_back(x_it1->second);
+      }
+      else
+      {
+        PointCrossCov* pCrossCov = new PointCrossCov(*pPoint1, *pPoint2);
+        pPoint1->mmpCrossCov[pPoint2] = pCrossCov;
+        pPoint2->mmpCrossCov[pPoint1] = pCrossCov;
+        
+        vCrossCov.push_back(pCrossCov);
+      }
+    }
+  }
+  
+  std::sort(vCrossCov.begin(), vCrossCov.end(), CompCrossCov);
+  
+  
+}
+
+void MapMakerClientBase::ComputeSelectedPointsCrossCov()
 {
   boost::mutex::scoped_lock lock(mCovMutex);
   CovHelper& helper = mvCovHelpers[mnCurrCov];
   
-  helper.mpCovBundle->SetPose(helper.mnTracker_BundleID, pTrackerMKF->mse3BaseFromWorld);
+  mdSelectedPointsCrossCovNorm = -1;
+  
+  if(helper.mpCovBundle == NULL)
+  {
+    std::cerr<<"No CovBundle found in helper!"<<std::endl;
+    return;
+  }
+    
+  if(mvpSelectedPoints[0] == NULL)
+  {
+    std::cerr<<"Selected point 1 is null!"<<std::endl;
+    return;
+  }
+    
+  if(mvpSelectedPoints[1] == NULL)
+  {
+    std::cerr<<"Selected point 2 is null!"<<std::endl;
+    return;
+  }
+    
+  if(helper.mmPoint_BundleID.count(mvpSelectedPoints[0]) == 0)
+  {
+    std::cerr<<"Selected point 1 not found in cov bundle!"<<std::endl;
+    return;
+  }
+    
+  if(helper.mmPoint_BundleID.count(mvpSelectedPoints[1]) == 0)
+  {
+    std::cerr<<"Selected point 2 not found in cov bundle!"<<std::endl;
+    return;
+  }
+        
+  int nPoint1_BundleID = helper.mmPoint_BundleID[mvpSelectedPoints[0]];
+  int nPoint2_BundleID = helper.mmPoint_BundleID[mvpSelectedPoints[1]]; 
+  
+  TooN::Matrix<3> m3Cov = TooN::Zeros;
+  bool bSuccess = helper.mpCovBundle->GetPointsCrossCov(nPoint1_BundleID, nPoint2_BundleID, m3Cov);
+  std::cout<<"==============================================================================="<<std::endl;
+  std::cout<<"Cross Cov success: "<<(bSuccess ? "yes" : "no")<<std::endl<<m3Cov<<std::endl;
+  std::cout<<"==============================================================================="<<std::endl;
+  
+  mdSelectedPointsCrossCovNorm = TooN::norm_fro(m3Cov);
+}
+
+TooN::Matrix<6> MapMakerClientBase::GetTrackerCov(TooN::SE3<> se3BaseFromWorld, std::vector<std::string>& vCamNames, std::vector<TrackerDataPtrVector>& vIterationSets)
+{
+  boost::mutex::scoped_lock lock(mCovMutex);
+  CovHelper& helper = mvCovHelpers[mnCurrCov];
+  
+  TooN::Matrix<6> m6Cov = TooN::Zeros;
+  
+  if(helper.mpCovBundle == NULL)
+    return m6Cov;
+  
+  helper.mpCovBundle->SetPose(helper.mnTracker_BundleID, se3BaseFromWorld);
   
   // Add the tracker measurements (incrementally)
-  for(KeyFramePtrMap::iterator kf_it = pTrackerMKF->mmpKeyFrames.begin(); kf_it != pTrackerMKF->mmpKeyFrames.end(); ++kf_it)
+  for(unsigned i=0; i < vCamNames.size(); ++i)
   {
-    KeyFrame& kf = *(kf_it->second);
-    std::string camName = kf_it->first;
-    
+    std::string camName = vCamNames[i];
     ROS_ASSERT(helper.mmCamName_BundleID.count(camName));
     
     std::vector<int> vCams(2);
     vCams[0] = helper.mnTracker_BundleID;
     vCams[1] = helper.mmCamName_BundleID[camName];
     
-    for(MeasPtrMap::iterator meas_it = kf.mmpMeasurements.begin(); meas_it != kf.mmpMeasurements.end(); ++meas_it)
+    for(TrackerDataPtrVector::iterator td_it = vIterationSets[i].begin(); td_it!= vIterationSets[i].end(); ++td_it)
     {
-      MapPoint& point = *(meas_it->first);
-
+      TrackerData& td = *(*td_it);
+      
+      if(!td.mbFound || td.mPoint.mbBad)
+        continue;
+        
+      MapPoint& point = td.mPoint;
+      
       if(helper.mmPoint_BundleID.count(&point) == 0)
         continue;
         
-      Measurement& meas = *(meas_it->second);
-      
       int nPoint_BundleID = helper.mmPoint_BundleID[&point];
       
-      helper.mpCovBundle->AddMeasIncrementally(vCams, nPoint_BundleID, meas.v2RootPos, LevelScale(meas.nLevel) * LevelScale(meas.nLevel), camName);
+      helper.mpCovBundle->AddMeasIncrementally(vCams, nPoint_BundleID, td.mv2Found, LevelScale(td.mnSearchLevel) * LevelScale(td.mnSearchLevel), camName);
     }
   }
   
   ros::Time start = ros::Time::now();
-  TooN::Matrix<6> m6Cov = helper.mpCovBundle->GetPoseCovIncrementally(helper.mnTracker_BundleID);
+  m6Cov = helper.mpCovBundle->GetPoseCovIncrementally(helper.mnTracker_BundleID);
   ros::Duration elapsed = ros::Time::now() - start;
   
+  std::cout<<"======================================================"<<std::endl;
   std::cout<<"================ EXPERIMENTAL COV ===================="<<std::endl;
+  std::cout<<"======================================================"<<std::endl;
   std::cout<<m6Cov<<std::endl;
   std::cout<<"Time taken: "<<elapsed<<" seconds"<<std::endl;
+  std::cout<<"======================================================"<<std::endl;
+  std::cout<<"======================================================"<<std::endl;
+  std::cout<<"======================================================"<<std::endl;
   
   return m6Cov;
+}
+
+TooN::Matrix<6> MapMakerClientBase::GetTrackerCovFull(MultiKeyFrame* pTrackerMKF)
+{
+  bool bUseRelativePoints = false;
+  
+  // Start building the bundle adjustment sets
+  std::set<MultiKeyFrame*> spAdjustSet;
+  std::set<MapPoint*> spMapPoints;
+  
+  // construct the sets of MKFs and points to be adjusted:
+  // in this case, all of them
+  ROS_DEBUG_STREAM("There are "<<mMap.mlpMultiKeyFrames.size()<<" MKFs in the map");
+  for(MultiKeyFramePtrList::iterator mkf_it = mMap.mlpMultiKeyFrames.begin(); mkf_it != mMap.mlpMultiKeyFrames.end(); ++mkf_it)
+  {
+    MultiKeyFrame& mkf = *(*mkf_it);
+    
+    if(mkf.mbBad)
+      continue;
+    
+    spAdjustSet.insert(&mkf);
+  }
+  
+  ROS_DEBUG_STREAM("Took "<<spAdjustSet.size()<<" of them, the rest are bad");
+  
+  ROS_DEBUG_STREAM("There are "<<mMap.mlpPoints.size()<<" points in the map");
+  for(MapPointPtrList::iterator point_it = mMap.mlpPoints.begin(); point_it != mMap.mlpPoints.end(); ++point_it)
+  {
+    MapPoint& point = *(*point_it);
+    
+    if(point.mbBad)
+      continue;
+      
+    if(point.mMMData.GoodMeasCount() < 2 && !point.mbFixed)  // skip if point doesn't have at least two measuring KFs
+      continue;
+      
+    spMapPoints.insert(&point);
+  }
+  
+  // The bundle adjuster does different accounting of MultiKeyFrames and MapPoints;
+  // Translation maps are stored:
+  std::map<MapPoint*, int> mPoint_BundleID;      ///< %Map FROM MapPoint* TO point id
+  std::map<int, MapPoint*> mBundleID_Point;      ///< %Map FROM point id TO MapPoint*
+  std::map<MultiKeyFrame*, int> mBase_BundleID;  ///< %Map FROM MultiKeyFrame* TO mkf id
+  std::map<int, MultiKeyFrame*> mBundleID_Base;  ///< %Map FROM mkf id TO MultiKeyFrame*
+  std::map<std::string, int> mCamName_BundleID;  ///< %Map FROM camera name TO camera id
+  std::map<int, std::string> mBundleID_CamName;  ///< %Map FROM camera id TO camera name
+  
+  
+  ROS_DEBUG_STREAM("BundleAdjustTrackerPose received: "<<spAdjustSet.size()<<" movable MKFs, "<<spMapPoints.size()<<" points");
+    
+  ChainBundleIncrementalCovariance multiBundle(mmCameraModels, true, false, false);
+  
+  int nNumPoses = 0;
+  // Add the MultiKeyFrames' poses to the bundle adjuster. Two parts: first nonfixed, then fixed.
+  for(std::set<MultiKeyFrame*>::iterator mkf_it = spAdjustSet.begin(); mkf_it!= spAdjustSet.end(); ++mkf_it)
+  {
+    MultiKeyFrame& mkf = *(*mkf_it);
+    
+    if(mkf.mbBad)
+      continue;
+    
+    int nBundleID = multiBundle.AddPose(mkf.mse3BaseFromWorld, mkf.mbFixed); 
+    nNumPoses++;
+    mBase_BundleID[&mkf] = nBundleID;
+    mBundleID_Base[nBundleID] = &mkf;
+    
+    for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
+    {
+      std::string camName = kf_it->first;
+      KeyFrame& kf = *(kf_it->second);
+      if(mCamName_BundleID.count(camName) == 0)   // not yet added
+      {
+        int nBundleID = multiBundle.AddPose(kf.mse3CamFromBase, true); nNumPoses++;
+        mCamName_BundleID[camName] = nBundleID;
+        mBundleID_CamName[nBundleID] = camName;
+      }
+    }
+  }
+  
+  int nNumPoints = 0;
+  int nWorldID = -1;  // in case we need to add a world pose (if adding fixed points)
+  for(std::set<MapPoint*>::iterator point_it = spMapPoints.begin(); point_it!=spMapPoints.end(); point_it++)
+  {
+    MapPoint& point = *(*point_it);
+    
+    //ROS_ASSERT(point.mMMData.GoodMeasCount() >= 2); // checked for this earlier....
+    
+    TooN::Vector<3> v3Pos;
+    std::vector<int> vPoses;
+    
+    if(point.mbFixed || !bUseRelativePoints)
+    {
+      if(nWorldID == -1)  // not yet added
+        nWorldID = multiBundle.AddPose(TooN::SE3<>(), true);
+        
+      v3Pos = point.mv3WorldPos;
+      vPoses.push_back(nWorldID);
+    }
+    else
+    {
+      v3Pos = point.mpPatchSourceKF->mse3CamFromWorld * point.mv3WorldPos;
+      vPoses.push_back(mBase_BundleID[point.mpPatchSourceKF->mpParent]);
+      vPoses.push_back(mCamName_BundleID[point.mpPatchSourceKF->mCamName]);
+    }
+    
+    int nBundleID = multiBundle.AddPoint(v3Pos, vPoses, point.mbFixed);  
+    nNumPoints++;
+    mPoint_BundleID[&point] = nBundleID;
+    mBundleID_Point[nBundleID] = &point;
+  }
+  
+  int nNumMeas = 0;
+  // Add the relevant point-in-keyframe measurements
+  for(std::map<MultiKeyFrame*, int>::iterator mkf_it = mBase_BundleID.begin(); mkf_it != mBase_BundleID.end(); ++mkf_it)
+  {
+    MultiKeyFrame& mkf = *(mkf_it->first);
+    int nMKF_BundleID = mkf_it->second;
+    
+    for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
+    {
+      KeyFrame& kf = *(kf_it->second);
+      std::string camName = kf_it->first;
+      
+      ROS_ASSERT(mCamName_BundleID.count(camName));
+      int nCamName_BundleID = mCamName_BundleID[camName];
+      
+      std::vector<int> vCams(2);
+      vCams[0] = nMKF_BundleID;
+      vCams[1] = nCamName_BundleID;
+      
+      for(MeasPtrMap::iterator meas_it = kf.mmpMeasurements.begin(); meas_it != kf.mmpMeasurements.end(); ++meas_it)
+      {
+        MapPoint& point = *(meas_it->first);
+  
+        if(mPoint_BundleID.count(&point) == 0)
+          continue;
+          
+        Measurement& meas = *(meas_it->second);
+        
+        int nPoint_BundleID = mPoint_BundleID[&point];
+        
+        multiBundle.AddMeas(vCams, nPoint_BundleID, meas.v2RootPos, LevelScale(meas.nLevel) * LevelScale(meas.nLevel), camName);
+        nNumMeas++;
+      }
+    }
+  }
+  
+  // Include tracker pose now
+  int nTrackerBundleID = multiBundle.AddPose(pTrackerMKF->mse3BaseFromWorld, false); 
+  nNumPoses++;
+  
+  mBase_BundleID[pTrackerMKF] = nTrackerBundleID;
+  mBundleID_Base[nTrackerBundleID] = pTrackerMKF;
+  
+  // Now add the tracker measurements
+  for(KeyFramePtrMap::iterator kf_it = pTrackerMKF->mmpKeyFrames.begin(); kf_it != pTrackerMKF->mmpKeyFrames.end(); ++kf_it)
+  {
+    KeyFrame& kf = *(kf_it->second);
+    std::string camName = kf_it->first;
+    
+    ROS_ASSERT(mCamName_BundleID.count(camName));
+    int nCamName_BundleID = mCamName_BundleID[camName];
+    
+    std::vector<int> vCams(2);
+    vCams[0] = nTrackerBundleID;
+    vCams[1] = nCamName_BundleID;
+    
+    for(MeasPtrMap::iterator meas_it = kf.mmpMeasurements.begin(); meas_it != kf.mmpMeasurements.end(); ++meas_it)
+    {
+      MapPoint& point = *(meas_it->first);
+
+      if(mPoint_BundleID.count(&point) == 0)
+        continue;
+        
+      Measurement& meas = *(meas_it->second);
+      
+      int nPoint_BundleID = mPoint_BundleID[&point];
+      
+      multiBundle.AddMeas(vCams, nPoint_BundleID, meas.v2RootPos, LevelScale(meas.nLevel) * LevelScale(meas.nLevel), camName);
+      nNumMeas++;
+    }
+  }
+  
+  
+  ROS_DEBUG_STREAM("Ended up adding "<<nNumPoses<<" poses, "<<nNumPoints<<" points, "<<nNumMeas<<" measurements");
+  
+  bool bAbortRequested = false;
+  int nAccepted = multiBundle.Compute(&bAbortRequested, 0, 0);
+  
+  return multiBundle.GetPoseCov(nTrackerBundleID);
 }
 

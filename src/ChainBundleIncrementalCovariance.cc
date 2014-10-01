@@ -237,8 +237,8 @@ class VertexRelPoint : public g2o::BaseVertex<3, TooN::Vector<3> >
 
     virtual void oplusImpl(const double* update)
     {
-      //_estimate += TooN::makeVector(update[0], update[1], update[2]);
-      //return;
+      _estimate += TooN::makeVector(update[0], update[1], update[2]);
+      return;
       
       // The update is specified in a coordinate frame where the _estimate
       // vector is first rotated to align with the z axis. This is done because
@@ -584,7 +584,7 @@ class EdgeChainMeas : public g2o::BaseMultiEdge<2, TooN::Vector<2> >
         // as would be done with a call to VertexRelPoint::oplusImpl
         
         TooN::Matrix<3> m3Jac;
-        
+        /*
         // d_beta, rotation about x axis
         m3Jac.T()[0] = Rp.inverse() * (TooN::SO3<>::generator_field(0,Rp*v3PointInCam));
         
@@ -593,8 +593,8 @@ class EdgeChainMeas : public g2o::BaseMultiEdge<2, TooN::Vector<2> >
         
         // d_rho, change in inverse depth
         m3Jac.T()[2] = -1*v3PointInCam / dRho;
-         
-        //m3Jac = TooN::Identity;
+         */
+        m3Jac = TooN::Identity;
         
         pPointVertex->_m3SphericalToCartesianJac = m3Jac;
         
@@ -1101,6 +1101,10 @@ ChainBundleIncrementalCovariance::ChainBundleIncrementalCovariance(TaylorCameraM
 , mbUseTukey(bUseTukey)
 , mbVerbose(bVerbose)
 {
+  measID = 0;
+  pointID = 0;
+  poseID = 0;
+  
   mnCurrId = 1;
   
   mpOptimizer = new SparseOptimizerIncrementalCovariance;
@@ -1390,10 +1394,10 @@ int ChainBundleIncrementalCovariance::Compute(bool *pAbortSignal, int nNumIter, 
     ROS_DEBUG("Externally Aborted");
   }
   
-  if(nCounter == 0 && !bExternalAbort)  // we have a problem
+  if(nNumIter > 0 && nCounter == 0 && !bExternalAbort)  // we have a problem
     return -1;
   
-  if(nCounter == 0 && *pAbortSignal)  // didn't actually take any steps, so we won't be able to do any of the tasks that follow, so just get out
+  if(nNumIter > 0 && nCounter == 0 && *pAbortSignal)  // didn't actually take any steps, so we won't be able to do any of the tasks that follow, so just get out
     return 0; 
   
   if(mbUseTukey)  // Need to calculate Tukey sigma and weight computation to determine outliers
@@ -1450,8 +1454,6 @@ int ChainBundleIncrementalCovariance::Compute(bool *pAbortSignal, int nNumIter, 
     
     //spinv.writeOctave("vertex_covariance.dat", false);
     
-    std::vector<double> vCov22;
-    
     for(unsigned i = 0; i < vAllVertices.size(); ++i)
     {
       OptimizableGraph::Vertex* pVertex = vAllVertices[i];
@@ -1464,12 +1466,7 @@ int ChainBundleIncrementalCovariance::Compute(bool *pAbortSignal, int nNumIter, 
       {
         TooN::Matrix<3,3,double> m3Cov = TooN::wrapMatrix<3,3,double>(pData);
         
-        // Look at the (2,2) entry of each covariance matrix, which indicates
-        // sensitivity in radial direction
-        vCov22.push_back(m3Cov(2,2));
-        
         VertexRelPoint* pPointVertex = dynamic_cast<VertexRelPoint*>(pVertex);
-        
         pPointVertex->_m3CartesianCov = pPointVertex->_m3SphericalToCartesianJac * m3Cov * pPointVertex->_m3SphericalToCartesianJac.T(); 
         
         //std::cout<<"Cov from g2o: "<<std::endl<<m3Cov<<std::endl;
@@ -1484,19 +1481,6 @@ int ChainBundleIncrementalCovariance::Compute(bool *pAbortSignal, int nNumIter, 
         VertexPoseSE3* pPoseVertex = dynamic_cast<VertexPoseSE3*>(pVertex);
         pPoseVertex->_m6Cov = m6Cov;
       }
-    }
-    
-    if(vCov22.size() > 0)
-    {
-      std::sort(vCov22.begin(), vCov22.end());
-      double median = vCov22[vCov22.size()/2];
-      ROS_INFO_STREAM("Point Cov 2,2 min: "<<*vCov22.begin()<<" max: "<<*vCov22.rbegin()<<" median: "<<median);
-      mdLastMaxCov = median;
-    }
-    else
-    {
-      ROS_WARN("Point Cov: none found because all fixed");
-      mdLastMaxCov = std::numeric_limits<double>::max();
     }
   }
   else
@@ -1549,8 +1533,37 @@ void ChainBundleIncrementalCovariance::SetPose(int n, TooN::SE3<> se3PoseFromRef
   ROS_ASSERT(bFound);
 }
 
+bool ChainBundleIncrementalCovariance::GetPointsCrossCov(int n1, int n2, TooN::Matrix<3>& m3Cov)
+{
+  const VertexRelPoint* pPoint1 = dynamic_cast<const VertexRelPoint*>(mpOptimizer->vertex(n1));
+  const VertexRelPoint* pPoint2 = dynamic_cast<const VertexRelPoint*>(mpOptimizer->vertex(n2));
+  
+  ROS_ASSERT(pPoint1 && pPoint2);
+  
+  std::vector<std::pair<int, int> > vBlockIndices;
+  vBlockIndices.push_back(std::make_pair(pPoint1->hessianIndex(), pPoint2->hessianIndex()));
+  
+  SparseBlockMatrix<MatrixXd> spinv;  // This will hold the covariance matrices
+  bool bSuccess = mpOptimizer->computeMarginals(spinv, vBlockIndices);
+  
+  if(!bSuccess)
+  {
+    ROS_WARN("Failed call to computeMarginals to find cross covariance");
+    return false;
+  }
+  
+  // Eigen stores in column major format by default. wrapMatrix function expects row major format.
+  Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> mBlock = *(spinv.block(vBlockIndices[0].first, vBlockIndices[0].second));
+  double* pData = mBlock.data();
+  m3Cov = TooN::wrapMatrix<3,3,double>(pData);
+  
+  return true;
+}
+
 TooN::Matrix<6> ChainBundleIncrementalCovariance::GetPoseCovIncrementally(int n)
 {
+  ROS_ASSERT(msIncrementalEdges.size() > 0);
+  
   SparseOptimizerIncrementalCovariance::VertexContainer vertices;
   
   bool bFound = false;
@@ -1569,10 +1582,17 @@ TooN::Matrix<6> ChainBundleIncrementalCovariance::GetPoseCovIncrementally(int n)
   ROS_ASSERT(bFound);
   ROS_ASSERT(nHessianIndex >= 0);
   
+  // Use old sigma from pre-factored map
   mpRobustKernelData->RecomputeNextTime();
   
   SparseBlockMatrix<MatrixXd> spinv;
-  mpOptimizer->computeUpdatedCovariance(msIncrementalEdges, vertices, spinv);
+  bool bSuccess = mpOptimizer->computeUpdatedCovariance(msIncrementalEdges, vertices, spinv);
+  
+  // Don't want to keep the edges around, we'll have to regenerate then before calling GetPoseCovIncrementally again!
+  for(HyperGraph::EdgeSet::iterator e_it = msIncrementalEdges.begin(); e_it != msIncrementalEdges.end(); ++e_it)
+    delete *e_it;
+    
+  msIncrementalEdges.clear();
   
   double dSigmaSquaredLimited = mpRobustKernelData->GetSigmaSquaredLimited();
   ROS_INFO_STREAM("After computing updated covariance, sigma squared limited: "<<dSigmaSquaredLimited);
@@ -1580,10 +1600,18 @@ TooN::Matrix<6> ChainBundleIncrementalCovariance::GetPoseCovIncrementally(int n)
   //std::cerr<<"spinv size: "<<spinv.rows()<<", "<<spinv.cols()<<std::endl;
   //spinv.writeOctave("spinv.dat", false);
   
+  TooN::Matrix<6,6,double> m6Cov = TooN::Zeros;
+  
+  if(!bSuccess)
+  {
+    std::cerr<<"Failed call to computeUpdatedCovariance, returning zero matrix"<<std::endl;
+    return m6Cov;
+  }
+  
   // Eigen stores in column major format by default. wrapMatrix function expects row major format.
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> mBlock = *(spinv.block(nHessianIndex, nHessianIndex));
   double* pData = mBlock.data();
-  TooN::Matrix<6,6,double> m6Cov = TooN::wrapMatrix<6,6,double>(pData);
+  m6Cov = TooN::wrapMatrix<6,6,double>(pData);
   
   return m6Cov;
 } 

@@ -64,6 +64,8 @@
 
 #include <mcptam/MapMakerBase.h>
 #include <mcptam/ChainBundleIncrementalCovariance.h>
+#include <mcptam/Tracker.h>  //just for data types
+#include <mcptam/TrackerData.h> //just for data types
 #include <deque>
 #include <boost/thread/mutex.hpp>
 #include <ros/ros.h>
@@ -133,7 +135,8 @@ public:
   bool NeedNewMultiKeyFrame(MultiKeyFrame &mkf, double dMAD);
   
   // testing
-  TooN::Matrix<6> GetTrackerCov(MultiKeyFrame* pTrackerMKF);
+  TooN::Matrix<6> GetTrackerCov(TooN::SE3<> se3BaseFromWorld, std::vector<std::string>& vCamNames, std::vector<TrackerDataPtrVector>& vIterationSets);
+  TooN::Matrix<6> GetTrackerCovFull(MultiKeyFrame* pTrackerMKF);
   
   /// Checks to see if the given KeyFrame is a candidate to be added to the Map
   /** @param kf The KeyFrame to check
@@ -204,6 +207,8 @@ protected:
   void ClearIncomingQueue();
   
   void LoadCovBundle();
+  
+  void ComputeSelectedPointsCrossCov();
    
   std::deque<MultiKeyFrame*> mqpMultiKeyFramesFromTracker;  ///< Queue of MultiKeyFrames from the tracker waiting to be processed
   boost::mutex mQueueMutex;     ///< Mutex to protect the MKF queue

@@ -102,3 +102,37 @@ void MapPoint::EraseAllMeasurements()
   mMMData.spMeasurementKFs.clear();
   
 }
+
+void MapPoint::EraseAllCrossCov()
+{
+  std::set<PointCrossCov*> spCrossCov;
+  boost::mutex::scoped_lock lock(mCrossCovMutex);
+  
+  // Need to gather PointCrossCov objects in a different container, because calling their 
+  // EraseLinks function will remove itself from both points. 
+  for(CrossCovPtrMap::iterator x_it = mmpCrossCov.begin(); x_it != mmpCrossCov.end(); ++x_it)
+  {
+    spCrossCov.insert(x_it->second);
+  }
+  
+  lock.unlock();
+  
+  for(std::set<PointCrossCov*>::iterator x_it = spCrossCov.begin(); x_it != spCrossCov.end(); ++x_it)
+  {
+    (*x_it)->EraseLinks();
+    delete *x_it;
+  }
+}
+
+TooN::Matrix<3> MapPoint::CrossCov(MapPoint* pOther)
+{
+  boost::mutex::scoped_lock lock(mCrossCovMutex);
+  
+  CrossCovPtrMap::iterator it = mmpCrossCov.find(pOther);
+  
+  if(it == mmpCrossCov.end())
+    return TooN::Zeros;
+  
+  else
+    return it->second->GetCrossCov(this);
+}

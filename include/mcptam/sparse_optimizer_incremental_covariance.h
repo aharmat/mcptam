@@ -36,6 +36,10 @@ namespace g2o {
       void setAlgorithm(OptimizationAlgorithm* algorithm) = delete;  // don't want user to be able to set algorithm since we manage that internally
 
       int optimize(int iterations, bool online = false);
+      
+      bool computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const std::vector<std::pair<int, int> >& blockIndices);
+      bool computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const Vertex* vertex);
+      bool computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const VertexContainer& vertices);
 
       bool computeUpdatedCovariance(HyperGraph::EdgeSet& eset, const VertexContainer& vertices, SparseBlockMatrix<MatrixXd>& spinv);
 
@@ -45,6 +49,7 @@ namespace g2o {
       CholmodExt* _cholmodSparse;
       cholmod_factor* _cholmodFactor;
       cholmod_triplet* _permutedUpdate;
+      cholmod_triplet* _permutedDowndate;
       cholmod_factor* _L;
       
       LinearSolverCholmod<BlockSolverX::PoseMatrixType>* _linearSolver;
@@ -55,9 +60,10 @@ namespace g2o {
 
       Eigen::VectorXi _tripletWorkspace;
       CholmodExt* _permutedUpdateAsSparse;
+      CholmodExt* _permutedDowndateAsSparse;
 
       bool computeCholeskyUpdate();
-      void convertTripletUpdateToSparse();
+      void convertTripletUpdateToSparse(cholmod_triplet* update, CholmodExt* updateAsSparse);
   };
 
 }

@@ -65,6 +65,7 @@
 #include <mcptam/Types.h>
 #include <ros/ros.h>
 #include <visualization_msgs/Marker.h>
+#include <geometry_msgs/PointStamped.h>
 
 class Map;
 class KeyFrame;
@@ -180,6 +181,8 @@ protected:
   /// Publish MKFs as a marker array
   void PublishMapMKFs();
   
+  void PublishSelectedPointsCov();
+  
   /// Converts an MKF to a visualization  message
   /** @param mkf The MKF to convert
    *  @param [out] marker The resulting visualization message */
@@ -187,6 +190,8 @@ protected:
   
   /// Dumps all map information to a file
   void DumpToFile(std::string filename);
+  
+  void SelectedPointCallback(const geometry_msgs::PointStamped::ConstPtr& pointMsg);
   
   Map &mMap;   ///< Reference to the Map
   
@@ -201,6 +206,13 @@ protected:
   double mdMaxCov;              ///< Maximum covariance of the point feature positions
   
   TaylorCameraMap mmCameraModels;          ///< The camera models used for projecting points
+  
+  ros::Subscriber mSelectedPointSub;
+  ros::Publisher mSelectedPointsCovPub;
+  
+  std::vector<MapPoint*> mvpSelectedPoints;
+  int mnCurrSelected;
+  double mdSelectedPointsCrossCovNorm;
   
 private:
   // Thread interaction signalling stuff, only want this accessed through appropriate functions

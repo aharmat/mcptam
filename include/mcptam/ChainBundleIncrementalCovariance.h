@@ -178,6 +178,9 @@ public:
    TooN::Matrix<6> GetPoseCov(int n); 
    
    TooN::Matrix<6> GetPoseCovIncrementally(int n); 
+   
+   //TooN::Matrix<3> GetPointsCrossCov(int n1, int n2);
+   bool GetPointsCrossCov(int n1, int n2, TooN::Matrix<3>& m3Cov);
     
   /** @brief Get measurements flagged as outliers
    * 

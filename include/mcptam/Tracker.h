@@ -151,7 +151,19 @@ public:
   
   /** @brief Get the current pose covariance
    *  @return The pose covariance */  
-  inline TooN::Matrix<6> GetCurrentCovariance() { return mm6PoseCovariance; }
+  inline TooN::Matrix<6> GetCurrentCovariance(int nCovType) 
+  { 
+    if(nCovType < 0)
+      return mm6PoseCovarianceOld;
+    else if(nCovType > 0)
+      return mm6PoseCovarianceExperimental;
+    else
+      return mm6PoseCovariance;
+  }
+  
+  inline ros::Duration GetCovarianceDuration() { return mCovDur; }
+  
+  inline int GetMeasNum() { return mnMeasNum; }
   
   /** @brief Get the Frobenius norm of the current pose covariance
    *  @return The pose covariance norm */  
@@ -221,6 +233,8 @@ public:
   static double sdTrackingQualityBad; ///< If fraction of potentially visible points actually founds is below this, tracking quality is bad
   static int snLostFrameThresh;       ///< Cap the number of frames where tracker is lost
   static bool sbCollectAllPoints;  ///< Should we project the whole map or do something smarter? (affects CollectNearestPoints)
+  
+  static double sdCrossCovDur;
   
 protected:
   
@@ -401,6 +415,11 @@ protected:
   Relocaliser mRelocaliser;                   ///< Relocalisation module
   
   TooN::Matrix<6>	mm6PoseCovariance;		///< covariance of current pose estimate
+  TooN::Matrix<6>	mm6PoseCovarianceExperimental;		///< covariance of current pose estimate
+  TooN::Matrix<6>	mm6PoseCovarianceOld;
+  ros::Duration mCovDur;
+  int mnMeasNum;
+  
   TooN::SE3<> mse3StartPose;             ///< The pose of the system at the start of processing a new set of images
   TooN::Vector<6> mv6BaseVelocity;    ///< The 6-vector representation of pose differences between the current and previous poses, divided by the time step
   double mdMSDScaledVelocityMagnitude;  ///< Velocity magnitude of base

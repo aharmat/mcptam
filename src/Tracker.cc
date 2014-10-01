@@ -82,6 +82,7 @@ double Tracker::sdTrackingQualityGood = 0.3;
 double Tracker::sdTrackingQualityBad = 0.13;
 int Tracker::snLostFrameThresh = 3;
 bool Tracker::sbCollectAllPoints = true;
+double Tracker::sdCrossCovDur = 0.02;
 
 // The constructor mostly sets up interal reference variables
 // to the other classes..
@@ -504,9 +505,9 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
             mnLostFrames == 0 &&
             ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.1) &&
             //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, CountMeasurements()))
-            //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF)
+            mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF)
             //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, mm6PoseCovariance)
-            mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, CalcMAD())
+            //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, CalcMAD())
             ))
         {
           if(mbAddNext)
@@ -778,7 +779,7 @@ void Tracker::FindPVS(std::string cameraName, TDVLevels& vPVSLevels)
       continue;   // a negative search pyramid level indicates an inappropriate warp for this view, so skip.
 
     // Debugging, rough check for a counting leak
-    if(point.mnUsing > mmCameraModels.size())
+    if(point.mnUsing > mmCameraModels.size() + 1)  // plus one to allow points to be selected in order to print covariance
     {
       ROS_FATAL_STREAM("Tracker: mnUsing greater than number of cameras, counting leak!: "<<point.mnUsing);
       ROS_BREAK();
@@ -1238,12 +1239,21 @@ void Tracker::TrackMap()
   timingMsg.depth = (ros::WallTime::now() - startTime).toSec();
   
   SaveSimpleMeasurements(mvIterationSets);
+  
+  //RecordMeasurements();
+  /*
+  ros::Time covStart = ros::Time::now();
+  mm6PoseCovarianceExperimental = mMapMaker.GetTrackerCov(mpCurrentMKF->mse3BaseFromWorld, mvCurrCamNames, mvIterationSets);
+  mCovDur = ros::Time::now() - covStart;
+  */
+  
 }
 
 // Save a simplified copy of the measurements made during tracking
 void Tracker::SaveSimpleMeasurements(std::vector<TrackerDataPtrVector>& vIterationSets)
 {
   mmSimpleMeas.clear();
+  mnMeasNum = 0;
   
   for(unsigned i=0; i < mvCurrCamNames.size(); ++i)
   {
@@ -1259,6 +1269,7 @@ void Tracker::SaveSimpleMeasurements(std::vector<TrackerDataPtrVector>& vIterati
         continue;
         
       mmSimpleMeas[camName][td.mnSearchLevel].push_back(td.mv2Found);
+      mnMeasNum++;
     }
   }
 }
@@ -1384,7 +1395,8 @@ double Tracker::CalcMAD()
     }
   }
   
-  ROS_ASSERT(vWeightedErrors.size() > 0);
+  if(vWeightedErrors.size() == 0)
+    return std::numeric_limits<double>::max();
   
   std::sort(vWeightedErrors.begin(), vWeightedErrors.end()); 
   double dMedian = vWeightedErrors[vWeightedErrors.size() / 2];
@@ -1506,6 +1518,101 @@ int Tracker::SearchForPoints(TrackerDataPtrVector& vTD, std::string cameraName, 
   return nFound;
 }
 
+Matrix<6> Tracker::CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationSets)
+{
+  int nMeasNum = 0;
+  int nCurrCol = 0;
+  std::map<MapPoint*, int> mPointToColumn;
+  std::set<MapPoint*> spParticipatingPoints;
+  
+  for(unsigned i=0; i < mvCurrCamNames.size(); ++i)
+  {
+    for(unsigned int j=0; j < vIterationSets[i].size(); ++j)
+    {
+      TrackerData &td = *vIterationSets[i][j];
+      if(!td.mbFound)
+        continue;
+        
+      nMeasNum++;
+      
+      if(!mPointToColumn.count(&td.mPoint))
+      {
+        mPointToColumn[&td.mPoint] = nCurrCol;
+        nCurrCol++;
+      }
+      
+      spParticipatingPoints.insert(&td.mPoint);
+    }
+  }
+  
+  int nPointNum = mPointToColumn.size();
+  
+  // Update as many cross covariances as possible within the given time budget
+  mMapMaker.UpdateCrossCovariances(spParticipatingPoints, ros::Duration(sdCrossCovDur));
+  
+  // The covariance matrix of the parameters
+  TooN::Matrix<> CovParams = TooN::Zeros(3*nPointNum+2*nMeasNum, 3*nPointNum+2*nMeasNum);
+  
+  // The jacobians
+  TooN::Matrix<> J1 = TooN::Zeros(2*nMeasNum, 3*nPointNum+2*nMeasNum);
+  TooN::Matrix<> J2 = TooN::Zeros(2*nMeasNum, 6);
+  
+  J1.slice(0, 3*nPointNum, 2*nMeasNum, 2*nMeasNum) =  TooN::Identity;
+  
+  int nMeasIdx = 0;
+  for(unsigned i=0; i < mvCurrCamNames.size(); ++i)
+  {
+    for(unsigned int j=0; j < vIterationSets[i].size(); ++j)
+    {
+      TrackerData &td = *vIterationSets[i][j];
+      if(!td.mbFound)
+        continue;
+        
+      int nPointCol = mPointToColumn[&td.mPoint];
+        
+      // diagonal of point block
+      CovParams.slice(3*nPointCol, 3*nPointCol, 3, 3) =  td.mPoint.mm3WorldCov;
+        
+      if(nPointCol > 0)
+      {
+        for(std::map<MapPoint*, int>::iterator point_it = mPointToColumn.begin(); point_it != mPointToColumn.end(); ++point_it)
+        {
+          MapPoint& otherPoint = *point_it->first;
+          int nOtherCol = point_it->second;
+          
+          if(nOtherCol >= nPointCol)
+            continue;
+          
+          TooN::Matrix<3> m3CrossCov = td.mPoint.CrossCov(&otherPoint);
+          
+          // off diagonal entry
+          CovParams.slice(3*nOtherCol, 3*nPointCol, 3, 3) = m3CrossCov;
+          CovParams.slice(3*nPointCol, 3*nOtherCol, 3, 3) = m3CrossCov.T();
+        }
+      }
+      
+      // finally the pixel noise cov
+      Matrix<2> m2PixelCov = TooN::Identity * (1.0/td.mdSqrtInvNoise);
+      CovParams.slice(3*nPointNum + 2*nMeasIdx, 3*nPointNum + 2*nMeasIdx, 2, 2) = m2PixelCov;
+      
+      // Now the jacobians
+      J1.slice(nMeasIdx*2, 3*nPointCol, 2, 3) = td.mm23Jacobian;
+      J2.slice(nMeasIdx*2, 0, 2, 6) = td.mm26Jacobian;
+      
+      nMeasIdx++;
+    }
+  }
+  
+  TooN::Matrix<> J1_Cov_J1t = J1 * CovParams * J1.T();
+  TooN::Cholesky<> chol1(J1_Cov_J1t.num_rows());
+  chol1.compute(J1_Cov_J1t);
+  
+  TooN::Matrix<> J2t_Inv_J2 = J2.T() * chol1.backsub(J2);
+  
+  TooN::Cholesky<> chol2(J2t_Inv_J2);
+  return chol2.get_inverse();
+}
+
 //Calculate a pose update 6-vector from a bunch of image measurements.
 //User-selectable M-Estimator.
 //Normally this robustly estimates a sigma-squared for all the measurements
@@ -1534,7 +1641,6 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
   std::vector<double> vErrorSquared;
   for(unsigned i=0; i < mvCurrCamNames.size(); ++i)
   {
-      
     for(unsigned int j=0; j < vIterationSets[i].size(); ++j)
     {
       TrackerData &td = *vIterationSets[i][j];
@@ -1573,6 +1679,8 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
   // It just needs errors and jacobians.
   WLS<6> wls; //, wls_noweight;
   wls.add_prior(100.0); // Stabilising prior
+  WLS<6> wls_old; //, wls_noweight;
+  wls_old.add_prior(100.0); // Stabilising prior
   mnNumInliers = 0;
   int nNumAdded = 0;
   
@@ -1640,17 +1748,19 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
       wls.add_mJ_rows(td.mv2Error, m26Jac, opts::M2Inverse(m2MeasCov) * td.mdWeight);
       
       nNumAdded++;
-      //wls.add_mJ(td.mv2Error_CovScaled[0], td.mdSqrtInvNoise * m26Jac[0], td.mdWeight); // These two lines are currently
-      //wls.add_mJ(td.mv2Error_CovScaled[1], td.mdSqrtInvNoise * m26Jac[1], td.mdWeight); // the slowest bit of poseits
+      wls_old.add_mJ(td.mv2Error_CovScaled[0], td.mdSqrtInvNoise * m26Jac[0], td.mdWeight); // These two lines are currently
+      wls_old.add_mJ(td.mv2Error_CovScaled[1], td.mdSqrtInvNoise * m26Jac[1], td.mdWeight); // the slowest bit of poseits
     }
     
   }
   
   wls.compute();
+  wls_old.compute();
   
   //if(bMarkOutliers)	
   {
 		mm6PoseCovariance = TooN::SVD<6>(wls.get_C_inv()).get_pinv();   // from ethzasl_ptam
+    mm6PoseCovarianceOld = TooN::SVD<6>(wls_old.get_C_inv()).get_pinv();
     
     //wls_noweight.compute();
     //mm6PoseCovarianceNoOutliers = TooN::SVD<6>(wls_noweight.get_C_inv()).get_pinv();   // from ethzasl_ptam

@@ -44,6 +44,8 @@
 #include <mcptam/TrackerState.h>
 #include <mcptam/Utility.h>
 #include <mcptam/LevelHelpers.h>
+#include <mcptam/TrackerCovInfo.h>
+#include <mcptam/Map.h>
 #include <sensor_msgs/Image.h>
 #include <std_msgs/Float64.h>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
@@ -91,6 +93,7 @@ SystemFrontendBase::SystemFrontendBase(std::string windowName, bool bFullSize)
   mSmallImagePub = mImageTransport.advertise("tracker_small_image", 1);
   
   mPoseCovNormPub = mNodeHandlePriv.advertise<std_msgs::Float64>("tracker_pose_cov_norm", 1);
+  mPoseCovExpNormPub = mNodeHandlePriv.advertise<mcptam::TrackerCovInfo>("tracker_pose_cov_exp_norm", 1);
   
   mNodeHandlePriv.param<int>("small_image_level", mnSmallImageLevel, 2);
   if(mnSmallImageLevel < 0)
@@ -175,12 +178,30 @@ void SystemFrontendBase::PublishPose()
   
   SE3<> pose = mpTracker->GetCurrentPose().inverse();
   Matrix<3> rot = pose.get_rotation().get_matrix();
-  TooN::Matrix<6> cov = mpTracker->GetCurrentCovariance();
+  TooN::Matrix<6> cov = mpTracker->GetCurrentCovariance(0);
   
   // debug:
   std_msgs::Float64 cov_norm_msg;
   cov_norm_msg.data = TooN::norm_fro(cov);
   mPoseCovNormPub.publish(cov_norm_msg);
+  
+  //---------- Experimental cov --------------
+  TooN::Matrix<6> cov_exp = mpTracker->GetCurrentCovariance(1);
+  TooN::Matrix<6> cov_old = mpTracker->GetCurrentCovariance(-1);
+  ros::Duration cov_dur = mpTracker->GetCovarianceDuration();
+  int nMapSize = mpMap->mlpPoints.size();
+  int nMeasNum = mpTracker->GetMeasNum();
+  
+  mcptam::TrackerCovInfo cov_info_msg;
+  cov_info_msg.cov_norm = TooN::norm_fro(cov_exp);
+  cov_info_msg.cov_norm_approx = cov_norm_msg.data;
+  cov_info_msg.cov_norm_old = TooN::norm_fro(cov_old);
+  cov_info_msg.calc_dur = cov_dur.toSec();
+  cov_info_msg.map_size = nMapSize;
+  cov_info_msg.meas_num = nMeasNum;
+  
+  mPoseCovExpNormPub.publish(cov_info_msg);
+  //------------------------------------------
   
   // clear cross correlation
   cov.slice<0,3,3,3>() = TooN::Zeros;

@@ -285,6 +285,8 @@ int BundleAdjusterMulti::AdjustAndUpdate(ChainBundle& multiBundle, std::set<Mult
       
     mbBundleConverged_Full = false;
     
+    boost::mutex::scoped_lock lock(mMap.mMutex);
+    
     // First update the MKF BaseFromWorld poses, and refresh the KF CamFromWorld poses
     for(std::map<MultiKeyFrame*,int>::iterator mkf_it = mmBase_BundleID.begin(); mkf_it!=mmBase_BundleID.end(); ++mkf_it)
     {

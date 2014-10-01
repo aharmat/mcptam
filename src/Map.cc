@@ -113,6 +113,7 @@ std::set<MapPoint*> Map::MoveBadPointsToTrash()
       boost::mutex::scoped_lock lock(mMutex);
       sBadPoints.insert(&point);
       point.EraseAllMeasurements();
+      point.EraseAllCrossCov();
       mlpPointsTrash.push_back(&point);
       mlpPoints.erase(point_it++);
     }

@@ -170,6 +170,8 @@ void MapMaker::run()
   
   while(!shouldStop() && ros::ok())  // ShouldStop is a CVD::Thread func which return true if the thread is told to exit.
   {
+    ros::spinOnce();
+    
     if(ResetRequested()) {Reset(); continue;}
     
     // Nothing to do if there is no map yet!
@@ -220,6 +222,8 @@ void MapMaker::run()
       
       mMap.Restore();
       mbRestoreMap = false;
+      
+      LoadCovBundle();
     }
     
     if(ResetRequested()) {Reset(); continue;}
@@ -227,6 +231,8 @@ void MapMaker::run()
     
     if(ros::Time::now() - lastPublishTime > publishDur)
     {
+      ComputeSelectedPointsCrossCov();
+      
       PublishMapInfo();
       PublishMapVisualization();
       lastPublishTime = ros::Time::now();
@@ -274,6 +280,8 @@ void MapMaker::run()
         mnNumConsecutiveFailedBA = 0;
         HandleOutliers(vOutliers);
         PublishMapVisualization();
+        
+        LoadCovBundle();
       }
     }
     
@@ -327,6 +335,13 @@ void MapMaker::run()
           ClearIncomingQueue();
           mbStopInit = false;
         }
+        
+        
+        if(mState == MM_RUNNING)
+        {
+          LoadCovBundle();
+        }
+        
       }
     }
     
@@ -417,7 +432,12 @@ bool MapMaker::Init(MultiKeyFrame*& pMKF_Incoming, bool bPutPlaneAtOrigin)
     }
   }
     
-  return InitFromMultiKeyFrame(pMKF, bPutPlaneAtOrigin);  // from MapMakerServerBase
+  bool bSuccess = InitFromMultiKeyFrame(pMKF, bPutPlaneAtOrigin);  // from MapMakerServerBase
+  
+  //if(bSuccess)
+  //  LoadCovBundle();
+    
+  return bSuccess;
 }
 
 // Add a MultiKeyFrame from the internal queue to the map

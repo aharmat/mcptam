@@ -1196,6 +1196,9 @@ void MapMakerServerBase::HandleOutliers(std::vector<std::pair<KeyFrame*, MapPoin
   {
     KeyFrame& kf = *(vOutliers[i].first);
     MapPoint& point = *(vOutliers[i].second);
+    
+    ROS_ASSERT(kf.mmpMeasurements.count(&point) > 0);
+    
     Measurement &meas = *(kf.mmpMeasurements[&point]);
     
     if(point.mbFixed) // fixed points can't be considered bad, but count them

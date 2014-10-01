@@ -75,7 +75,7 @@ namespace g2o {
   SparseOptimizerIncrementalCovariance::SparseOptimizerIncrementalCovariance()
   {
     // Set up algorithms internally
-    _linearSolver = new LinearSolverCholmod<BlockSolverX::PoseMatrixType>(true, 6);  // additional space for a pose vertex (dim = 6)
+    _linearSolver = new LinearSolverCholmod<BlockSolverX::PoseMatrixType>(true, 0);  // additional space for a pose vertex (dim = 6)
     _blockSolver = new BlockSolverX(_linearSolver);
     OptimizationAlgorithmLevenberg* pAlgorithm = new OptimizationAlgorithmLevenberg(_blockSolver);
     
@@ -94,15 +94,18 @@ namespace g2o {
     _cholmodCommon.supernodal = CHOLMOD_SIMPLICIAL;
 
     _permutedUpdate = cholmod_allocate_triplet(1000, 1000, 1024, 0, CHOLMOD_REAL, &_cholmodCommon);
+    _permutedDowndate = cholmod_allocate_triplet(1000, 1000, 1024, 0, CHOLMOD_REAL, &_cholmodCommon);
     _L = 0;
     _cholmodFactor = 0;
 
     _permutedUpdateAsSparse = new CholmodExt;
+    _permutedDowndateAsSparse = new CholmodExt;
   }
 
   SparseOptimizerIncrementalCovariance::~SparseOptimizerIncrementalCovariance()
   {
     delete _permutedUpdateAsSparse;
+    delete _permutedDowndateAsSparse;
     _updateMat.clear(true);
     delete _cholmodSparse;
     if (_cholmodFactor) {
@@ -110,6 +113,7 @@ namespace g2o {
       _cholmodFactor = 0;
     }
     cholmod_free_triplet(&_permutedUpdate, &_cholmodCommon);
+    cholmod_free_triplet(&_permutedDowndate, &_cholmodCommon);
     cholmod_finish(&_cholmodCommon);
   }
 
@@ -138,6 +142,10 @@ namespace g2o {
 
   bool SparseOptimizerIncrementalCovariance::computeUpdatedCovariance(HyperGraph::EdgeSet& eset, const VertexContainer& vertices, SparseBlockMatrix<MatrixXd>& spinv)
   {
+    bool bUseUpDown = true;
+    double dLambda = 100;
+    double dRootLambda = sqrt(dLambda);
+    
     // get the current cholesky factor along with the permutation
     _L = _linearSolver->L();
         
@@ -145,10 +153,17 @@ namespace g2o {
     
     if (_perm.size() < (int)_L->n)
       _perm.resize(2*_L->n);
+      
+    //std::cerr<<"Printing Perm"<<std::endl;
+    _perm.fill(-1);
     int* p = (int*)_L->Perm;
     for (size_t i = 0; i < _L->n; ++i)
+    {
       _perm[p[i]] = i;
+      //std::cerr<<p[i]<<" => "<<i<<std::endl;
+    }
       
+    //cholmod_print_perm((int*)_L->Perm, _L->n, _L->n, "L->Perm", &_cholmodCommon);
       
     // get the touched vertices
     _touchedVertices.clear();
@@ -163,6 +178,13 @@ namespace g2o {
       }
     }
     cerr << PVAR(_touchedVertices.size()) << endl;
+    
+    int nNumPoints = _touchedVertices.size()-1;
+    int nJacCols = 6 + nNumPoints*3;
+    int nJacRows = eset.size() * 2;
+    
+    std::cerr << "Update jacobian size: "<<nJacRows<<", "<<nJacCols<<std::endl;
+    std::cerr << "Barring anything funny inside the jacobian blocks, expect JtJ to be: "<<(nJacRows >= nJacCols ? "positive definite" : "NOT positive definite")<<std::endl;
     
     // Temporarily add the new edges to the optimizer's _activeEdges vector. This is done so that the robustification function
     // can recompute a proper sigma value, since it accesses all relevant edges through _activeEdges. Afterwards, these extra 
@@ -246,6 +268,8 @@ namespace g2o {
         MatrixXd* m = _updateMat.block(ind, ind, true);
         v->mapHessianMemory(m->data());
         lastBlock = m;
+        if(bUseUpDown)
+          m->diagonal().array() += dLambda;
       }
     }
     lastBlock->diagonal().array() += 1e-6; // HACK to get Eigen value > 0
@@ -301,6 +325,9 @@ namespace g2o {
     // restore the original _activeEdges, getting rid of all the newly added (temporary) edges
     _activeEdges.resize(nOldEdgesSize);
     
+    //cerr << "Writing updateMat to updateMat.dat" << endl;
+    //_updateMat.writeOctave("updateMat.dat", true);
+    
     bool updateStatus = computeCholeskyUpdate();
     if (! updateStatus) {
       cerr << "Error while computing update" << endl;
@@ -314,15 +341,19 @@ namespace g2o {
     cerr << "Update sparse size: " << updateAsSparseFactor->nrow << ", " << updateAsSparseFactor->ncol << endl;
     cerr << "L size: " << _L->n << ", " << _L->n << endl;
     
+    //cerr << "Writing updateAsSparseFactor to updateAsSparseFactor.dat" << endl;
     //writeOctave(updateAsSparseFactor, "updateAsSparseFactor.dat");
     
     // convert CCS update by permuting back to the permutation of L
     if (updateAsSparseFactor->nzmax > _permutedUpdate->nzmax) {
       //cerr << "realloc _permutedUpdate" << endl;
       cholmod_reallocate_triplet(updateAsSparseFactor->nzmax, _permutedUpdate, &_cholmodCommon);
+      cholmod_reallocate_triplet(updateAsSparseFactor->nzmax, _permutedDowndate, &_cholmodCommon);
     }
     _permutedUpdate->nnz = 0;
     _permutedUpdate->nrow = _permutedUpdate->ncol = _L->n;
+    _permutedDowndate->nnz = 0;
+    _permutedDowndate->nrow = _permutedDowndate->ncol = _L->n;
     
     int* Ap = (int*)updateAsSparseFactor->p;
     int* Ai = (int*)updateAsSparseFactor->i;
@@ -330,6 +361,9 @@ namespace g2o {
     int* Bj = (int*)_permutedUpdate->j;
     int* Bi = (int*)_permutedUpdate->i;
     double* Bx = (double*)_permutedUpdate->x;
+    int* Cj = (int*)_permutedDowndate->j;
+    int* Ci = (int*)_permutedDowndate->i;
+    double* Cx = (double*)_permutedDowndate->x;
     
     for (size_t c = 0; c < updateAsSparseFactor->ncol; ++c) 
     {
@@ -343,6 +377,7 @@ namespace g2o {
       const int& cbase = backupIdx[cc].vertex->colInHessian();
       assert(cbase != -1);
       const int& ccol = _perm(cbase + coff);
+      assert(ccol != -1);
       for (int j = rbeg; j < rend; j++) {
         const int& r = Ai[j];
         const double& val = Ax[j];
@@ -356,6 +391,7 @@ namespace g2o {
         assert(rbase != -1);
         
         int row = _perm(rbase + roff);
+        assert(row != -1);
         int col = ccol;
         if (col > row) // lower triangular entry
           swap(col, row);
@@ -363,6 +399,14 @@ namespace g2o {
         Bj[_permutedUpdate->nnz] = col;
         Bx[_permutedUpdate->nnz] = val;
         ++_permutedUpdate->nnz;
+        
+        if(c == (size_t)r)
+        {
+          Ci[_permutedDowndate->nnz] = row;
+          Cj[_permutedDowndate->nnz] = col;
+          Cx[_permutedDowndate->nnz] = dRootLambda;
+          ++_permutedDowndate->nnz;
+        }
       }
     }
     
@@ -373,11 +417,17 @@ namespace g2o {
 #endif
 */
 
-    convertTripletUpdateToSparse();
+    convertTripletUpdateToSparse(_permutedUpdate, _permutedUpdateAsSparse);
+    convertTripletUpdateToSparse(_permutedDowndate, _permutedDowndateAsSparse);
+    
+    //cerr << "Writing _permutedUpdateAsSparse to permutedUpdateAsSparse.dat" << endl;
     //writeOctave(_permutedUpdateAsSparse, "permutedUpdateAsSparse.dat");
     
     _linearSolver->saveFactor();
-    _linearSolver->choleskyUpdate(_permutedUpdateAsSparse);
+    _linearSolver->choleskyUpDown(_permutedUpdateAsSparse, true);
+    
+    if(bUseUpDown)
+      _linearSolver->choleskyUpDown(_permutedDowndateAsSparse, false);
     
     bool marginalsStatus = computeMarginals(spinv, vertices); 
     
@@ -430,61 +480,63 @@ namespace g2o {
 #endif
 
     if (_cholmodCommon.status == CHOLMOD_NOT_POSDEF) {
-      //std::cerr << "Cholesky failure, writing debug.txt (Hessian loadable by Octave)" << std::endl;
-      //writeCCSMatrix("debug.txt", _cholmodSparse->nrow, _cholmodSparse->ncol, (int*)_cholmodSparse->p, (int*)_cholmodSparse->i, (double*)_cholmodSparse->x, true);
+      std::cerr<<"Update matrix not positive definite!"<<std::endl;
+      std::cerr << "Cholesky failure, writing updateMat.txt (Hessian loadable by Octave)" << std::endl;
+      writeCCSMatrix("updateMat.txt", _cholmodSparse->nrow, _cholmodSparse->ncol, (int*)_cholmodSparse->p, (int*)_cholmodSparse->i, (double*)_cholmodSparse->x, true);
       return false;
     }
 
     // change to the specific format we need to have a pretty normal L
     int change_status = cholmod_change_factor(CHOLMOD_REAL, 1, 0, 1, 1, _cholmodFactor, &_cholmodCommon);
     if (! change_status) {
+      std::cerr<<"Failed changing cholmod factor format!"<<std::endl;
       return false;
     }
 
     return true;
   }
 
-  void SparseOptimizerIncrementalCovariance::convertTripletUpdateToSparse()
+  void SparseOptimizerIncrementalCovariance::convertTripletUpdateToSparse(cholmod_triplet* update, CholmodExt* updateAsSparse)
   {
     // re-allocate the memory
-    if (_tripletWorkspace.size() < (int)_permutedUpdate->ncol) {
-      _tripletWorkspace.resize(_permutedUpdate->ncol * 2);
+    if (_tripletWorkspace.size() < (int)update->ncol) {
+      _tripletWorkspace.resize(update->ncol * 2);
     }
 
     // reallocate num-zeros
-    if (_permutedUpdateAsSparse->nzmax < _permutedUpdate->nzmax) {
-      _permutedUpdateAsSparse->nzmax = _permutedUpdate->nzmax;
-      delete[] (int*)_permutedUpdateAsSparse->i;
-      delete[] (double*)_permutedUpdateAsSparse->x;
-      _permutedUpdateAsSparse->x = new double[_permutedUpdateAsSparse->nzmax];
-      _permutedUpdateAsSparse->i = new int[_permutedUpdateAsSparse->nzmax];
+    if (updateAsSparse->nzmax < update->nzmax) {
+      updateAsSparse->nzmax = update->nzmax;
+      delete[] (int*)updateAsSparse->i;
+      delete[] (double*)updateAsSparse->x;
+      updateAsSparse->x = new double[updateAsSparse->nzmax];
+      updateAsSparse->i = new int[updateAsSparse->nzmax];
     }
 
-    if (_permutedUpdateAsSparse->columnsAllocated < _permutedUpdate->ncol) {
-      _permutedUpdateAsSparse->columnsAllocated = 2*_permutedUpdate->ncol;
-      delete[] (int*) _permutedUpdateAsSparse->p;
-      _permutedUpdateAsSparse->p = new int[_permutedUpdateAsSparse->columnsAllocated + 1];
+    if (updateAsSparse->columnsAllocated < update->ncol) {
+      updateAsSparse->columnsAllocated = 2*update->ncol;
+      delete[] (int*) updateAsSparse->p;
+      updateAsSparse->p = new int[updateAsSparse->columnsAllocated + 1];
     }
 
-    _permutedUpdateAsSparse->ncol = _permutedUpdate->ncol;
-    _permutedUpdateAsSparse->nrow = _permutedUpdate->nrow;
+    updateAsSparse->ncol = update->ncol;
+    updateAsSparse->nrow = update->nrow;
 
     int* w = _tripletWorkspace.data();
-    memset(w, 0, sizeof(int) * _permutedUpdate->ncol);
+    memset(w, 0, sizeof(int) * update->ncol);
 
-    int* Ti = (int*) _permutedUpdate->i;
-    int* Tj = (int*) _permutedUpdate->j;
-    double* Tx = (double*) _permutedUpdate->x;
+    int* Ti = (int*) update->i;
+    int* Tj = (int*) update->j;
+    double* Tx = (double*) update->x;
 
-    int* Cp = (int*) _permutedUpdateAsSparse->p;
-    int* Ci = (int*) _permutedUpdateAsSparse->i;
-    double* Cx = (double*) _permutedUpdateAsSparse->x;
+    int* Cp = (int*) updateAsSparse->p;
+    int* Ci = (int*) updateAsSparse->i;
+    double* Cx = (double*) updateAsSparse->x;
 
-    for (size_t k = 0; k < _permutedUpdate->nnz; ++k) /* column counts */
+    for (size_t k = 0; k < update->nnz; ++k) /* column counts */
       w[Tj [k]]++;
 
     /* column pointers */
-    int n = _permutedUpdate->ncol;
+    int n = update->ncol;
     int nz = 0;
     for (int i = 0 ; i < n ; i++) {
       Cp[i] = nz;
@@ -492,15 +544,36 @@ namespace g2o {
       w[i] = Cp[i];
     }
     Cp[n] = nz;
-    assert((size_t)nz == _permutedUpdate->nnz);
+    assert((size_t)nz == update->nnz);
 
     int p;
-    for (size_t k = 0 ; k < _permutedUpdate->nnz ; ++k) {
+    for (size_t k = 0 ; k < update->nnz ; ++k) {
       p = w[Tj[k]]++;
       Ci[p] = Ti[k] ;    /* A(i,j) is the pth entry in C */
       Cx[p] = Tx[k] ;
     }
 
+  }
+  
+  bool SparseOptimizerIncrementalCovariance::computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const std::vector<std::pair<int, int> >& blockIndices)
+  {
+    _linearSolver->setRecomputeCov(_blockSolver->touchedHpp());
+    SparseOptimizer::computeMarginals(spinv, blockIndices);
+    _linearSolver->setRecomputeCov(_blockSolver->touchedHpp());
+  }
+  
+  bool SparseOptimizerIncrementalCovariance::computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const Vertex* vertex)
+  {
+    _linearSolver->setRecomputeCov(_blockSolver->touchedHpp());
+    SparseOptimizer::computeMarginals(spinv, vertex);
+    _linearSolver->setRecomputeCov(_blockSolver->touchedHpp());
+  }
+      
+  bool SparseOptimizerIncrementalCovariance::computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const VertexContainer& vertices)
+  {
+    _linearSolver->setRecomputeCov(_blockSolver->touchedHpp());
+    SparseOptimizer::computeMarginals(spinv, vertices);
+    _linearSolver->setRecomputeCov(_blockSolver->touchedHpp());
   }
 
 } // end namespace

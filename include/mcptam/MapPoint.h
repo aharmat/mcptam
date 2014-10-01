@@ -68,6 +68,70 @@
 #include <atomic>
 
 class TrackerData;
+class MapPoint;
+
+typedef std::map<MapPoint*, PointCrossCov*> CrossCovPtrMap;
+
+class PointCrossCov
+{
+public:
+  PointCrossCov(MapPoint& point1, MapPoint& point2)
+  : mPoint1(point1)
+  , mPoint2(point2)
+  {
+    mm3CrossCov = TooN::Zeros;
+    dPriority = 1e10;
+  }
+  
+  // Row: point1, Col: point2
+  void SetCrossCov(const TooN::Matrix<3>& m3CrossCov)
+  {
+    mm3CrossCov = m3CrossCov;
+    dPriority = 0;
+  }
+
+  /// point: the querying point
+  TooN::Matrix<3> GetCrossCov(MapPoint* pPoint)
+  {
+    if(pPoint == &mPoint1)
+      return mm3CrossCov;
+    else if(pPoint == &mPoint2)
+      return mm3CrossCov.T();
+    else
+      ROS_BREAK();
+  }
+  
+  void EraseLinks()
+  {
+    boost::mutex::scoped_lock lock1(mPoint1.mCrossCovMutex);
+    CrossCovPtrMap::iterator it1 = mPoint1.mmpCrossCov.find(this);
+    ROS_ASSERT(it1 != mPoint1.mmpCrossCov.end());
+    mPoint1.mmpCrossCov.erase(it1);
+    lock1.unlock();
+    
+    boost::mutex::scoped_lock lock2(mPoint2.mCrossCovMutex);
+    CrossCovPtrMap::iterator it2 = mPoint2.mmpCrossCov.find(this);
+    ROS_ASSERT(it2 != mPoint2.mmpCrossCov.end());
+    mPoint2.mmpCrossCov.erase(it2);
+  }
+  
+  void UpdatePriority(double dNorm)
+  {
+    dPriority += dNorm;
+  }
+  
+  double GetPriority(){ return dPriority; }
+
+protected:
+  MapPoint& mPoint1;
+  MapPoint& mPoint2;
+  
+  TooN::Matrix<3> mm3CrossCov;
+  
+  double dPriority;
+  
+}
+
 
 /// Stores information on keyframe status relative to owner MapPoint
 struct MapMakerData
@@ -123,6 +187,10 @@ public:
   /// Refreshes the cached vectors used for patch finding
   void RefreshPixelVectors();      
   
+  void EraseAllCrossCov();
+  
+  TooN::Matrix<3> CrossCov(MapPoint* pOther);
+  
   TooN::Vector<3> mv3WorldPos; ///< Current position relative to the world
   TooN::Matrix<3> mm3WorldCov; ///< Current covariance in world frame
   
@@ -151,6 +219,9 @@ public:
   
   MapMakerData mMMData; ///< Info for the Mapmaker (not to be trashed by the tracker)
   std::map<std::string, TrackerData*> mmpTData;  ///< Info for the Tracker (not to be trashed by the MapMaker)
+  
+  CrossCovPtrMap mmpCrossCov;
+  boost::mutex mCrossCovMutex;
   
   // Info provided by the tracker for the mapmaker:
   int mnMEstimatorOutlierCount;  ///< Number of times this point was seen as an inlier while tracking

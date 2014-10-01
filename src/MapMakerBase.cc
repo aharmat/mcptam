@@ -44,6 +44,7 @@
 #include <mcptam/LevelHelpers.h>
 #include <mcptam/Utility.h>
 #include <mcptam/MapPoint.h>
+#include <mcptam/SelectedPointsCov.h>
 #include <TooN/SymEigen.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <ros/common.h>
@@ -55,6 +56,9 @@ MapMakerBase::MapMakerBase(Map& map, TaylorCameraMap &cameras, bool bAdvertise)
   : mMap(map)
   , mmCameraModels(cameras)
   , mNodeHandlePriv("~")
+  , mvpSelectedPoints(2, NULL)
+  , mnCurrSelected(1)
+  , mdSelectedPointsCrossCovNorm(-1)
 {
   if(bAdvertise)
   {
@@ -64,12 +68,24 @@ MapMakerBase::MapMakerBase(Map& map, TaylorCameraMap &cameras, bool bAdvertise)
     mMapMKFsPub = mNodeHandlePriv.advertise<visualization_msgs::MarkerArray>("map_mkfs_array", 1,true);
   }
   
+  mSelectedPointSub = mNodeHandle.subscribe<geometry_msgs::PointStamped>("clicked_point",10, &MapMakerBase::SelectedPointCallback,this);
+  mSelectedPointsCovPub = mNodeHandlePriv.advertise<mcptam::SelectedPointsCov>("selected_points_cov", 1,true);
+  
   Reset();
 }
 
 void MapMakerBase::Reset()
 {
   ROS_DEBUG("MapMakerBase: Reset");
+  
+  for(unsigned i=0; i < mvpSelectedPoints.size(); ++i)
+  {
+    if(mvpSelectedPoints[i] == NULL)
+      continue;
+      
+    mvpSelectedPoints[i]->mnUsing--;
+  }
+  
   mMap.Reset();
   
   mbResetDone = true;
@@ -535,6 +551,8 @@ void MapMakerBase::PublishMapVisualization()
   ROS_DEBUG(" >>>>>>>>>>>>>>>> PUBLISHING MAP VISUALIZATION <<<<<<<<<<<<<<<<<<<<<<<");
   PublishMapPoints();
   PublishMapMKFs();
+  
+  PublishSelectedPointsCov();
 }
 
 // Dumps all map information to a file
@@ -643,4 +661,58 @@ void MapMakerBase::DumpToFile(std::string filename)
   ofs<<"% The end";
   ofs.close();
   
+}
+
+void MapMakerBase::SelectedPointCallback(const geometry_msgs::PointStamped::ConstPtr& pointMsg)
+{
+  // Find closest point to pointMsg
+  TooN::Vector<3> v3ClickedWorld = TooN::makeVector(pointMsg->point.x, pointMsg->point.y, pointMsg->point.z);
+  std::cout<<"In SelectedPointCallback, world cooords: "<<v3ClickedWorld<<std::endl;
+  
+  MapPoint* pClosestPoint = NULL;
+  double dMinDist = std::numeric_limits<double>::max();
+  
+  for(MapPointPtrList::iterator point_it = mMap.mlpPoints.begin(); point_it != mMap.mlpPoints.end(); ++point_it)
+  {
+    MapPoint* pPoint = *point_it;
+    double dDist = TooN::norm(pPoint->mv3WorldPos - v3ClickedWorld);
+    if(dDist < dMinDist)
+    {
+      dMinDist = dDist;
+      pClosestPoint = pPoint;
+    }
+  }
+  
+  std::cout<<"Minimum distance was: "<<dMinDist<<std::endl;
+  
+  if(pClosestPoint == NULL)
+    return;
+    
+  if(dMinDist > 0.2)
+    return;
+    
+  pClosestPoint->mnUsing++;
+    
+  // Decrement using count if we already have a point in the target slot
+  if(mvpSelectedPoints[1-mnCurrSelected] != NULL)
+    mvpSelectedPoints[1-mnCurrSelected]->mnUsing--;
+    
+  mvpSelectedPoints[1-mnCurrSelected] = pClosestPoint;  
+  mnCurrSelected = 1-mnCurrSelected;
+}
+
+void MapMakerBase::PublishSelectedPointsCov()
+{
+  mcptam::SelectedPointsCov covMsg;
+  
+  if(mvpSelectedPoints[0] != NULL)
+    covMsg.cov_norm_1 = TooN::norm_fro(mvpSelectedPoints[0]->mm3WorldCov);
+  
+  if(mvpSelectedPoints[1] != NULL)
+    covMsg.cov_norm_2 = TooN::norm_fro(mvpSelectedPoints[1]->mm3WorldCov);
+    
+  if(mdSelectedPointsCrossCovNorm > 0)
+    covMsg.cov_norm_x = mdSelectedPointsCrossCovNorm;
+    
+  mSelectedPointsCovPub.publish(covMsg);
 }
