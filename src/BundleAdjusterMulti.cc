@@ -315,7 +315,11 @@ int BundleAdjusterMulti::AdjustAndUpdate(ChainBundle& multiBundle, std::set<Mult
           
           if(multiBundle.GetMaxCov() < std::numeric_limits<double>::max())
           {
-            point.mm3WorldCov = multiBundle.GetPointCov(point_it->second);
+            TooN::Matrix<3> m3NewCov = multiBundle.GetPointCov(point_it->second);
+            double dChange = TooN::norm_fro(m3NewCov - point.mm3WorldCov);
+            
+            point.mm3WorldCov = m3NewCov;
+            point.UpdateCrossCovPriorities(dChange);
           }
         }
         else

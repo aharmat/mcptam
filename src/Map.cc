@@ -113,7 +113,6 @@ std::set<MapPoint*> Map::MoveBadPointsToTrash()
       boost::mutex::scoped_lock lock(mMutex);
       sBadPoints.insert(&point);
       point.EraseAllMeasurements();
-      point.EraseAllCrossCov();
       mlpPointsTrash.push_back(&point);
       mlpPoints.erase(point_it++);
     }
@@ -208,6 +207,8 @@ void Map::EmptyTrash()
     // my logic was off
     if(point.mnUsing == 0 && point.mMMData.spMeasurementKFs.size() == 0)
     {
+      //BAD: put this back after testing!!!
+      //point.EraseAllCrossCov();
       delete (&point);
       mlpPointsTrash.erase(point_it++);
     }

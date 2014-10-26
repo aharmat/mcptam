@@ -67,6 +67,7 @@
 #include <mcptam/Tracker.h>  //just for data types
 #include <mcptam/TrackerData.h> //just for data types
 #include <deque>
+#include <unordered_set>
 #include <boost/thread/mutex.hpp>
 #include <ros/ros.h>
 #include <cvd/image.h>
@@ -137,6 +138,9 @@ public:
   // testing
   TooN::Matrix<6> GetTrackerCov(TooN::SE3<> se3BaseFromWorld, std::vector<std::string>& vCamNames, std::vector<TrackerDataPtrVector>& vIterationSets);
   TooN::Matrix<6> GetTrackerCovFull(MultiKeyFrame* pTrackerMKF);
+  
+  // testing
+  void UpdateCrossCovariances(std::unordered_set<MapPoint*> spParticipatingPoints, ros::Duration allowedDur);
   
   /// Checks to see if the given KeyFrame is a candidate to be added to the Map
   /** @param kf The KeyFrame to check

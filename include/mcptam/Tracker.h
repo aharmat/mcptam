@@ -70,19 +70,14 @@
 #include <mcptam/KeyFrame.h>  // needed for LEVELS define
 #include <mcptam/GLWindow2.h>
 #include <mcptam/TrackerTiming.h>
+#include <mcptam/TrackerCovariance.h>
 #include <sstream>
 #include <vector>
-#include <boost/intrusive_ptr.hpp>
 #include <TooN/TooN.h>
 #include <ros/ros.h>
 
-class TrackerData;
 class Map;
 class MapMakerClientBase;
-
-/// Using a boost intrusive_ptr allows claiming a MapPoint as "used", so it won't
-/// be deleted until it is released. See MapPoint.
-typedef std::vector<boost::intrusive_ptr<TrackerData> > TrackerDataPtrVector;
 
 /// Can't put a LEVEL-sized array of objects into another STL container, so use this intermediary
 template<typename T>
@@ -403,6 +398,10 @@ protected:
   void InitTrial();
   
   double CalcMAD();
+  
+  TooN::Matrix<6> CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationSets);
+  
+  TooN::Matrix<6> CalcCovariance2(std::vector<TrackerDataPtrVector>& vIterationSets);
          
   
   MultiKeyFrame* mpCurrentMKF;       ///< The current processing space as a MultiKeyFrame
@@ -483,6 +482,8 @@ protected:
   int mnMaxTrials;
   TooN::SE3<> mse3SavedPose;
   bool mbTrialAdding;
+  
+  TrackerCovariance mTrackerCovariance;
   
 };
 

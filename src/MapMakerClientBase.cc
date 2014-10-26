@@ -519,53 +519,145 @@ void MapMakerClientBase::LoadCovBundle()
   bool bAbortRequested = false;
   helper.mpCovBundle->Compute(&bAbortRequested, 0, 0);
   
-  // Now add the tracker pose (incrementally)
-  //helper.mnTracker_BundleID = helper.mpCovBundle->AddPoseIncrementally(TooN::SE3<>()); 
-  
-  // Swap current helper
-  boost::mutex::scoped_lock lock(mCovMutex);
-  mnCurrCov = 1-mnCurrCov;
+  if(helper.mpCovBundle->CovValid())
+  {
+    // Now add the tracker pose (incrementally)
+    //helper.mnTracker_BundleID = helper.mpCovBundle->AddPoseIncrementally(TooN::SE3<>()); 
+    
+    // Swap current helper
+    boost::mutex::scoped_lock lock(mCovMutex);
+    mnCurrCov = 1-mnCurrCov;
+  }
+  else
+  {
+    ROS_WARN_STREAM("Computing covariance in CovBundle failed, not swapping with current!");
+  }
 }
 
+/*
 bool CompCrossCov(PointCrossCov* pXCov1, PointCrossCov* pXCov2) 
 { 
-  return pXCov1->GetPriority() < pXCov2->GetPriority();
+  return pXCov1->mdPriority > pXCov2->mdPriority;
+}
+*/
+
+bool CompCrossCov(const std::pair<double, PointCrossCov*>& cov1, const std::pair<double, PointCrossCov*> cov2)
+{
+  return cov1.first > cov2.first;
 }
 
-void UpdateCrossCovariances(std::set<MapPoint*> spParticipatingPoints, ros::Duration allowedDur)
+void MapMakerClientBase::UpdateCrossCovariances(std::unordered_set<MapPoint*> spParticipatingPoints, ros::Duration allowedDur)
 {
-  std::vector<PointCrossCov*> vCrossCov;
+  boost::mutex::scoped_lock lock(mCovMutex);
+  CovHelper& helper = mvCovHelpers[mnCurrCov];
+  
+  if(helper.mpCovBundle == NULL)
+  {
+    std::cerr<<"No CovBundle found in helper!"<<std::endl;
+    return;
+  }
+    
+  std::vector<std::pair<double, PointCrossCov*> > vCrossCov;
   vCrossCov.reserve(spParticipatingPoints.size() * spParticipatingPoints.size() * 0.5);
   
-  for(std::set<MapPoint*>::iterator point1_it = spParticipatingPoints.begin(); point1_it != spParticipatingPoints.end(); ++point1_it)
+  std::cerr<<"About to build vCrossCov"<<std::endl;
+  ros::Time startBuild = ros::Time::now();
+  
+  for(std::unordered_set<MapPoint*>::iterator point1_it = spParticipatingPoints.begin(); point1_it != spParticipatingPoints.end(); ++point1_it)
   {
-    MapPoint pPoint1 = *point1_it;
+    MapPoint* pPoint1 = *point1_it;
     
-    for(std::set<MapPoint*>::iterator point2_it = point1_it; point2_it != spParticipatingPoints.end(); ++point2_it)
+    for(std::unordered_set<MapPoint*>::iterator point2_it = point1_it; point2_it != spParticipatingPoints.end(); ++point2_it)
     {
       if(point2_it == point1_it)
         continue;
         
-      MapPoint pPoint2 = *point2_it;
+      MapPoint* pPoint2 = *point2_it;
       
       CrossCovPtrMap::iterator x_it1 = pPoint1->mmpCrossCov.find(pPoint2);
       if(x_it1 != pPoint1->mmpCrossCov.end())
       {
-        vCrossCov.push_back(x_it1->second);
+        PointCrossCov* pCrossCov = x_it1->second;
+        ROS_ASSERT(pCrossCov->mdPriority >= 0);
+        
+        // Don't bother adding anything with priority zero since it doesn't need to be updated
+        if(pCrossCov->mdPriority > 0)
+        {
+          vCrossCov.push_back(std::make_pair(pCrossCov->mdPriority, pCrossCov));
+        }
       }
       else
       {
         PointCrossCov* pCrossCov = new PointCrossCov(*pPoint1, *pPoint2);
-        pPoint1->mmpCrossCov[pPoint2] = pCrossCov;
-        pPoint2->mmpCrossCov[pPoint1] = pCrossCov;
         
-        vCrossCov.push_back(pCrossCov);
+        pPoint1->AddCrossCov(pPoint2, pCrossCov);
+        pPoint2->AddCrossCov(pPoint1, pCrossCov);
+        
+        vCrossCov.push_back(std::make_pair(pCrossCov->mdPriority, pCrossCov));
       }
     }
   }
   
+  std::cerr<<">>>>>>>>>>>>>>>>>>>> Build vCrossCov in "<<ros::Time::now() - startBuild<<" seconds"<<std::endl;
+  
+  //debugging
+  /*
+  double dSum = 0;
+  for(unsigned i=0; i < vCrossCov.size(); ++i)
+  {
+    dSum += vCrossCov[i]->mdPriority;
+  }
+  std::cerr<<"Priority sum: "<<dSum<<std::endl;
+  */
+  /*
+  std::cerr<<"About to sort "<<vCrossCov.size()<<" cross covariance objects"<<std::endl;
+  
+  ros::WallTime sortStart = ros::WallTime::now();
   std::sort(vCrossCov.begin(), vCrossCov.end(), CompCrossCov);
   
+  std::cerr<<"Done sorting, took "<<ros::WallTime::now() - sortStart <<" seconds"<<std::endl;
+  */
+  
+  std::cerr<<"About to shuffle "<<vCrossCov.size()<<" cross covariance objects"<<std::endl;
+  ros::WallTime shuffleStart = ros::WallTime::now();
+  std::random_shuffle(vCrossCov.begin(), vCrossCov.end());
+  std::cerr<<"Done shuffling, took "<<ros::WallTime::now() - shuffleStart <<" seconds"<<std::endl;
+  
+  ros::Time startTime = ros::Time::now();
+  
+  int nNumProcessed = 0;
+  for(unsigned i=0; i < vCrossCov.size(); ++i, ++nNumProcessed)
+  {
+    if(ros::Time::now() - startTime > allowedDur)
+      break;
+    
+    PointCrossCov* pCrossCov = vCrossCov[i].second;
+    
+    if(helper.mmPoint_BundleID.count(&pCrossCov->mPoint1) == 0)
+    {
+      std::cerr<<"Participating point 1 not found in cov bundle!"<<std::endl;
+      continue;
+    }
+      
+    if(helper.mmPoint_BundleID.count(&pCrossCov->mPoint2) == 0)
+    {
+      std::cerr<<"Participating point 2 not found in cov bundle!"<<std::endl;
+      continue;
+    }
+    
+    int nPoint1_BundleID = helper.mmPoint_BundleID[&pCrossCov->mPoint1];
+    int nPoint2_BundleID = helper.mmPoint_BundleID[&pCrossCov->mPoint2]; 
+  
+    TooN::Matrix<3> m3Cov = TooN::Zeros;
+    bool bSuccess = helper.mpCovBundle->GetPointsCrossCov(nPoint1_BundleID, nPoint2_BundleID, m3Cov);
+    
+    if(bSuccess)
+    {
+      pCrossCov->SetCrossCov(m3Cov);
+    }
+  }
+  
+  std::cerr<<"Processed "<<nNumProcessed<<" cross cov in alotted time of "<<allowedDur<<" seconds"<<std::endl;
   
 }
 
@@ -584,13 +676,13 @@ void MapMakerClientBase::ComputeSelectedPointsCrossCov()
     
   if(mvpSelectedPoints[0] == NULL)
   {
-    std::cerr<<"Selected point 1 is null!"<<std::endl;
+    //std::cerr<<"Selected point 1 is null!"<<std::endl;
     return;
   }
     
   if(mvpSelectedPoints[1] == NULL)
   {
-    std::cerr<<"Selected point 2 is null!"<<std::endl;
+    //std::cerr<<"Selected point 2 is null!"<<std::endl;
     return;
   }
     

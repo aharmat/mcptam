@@ -201,6 +201,8 @@ public:
   /** @brief Get the last value of the LM lambda parameter */
   double GetLambda();
   
+  bool CovValid(){ return mbCovValid; }
+  
   // Static members
   static int snMaxIterations;   ///< Maximum number of iterations allowed before bailing
   static int snMaxTrialsAfterFailure;  ///< Maximum number of times the solver will 
@@ -230,6 +232,7 @@ protected:
   bool mbConverged;         ///< Is the solution converged?
   bool mbHitMaxIterations;  ///< Did the algorithm hit an interation ceiling
   double mdLastMaxCov;     ///< The maximum point depth covariance from the last run
+  bool mbCovValid;
   
   int mnCurrId;   ///< Used to give IDs to poses and points, incremented each time AddPose() or AddPoint() is called
   bool mbUseRobust; ///< Use robustification of errors?

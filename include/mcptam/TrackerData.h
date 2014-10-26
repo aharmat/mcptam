@@ -69,6 +69,7 @@ public:
   TrackerData(MapPoint *pPoint, CVD::ImageRef irImageSize) 
   : mPoint(*pPoint)
   , mirImageSize(irImageSize)
+  , mnBlockIdx(-1)
     {};
   
   MapPoint &mPoint;  ///< The MapPoint being worked on
@@ -95,6 +96,7 @@ public:
   double mdWeight;
   TooN::Matrix<2,6> mm26Jacobian;   ///< Jacobian of projection with respect to camera position
   TooN::Matrix<2,3> mm23Jacobian;   ///< Jacobian of projection with respect to point position
+  int mnBlockIdx;
   
   /** @brief Project point into image given certain pose and camera.
    * 

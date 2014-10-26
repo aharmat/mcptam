@@ -63,75 +63,16 @@
 #include <cvd/image_ref.h>
 #include <set>
 #include <map>
+#include <unordered_map>
 
 #include <ros/ros.h>
 #include <atomic>
 
 class TrackerData;
 class MapPoint;
+class PointCrossCov;
 
-typedef std::map<MapPoint*, PointCrossCov*> CrossCovPtrMap;
-
-class PointCrossCov
-{
-public:
-  PointCrossCov(MapPoint& point1, MapPoint& point2)
-  : mPoint1(point1)
-  , mPoint2(point2)
-  {
-    mm3CrossCov = TooN::Zeros;
-    dPriority = 1e10;
-  }
-  
-  // Row: point1, Col: point2
-  void SetCrossCov(const TooN::Matrix<3>& m3CrossCov)
-  {
-    mm3CrossCov = m3CrossCov;
-    dPriority = 0;
-  }
-
-  /// point: the querying point
-  TooN::Matrix<3> GetCrossCov(MapPoint* pPoint)
-  {
-    if(pPoint == &mPoint1)
-      return mm3CrossCov;
-    else if(pPoint == &mPoint2)
-      return mm3CrossCov.T();
-    else
-      ROS_BREAK();
-  }
-  
-  void EraseLinks()
-  {
-    boost::mutex::scoped_lock lock1(mPoint1.mCrossCovMutex);
-    CrossCovPtrMap::iterator it1 = mPoint1.mmpCrossCov.find(this);
-    ROS_ASSERT(it1 != mPoint1.mmpCrossCov.end());
-    mPoint1.mmpCrossCov.erase(it1);
-    lock1.unlock();
-    
-    boost::mutex::scoped_lock lock2(mPoint2.mCrossCovMutex);
-    CrossCovPtrMap::iterator it2 = mPoint2.mmpCrossCov.find(this);
-    ROS_ASSERT(it2 != mPoint2.mmpCrossCov.end());
-    mPoint2.mmpCrossCov.erase(it2);
-  }
-  
-  void UpdatePriority(double dNorm)
-  {
-    dPriority += dNorm;
-  }
-  
-  double GetPriority(){ return dPriority; }
-
-protected:
-  MapPoint& mPoint1;
-  MapPoint& mPoint2;
-  
-  TooN::Matrix<3> mm3CrossCov;
-  
-  double dPriority;
-  
-}
-
+typedef std::unordered_map<MapPoint*, PointCrossCov*> CrossCovPtrMap;
 
 /// Stores information on keyframe status relative to owner MapPoint
 struct MapMakerData
@@ -189,7 +130,11 @@ public:
   
   void EraseAllCrossCov();
   
-  TooN::Matrix<3> CrossCov(MapPoint* pOther);
+  bool CrossCov(MapPoint* pOther, TooN::Matrix<3>& m3CrossCov);
+  
+  void UpdateCrossCovPriorities(double dVal);
+  
+  void AddCrossCov(MapPoint* pOther, PointCrossCov* pCrossCov);
   
   TooN::Vector<3> mv3WorldPos; ///< Current position relative to the world
   TooN::Matrix<3> mm3WorldCov; ///< Current covariance in world frame
@@ -201,7 +146,7 @@ public:
   bool mbOptimized; ///< This point has been optimized and is in a valid position to track against
   
   // What pixels should be used to search for this point?
-  KeyFrame* mpPatchSourceKF; ///< The KeyFrame the point was originally made in
+  KeyFrame* mpPatchSourceKF; ///< mnUsingThe KeyFrame the point was originally made in
   int mnSourceLevel;         ///< Pyramid level in source KeyFrame
   CVD::ImageRef mirCenter;   ///< The center of the patch, in level-coords in the source pyramid level
   
@@ -230,6 +175,34 @@ public:
   // Random junk (e.g. for visualisation)
   //ros::Time mtCreationTime;   ///< Time of creation
   int mnID;     ///< Used when dumping map to file
+  
+};
+
+
+class PointCrossCov
+{
+public:
+  PointCrossCov(MapPoint& point1, MapPoint& point2);
+  
+  // DEBUG
+  ~PointCrossCov(){ ROS_BREAK(); }
+  
+  // Row: point1, Col: point2
+  void SetCrossCov(const TooN::Matrix<3>& m3CrossCov);
+
+  /// point: the querying point
+  TooN::Matrix<3> GetCrossCov(MapPoint* pPoint);
+  
+  void EraseLinks();
+  
+  MapPoint& mPoint1;
+  MapPoint& mPoint2;
+  
+  double mdPriority;
+
+protected:
+  
+  TooN::Matrix<3> mm3CrossCov;
   
 };
 

@@ -29,50 +29,33 @@
 
 /****************************************************************************************
  *
- * \file Types.h
- * \brief Declaration of generic types for mcptam
- *
- * Copyright 2014   Adam Harmat, McGill University (adam.harmat@mail.mcgill.ca)
- *                  Michael Tribou, University of Waterloo (mjtribou@uwaterloo.ca)
- *
- * A bunch of typedefs that are used throughout mcptam.
+ * \file TrackerCovariance.h
+ * \brief Functions for computing Tracker covariance
  *
  ****************************************************************************************/
 
-#ifndef __TYPES_H
-#define __TYPES_H
+#ifndef __TRACKER_COVARIANCE_H
+#define __TRACKER_COVARIANCE_H
 
-#include <mcptam/TaylorCamera.h>
-#include <map>
-#include <list>
-#include <vector>
-#include <cvd/image.h>
-#include <cvd/byte.h>
-#include <cvd/rgb.h>
-#include <TooN/TooN.h>
-#include <TooN/se3.h>
-#include <boost/intrusive_ptr.hpp>
+#include <mcptam/Types.h>
+#include <Eigen/Core>
 
-// Forward declarations
-class MapPoint;
-class TrackerData;
-class KeyFrame;
-class MultiKeyFrame;
+namespace g2o{
+  template <typename MatrixType>
+  class LinearSolverCholmodCustom;
+}
 
-typedef std::list<MapPoint*> MapPointPtrList;
-typedef std::list<MultiKeyFrame*> MultiKeyFramePtrList;
+class TrackerCovariance
+{
+public:
+  TrackerCovariance();
+  ~TrackerCovariance();
+  
+  TooN::Matrix<6> CalcCovariance(TrackerDataPtrVector& vpAllMeas);
 
-typedef std::map<std::string, TaylorCamera> TaylorCameraMap;
-typedef std::map<std::string, TooN::Vector<9> > ParamMap;
-
-typedef std::map<std::string, CVD::ImageRef > ImageRefMap;
-typedef std::map<std::string, CVD::Image<CVD::byte> > ImageBWMap;
-typedef std::map<std::string, CVD::Image<CVD::Rgb<CVD::byte> > > ImageRGBMap;
-
-typedef std::map<std::string, TooN::SE3<> > SE3Map;
-
-/// Using a boost intrusive_ptr allows claiming a MapPoint as "used", so it won't
-/// be deleted until it is released. See MapPoint.
-typedef std::vector<boost::intrusive_ptr<TrackerData> > TrackerDataPtrVector;
+protected:
+  g2o::LinearSolverCholmodCustom<Eigen::Matrix2d>* mpLinearSolver;
+};
 
 #endif
+

@@ -1126,6 +1126,7 @@ ChainBundleIncrementalCovariance::ChainBundleIncrementalCovariance(TaylorCameraM
   mpConvergedResidualAction = new CheckConvergedResidualAction(ChainBundleIncrementalCovariance::sdUpdatePercentConvergenceLimit);
   mpOptimizer->addPostIterationAction(mpConvergedResidualAction);
   
+  mbCovValid = false;
   mdLastMaxCov = std::numeric_limits<double>::max();
   mbConverged = false;
 }
@@ -1448,7 +1449,9 @@ int ChainBundleIncrementalCovariance::Compute(bool *pAbortSignal, int nNumIter, 
   
   SparseBlockMatrix<MatrixXd> spinv;  // This will hold the covariance matrices
   
-  if(mpOptimizer->computeMarginals(spinv, vAllVertices))
+  mbCovValid = mpOptimizer->computeMarginals(spinv, vAllVertices);
+  
+  if(mbCovValid)
   {
     ROS_INFO("computeMarginals() success!");
     

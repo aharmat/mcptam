@@ -51,7 +51,8 @@ add_executable(mcptam src/Main.cc src/GLWindow2.cc src/GLWindowMenu.cc src/Video
                       src/SmallBlurryImage.cc src/ShiTomasi.cc src/MapMaker.cc src/MapMakerBase.cc src/MapMakerClientBase.cc src/MapMakerServerBase.cc 
                       src/PatchFinder.cc src/Relocaliser.cc src/Tracker.cc src/KeyFrameViewer.cc 
                       src/BundleAdjusterBase.cc src/MiniPatch.cc src/BundleAdjusterMulti.cc src/ChainBundle.cc
-                      src/ChainBundleIncrementalCovariance.cc src/sparse_optimizer_incremental_covariance.cc)
+                      src/ChainBundleIncrementalCovariance.cc src/sparse_optimizer_incremental_covariance.cc
+                      src/TrackerCovariance.cc)
 add_dependencies(mcptam ${PROJECT_NAME}_gencpp)
 target_link_libraries(mcptam ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OpenCV_LIBS} ${OPENGL_gl_LIBRARY} ${GVars3_LIBRARIES}
                              ${G2O_STUFF_LIBRARY} ${G2O_CORE_LIBRARY} ${G2O_SOLVER_CHOLMOD}                             )
@@ -83,7 +84,8 @@ target_link_libraries(mcptam ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARS
                               #~ src/TrackerCalib.cc src/MapMakerCalib.cc src/MapMaker.cc src/MapMakerBase.cc src/MapMakerClientBase.cc src/MapMakerServerBase.cc
                               #~ src/TaylorCamera.cc src/KeyFrame.cc src/MapPoint.cc src/Map.cc src/SmallBlurryImage.cc src/ShiTomasi.cc  
                               #~ src/PatchFinder.cc src/Relocaliser.cc src/Tracker.cc src/KeyFrameViewer.cc
-                              #~ src/BundleAdjusterBase.cc src/BundleAdjusterSingle.cc src/BundleAdjusterCalib.cc src/ChainBundle.cc src/MiniPatch.cc)
+                              #~ src/BundleAdjusterBase.cc src/BundleAdjusterSingle.cc src/BundleAdjusterCalib.cc src/ChainBundle.cc src/MiniPatch.cc
+                              #~ src/ChainBundleIncrementalCovariance.cc src/sparse_optimizer_incremental_covariance.cc)
 #~ add_dependencies(pose_calibrator ${PROJECT_NAME}_gencpp)
 #~ target_link_libraries(pose_calibrator ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OpenCV_LIBS} ${OPENGL_gl_LIBRARY} ${GVars3_LIBRARIES}
                                      #~ ${G2O_STUFF_LIBRARY} ${G2O_CORE_LIBRARY} ${G2O_SOLVER_CHOLMOD})

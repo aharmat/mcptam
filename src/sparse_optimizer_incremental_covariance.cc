@@ -558,22 +558,28 @@ namespace g2o {
   bool SparseOptimizerIncrementalCovariance::computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const std::vector<std::pair<int, int> >& blockIndices)
   {
     _linearSolver->setRecomputeCov(_blockSolver->touchedHpp());
-    SparseOptimizer::computeMarginals(spinv, blockIndices);
+    bool bRet = SparseOptimizer::computeMarginals(spinv, blockIndices);
     _linearSolver->setRecomputeCov(_blockSolver->touchedHpp());
+    
+    return bRet;
   }
   
   bool SparseOptimizerIncrementalCovariance::computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const Vertex* vertex)
   {
     _linearSolver->setRecomputeCov(_blockSolver->touchedHpp());
-    SparseOptimizer::computeMarginals(spinv, vertex);
+    bool bRet = SparseOptimizer::computeMarginals(spinv, vertex);
     _linearSolver->setRecomputeCov(_blockSolver->touchedHpp());
+    
+    return bRet;
   }
       
   bool SparseOptimizerIncrementalCovariance::computeMarginals(SparseBlockMatrix<MatrixXd>& spinv, const VertexContainer& vertices)
   {
     _linearSolver->setRecomputeCov(_blockSolver->touchedHpp());
-    SparseOptimizer::computeMarginals(spinv, vertices);
+    bool bRet = SparseOptimizer::computeMarginals(spinv, vertices);
     _linearSolver->setRecomputeCov(_blockSolver->touchedHpp());
+    
+    return bRet;
   }
 
 } // end namespace

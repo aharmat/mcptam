@@ -62,6 +62,9 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+#include <unordered_set>
+#include <unordered_map>
+
 using namespace TooN;
 using namespace GVars3;
 
@@ -82,7 +85,7 @@ double Tracker::sdTrackingQualityGood = 0.3;
 double Tracker::sdTrackingQualityBad = 0.13;
 int Tracker::snLostFrameThresh = 3;
 bool Tracker::sbCollectAllPoints = true;
-double Tracker::sdCrossCovDur = 0.02;
+double Tracker::sdCrossCovDur = 0.05;
 
 // The constructor mostly sets up interal reference variables
 // to the other classes..
@@ -1240,6 +1243,9 @@ void Tracker::TrackMap()
   
   SaveSimpleMeasurements(mvIterationSets);
   
+  mm6PoseCovarianceExperimental = CalcCovariance2(mvIterationSets);
+  //std::cout<<"mm6PoseCovarianceExperimental: "<<std::endl<<mm6PoseCovarianceExperimental<<std::endl;
+  
   //RecordMeasurements();
   /*
   ros::Time covStart = ros::Time::now();
@@ -1518,12 +1524,48 @@ int Tracker::SearchForPoints(TrackerDataPtrVector& vTD, std::string cameraName, 
   return nFound;
 }
 
+Matrix<6> Tracker::CalcCovariance2(std::vector<TrackerDataPtrVector>& vIterationSets)
+{
+  std::unordered_set<MapPoint*> spParticipatingPoints;
+  TrackerDataPtrVector vpAllMeas;
+  
+  int nMaxMeasNum = 0;
+  
+  for(unsigned i=0; i < vIterationSets.size(); ++i)
+  {
+    nMaxMeasNum += vIterationSets[i].size();
+  }
+  
+  vpAllMeas.reserve(nMaxMeasNum);
+
+  for(unsigned i=0; i < mvCurrCamNames.size(); ++i)
+  {
+    for(unsigned int j=0; j < vIterationSets[i].size(); ++j)
+    {
+      TrackerData &td = *vIterationSets[i][j];
+      if(!td.mbFound)
+        continue;
+      
+      vpAllMeas.push_back(vIterationSets[i][j]);
+      spParticipatingPoints.insert(&td.mPoint);
+    }
+  }
+  
+  // Update as many cross covariances as possible within the given time budget
+  std::cerr<<"Calling UpdateCrossCovariances"<<std::endl;
+  ros::Time updateStart = ros::Time::now();
+  mMapMaker.UpdateCrossCovariances(spParticipatingPoints, ros::Duration(Tracker::sdCrossCovDur));
+  std::cerr<<"Took "<<ros::Time::now() - updateStart<<" seconds to update cross covariances"<<std::endl;
+  
+  return mTrackerCovariance.CalcCovariance(vpAllMeas);
+}
+
 Matrix<6> Tracker::CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationSets)
 {
   int nMeasNum = 0;
   int nCurrCol = 0;
-  std::map<MapPoint*, int> mPointToColumn;
-  std::set<MapPoint*> spParticipatingPoints;
+  std::unordered_map<MapPoint*, int> mPointToColumn;
+  std::unordered_set<MapPoint*> spParticipatingPoints;
   
   for(unsigned i=0; i < mvCurrCamNames.size(); ++i)
   {
@@ -1548,17 +1590,23 @@ Matrix<6> Tracker::CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationS
   int nPointNum = mPointToColumn.size();
   
   // Update as many cross covariances as possible within the given time budget
-  mMapMaker.UpdateCrossCovariances(spParticipatingPoints, ros::Duration(sdCrossCovDur));
+  std::cerr<<"Calling UpdateCrossCovariances"<<std::endl;
+  ros::Time updateStart = ros::Time::now();
+  mMapMaker.UpdateCrossCovariances(spParticipatingPoints, ros::Duration(Tracker::sdCrossCovDur));
+  std::cerr<<"Took "<<ros::Time::now() - updateStart<<" seconds to update cross covariances"<<std::endl;
   
   // The covariance matrix of the parameters
-  TooN::Matrix<> CovParams = TooN::Zeros(3*nPointNum+2*nMeasNum, 3*nPointNum+2*nMeasNum);
+  //TooN::Matrix<> CovParams = TooN::Zeros(3*nPointNum+2*nMeasNum, 3*nPointNum+2*nMeasNum);
   
   // The jacobians
-  TooN::Matrix<> J1 = TooN::Zeros(2*nMeasNum, 3*nPointNum+2*nMeasNum);
-  TooN::Matrix<> J2 = TooN::Zeros(2*nMeasNum, 6);
+  //TooN::Matrix<> J1 = TooN::Zeros(2*nMeasNum, 3*nPointNum+2*nMeasNum);
+  //TooN::Matrix<> J2 = TooN::Zeros(2*nMeasNum, 6);
   
-  J1.slice(0, 3*nPointNum, 2*nMeasNum, 2*nMeasNum) =  TooN::Identity;
+  //J1.slice(0, 3*nPointNum, 2*nMeasNum, 2*nMeasNum) =  TooN::Identity;
   
+  ros::Time buildStart = ros::Time::now();
+  std::cerr<<"About to build cross cov system"<<std::endl;
+  TooN::Matrix<3> m3CrossCov;
   int nMeasIdx = 0;
   for(unsigned i=0; i < mvCurrCamNames.size(); ++i)
   {
@@ -1571,11 +1619,11 @@ Matrix<6> Tracker::CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationS
       int nPointCol = mPointToColumn[&td.mPoint];
         
       // diagonal of point block
-      CovParams.slice(3*nPointCol, 3*nPointCol, 3, 3) =  td.mPoint.mm3WorldCov;
+      //CovParams.slice(3*nPointCol, 3*nPointCol, 3, 3) =  td.mPoint.mm3WorldCov;
         
       if(nPointCol > 0)
       {
-        for(std::map<MapPoint*, int>::iterator point_it = mPointToColumn.begin(); point_it != mPointToColumn.end(); ++point_it)
+        for(std::unordered_map<MapPoint*, int>::iterator point_it = mPointToColumn.begin(); point_it != mPointToColumn.end(); ++point_it)
         {
           MapPoint& otherPoint = *point_it->first;
           int nOtherCol = point_it->second;
@@ -1583,26 +1631,30 @@ Matrix<6> Tracker::CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationS
           if(nOtherCol >= nPointCol)
             continue;
           
-          TooN::Matrix<3> m3CrossCov = td.mPoint.CrossCov(&otherPoint);
+          td.mPoint.CrossCov(&otherPoint, m3CrossCov);
           
           // off diagonal entry
-          CovParams.slice(3*nOtherCol, 3*nPointCol, 3, 3) = m3CrossCov;
-          CovParams.slice(3*nPointCol, 3*nOtherCol, 3, 3) = m3CrossCov.T();
+          //CovParams.slice(3*nOtherCol, 3*nPointCol, 3, 3) = m3CrossCov;
+          //CovParams.slice(3*nPointCol, 3*nOtherCol, 3, 3) = m3CrossCov.T();
         }
       }
       
       // finally the pixel noise cov
       Matrix<2> m2PixelCov = TooN::Identity * (1.0/td.mdSqrtInvNoise);
-      CovParams.slice(3*nPointNum + 2*nMeasIdx, 3*nPointNum + 2*nMeasIdx, 2, 2) = m2PixelCov;
+      //CovParams.slice(3*nPointNum + 2*nMeasIdx, 3*nPointNum + 2*nMeasIdx, 2, 2) = m2PixelCov;
       
       // Now the jacobians
-      J1.slice(nMeasIdx*2, 3*nPointCol, 2, 3) = td.mm23Jacobian;
-      J2.slice(nMeasIdx*2, 0, 2, 6) = td.mm26Jacobian;
+      //J1.slice(nMeasIdx*2, 3*nPointCol, 2, 3) = td.mm23Jacobian;
+      //J2.slice(nMeasIdx*2, 0, 2, 6) = td.mm26Jacobian;
       
       nMeasIdx++;
     }
   }
   
+  std::cerr<<"Build cross cov system in "<<ros::Time::now() - buildStart<<" seconds"<<std::endl;
+  ROS_DEBUG_STREAM("m3CrossCov: "<<std::endl<<m3CrossCov);
+  
+  /*
   TooN::Matrix<> J1_Cov_J1t = J1 * CovParams * J1.T();
   TooN::Cholesky<> chol1(J1_Cov_J1t.num_rows());
   chol1.compute(J1_Cov_J1t);
@@ -1611,6 +1663,9 @@ Matrix<6> Tracker::CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationS
   
   TooN::Cholesky<> chol2(J2t_Inv_J2);
   return chol2.get_inverse();
+  */
+  
+  return TooN::Zeros;
 }
 
 //Calculate a pose update 6-vector from a bunch of image measurements.
@@ -1677,8 +1732,8 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
   
   // The TooN WLSCholesky class handles reweighted least squares.
   // It just needs errors and jacobians.
-  WLS<6> wls; //, wls_noweight;
-  wls.add_prior(100.0); // Stabilising prior
+  //WLS<6> wls; //, wls_noweight;
+  //wls.add_prior(100.0); // Stabilising prior
   WLS<6> wls_old; //, wls_noweight;
   wls_old.add_prior(100.0); // Stabilising prior
   mnNumInliers = 0;
@@ -1728,12 +1783,12 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
       }
       
       Matrix<2,6> &m26Jac = td.mm26Jacobian;
-      Matrix<2,3> &m23Jac = td.mm23Jacobian;
-      Matrix<2> m2PixelCov = TooN::Identity * (1.0/td.mdSqrtInvNoise);
+      //Matrix<2,3> &m23Jac = td.mm23Jacobian;
+      //Matrix<2> m2PixelCov = TooN::Identity * (1.0/td.mdSqrtInvNoise);
       
-      Matrix<3> m3PointCov = td.mPoint.mm3WorldCov == m3Zeros ? TooN::Identity * 1e10 : td.mPoint.mm3WorldCov;
+      //Matrix<3> m3PointCov = td.mPoint.mm3WorldCov == m3Zeros ? TooN::Identity * 1e10 : td.mPoint.mm3WorldCov;
     
-      Matrix<2> m2MeasCov = m23Jac * m3PointCov * m23Jac.T() + m26Jac * mm6PoseCovariance * m26Jac.T() + m2PixelCov;
+      //Matrix<2> m2MeasCov = m23Jac * m3PointCov * m23Jac.T() + m26Jac * mm6PoseCovariance * m26Jac.T() + m2PixelCov;
       /*
       if(j == 0)
       {
@@ -1745,7 +1800,7 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
         std::cerr<<"m2MeasCov: "<<std::endl<<m2MeasCov<<std::endl;
       }
       */
-      wls.add_mJ_rows(td.mv2Error, m26Jac, opts::M2Inverse(m2MeasCov) * td.mdWeight);
+      //wls.add_mJ_rows(td.mv2Error, m26Jac, opts::M2Inverse(m2MeasCov) * td.mdWeight);
       
       nNumAdded++;
       wls_old.add_mJ(td.mv2Error_CovScaled[0], td.mdSqrtInvNoise * m26Jac[0], td.mdWeight); // These two lines are currently
@@ -1754,12 +1809,12 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
     
   }
   
-  wls.compute();
+  //wls.compute();
   wls_old.compute();
   
-  //if(bMarkOutliers)	
+  if(bMarkOutliers)	
   {
-		mm6PoseCovariance = TooN::SVD<6>(wls.get_C_inv()).get_pinv();   // from ethzasl_ptam
+		//mm6PoseCovariance = TooN::SVD<6>(wls.get_C_inv()).get_pinv();   // from ethzasl_ptam
     mm6PoseCovarianceOld = TooN::SVD<6>(wls_old.get_C_inv()).get_pinv();
     
     //wls_noweight.compute();
@@ -1768,16 +1823,16 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
   
   //std::cout<<"CalcPoseUpdate: "<<wls.get_mu()<<std::endl;
   
-  if(!TooN::isfinite(wls.get_mu()))
+  if(!TooN::isfinite(wls_old.get_mu()))
   {
-    std::cout<<"wls.get_mu(): "<<wls.get_mu()<<std::endl;
+    std::cout<<"wls.get_mu(): "<<wls_old.get_mu()<<std::endl;
     std::cout<<"nNumAdded: "<<nNumAdded<<std::endl;
     std::cout<<"dSigmaSquared: "<<dSigmaSquared<<std::endl;
     std::cout<<"dOverrideSigma: "<<dOverrideSigma<<std::endl;
     ROS_BREAK();
   }
   
-  return wls.get_mu();
+  return wls_old.get_mu();
 }
 
 
