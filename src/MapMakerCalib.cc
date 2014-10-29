@@ -109,7 +109,6 @@ bool MapMakerCalib::InitFromCalibImage(CalibImageTaylor &calibImage, double dSqu
       // Patch source stuff:
       pNewPoint->mpPatchSourceKF = pKF;
       pNewPoint->mnSourceLevel = l;
-      pNewPoint->mv3Normal_NC = makeVector( 0,0,-1);
       
       Vector<2> v2RootPos = calibImage.mvGridCorners[i].mParams.v2Pos;
       
@@ -175,8 +174,6 @@ bool MapMakerCalib::InitFromCalibImage(CalibImageTaylor &calibImage, double dSqu
     mBundleAdjuster.BundleAdjustAll(vOutliers);
     if(ResetRequested() || nSanityCounter > 5)
     {
-      ROS_WARN("Dumping map to map_after.dat");
-      DumpToFile("map_after.dat");
       ROS_ERROR("MapMakerCalib: Exceeded sanity counter or reset requested, bailing");
       return false;
     }

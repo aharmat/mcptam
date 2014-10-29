@@ -68,13 +68,15 @@ void MapPoint::RefreshPixelVectors()
   // Treat it as a general point on the plane.
   Vector<3> v3PlanePoint_C = k.mse3CamFromWorld * mv3WorldPos;
   
+  Vector<3> v3Normal_NC = makeVector( 0,0,-1);
+  
   // Find the height of this above the plane.
   // Assumes the normal is  pointing toward the camera.
-  double dCamHeight = fabs(v3PlanePoint_C * mv3Normal_NC);
+  double dCamHeight = fabs(v3PlanePoint_C * v3Normal_NC);
 
-  double dPixelRate = fabs(mv3Center_NC * mv3Normal_NC);
-  double dOneRightRate = fabs(mv3OneRightFromCenter_NC * mv3Normal_NC);
-  double dOneDownRate = fabs(mv3OneDownFromCenter_NC * mv3Normal_NC);
+  double dPixelRate = fabs(mv3Center_NC * v3Normal_NC);
+  double dOneRightRate = fabs(mv3OneRightFromCenter_NC * v3Normal_NC);
+  double dOneDownRate = fabs(mv3OneDownFromCenter_NC * v3Normal_NC);
   
   // Find projections onto plane
   Vector<3> v3CenterOnPlane_C = mv3Center_NC * dCamHeight / dPixelRate;
@@ -84,6 +86,14 @@ void MapPoint::RefreshPixelVectors()
   // Find differences of these projections in the world frame
   mv3PixelRight_W = k.mse3CamFromWorld.get_rotation().inverse() * (v3OneRightOnPlane_C - v3CenterOnPlane_C);
   mv3PixelDown_W = k.mse3CamFromWorld.get_rotation().inverse() * (v3OneDownOnPlane_C - v3CenterOnPlane_C);
+  
+  if(!TooN::isfinite(mv3PixelRight_W))
+  {
+    ROS_FATAL_STREAM("k.mse3CamFromWorld: "<<k.mse3CamFromWorld);
+    ROS_FATAL_STREAM("v3OneRightOnPlane_C: "<<v3OneRightOnPlane_C);
+    ROS_FATAL_STREAM("v3CenterOnPlane_C: "<<v3CenterOnPlane_C);
+    ROS_BREAK();
+  }
 }  
 
 // Calls the EraseMeasurementOfPoint() function of all keyframes that hold measurements of this point 

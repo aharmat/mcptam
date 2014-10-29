@@ -41,6 +41,7 @@
 #include <mcptam/OpenGL.h>
 #include <mcptam/Map.h>
 #include <mcptam/VideoSourceMulti.h>
+#include <mcptam/Utility.h>
 #include <cvd/image_io.h>
 #include <stdlib.h>
 #include <fstream>
@@ -63,7 +64,7 @@ SystemBase::SystemBase(std::string windowName, bool bFullSize, bool bDrawWindow)
   ParamMap mParams = mpVideoSourceMulti->GetParams();
   
   mmDrawOffsets = mpVideoSourceMulti->GetDrawOffsets();
-  mmPoses = mpVideoSourceMulti->GetPoses();
+  mmPosesLive = mpVideoSourceMulti->GetPoses();
   
   std::string cameraPoseFile;
   if(mNodeHandlePriv.getParam("camera_pose_file", cameraPoseFile))
@@ -79,12 +80,12 @@ SystemBase::SystemBase(std::string windowName, bool bFullSize, bool bDrawWindow)
       
       se3Pose = se3Pose.inverse();
       
-      if(!mmPoses.count(camName))
+      if(!mmPosesLive.count(camName))
         ROS_WARN_STREAM("Got camera name "<<camName<<" in camera pose file but we are not currently using this camera");
       else
       {
-        ROS_INFO_STREAM("Replacing "<<camName<<" pose, old pose: "<<std::endl<<mmPoses[camName]<<std::endl<<" new pose: "<<std::endl<<se3Pose);
-        mmPoses[camName] = se3Pose;
+        ROS_INFO_STREAM("Replacing "<<camName<<" pose, old pose: "<<std::endl<<mmPosesLive[camName]<<std::endl<<" new pose: "<<std::endl<<se3Pose);
+        mmPosesLive[camName] = se3Pose;
       }
     }
   }
@@ -99,10 +100,80 @@ SystemBase::SystemBase(std::string windowName, bool bFullSize, bool bDrawWindow)
     CVD::ImageRef& irCalibSize = mCalibSizes[camName];
     Vector<9>& v9Params = mParams[camName];
     
-    mmCameraModels.insert(std::pair<std::string,TaylorCamera>(camName, TaylorCamera(v9Params, irCalibSize, irFullScaleSize, irImageSize)));
+    mmCameraModelsLive.insert(std::pair<std::string,TaylorCamera>(camName, TaylorCamera(v9Params, irCalibSize, irFullScaleSize, irImageSize)));
   }
   
+  std::cout<<"Creating map"<<std::endl;
+  
   mpMap = new Map;  
+  
+  std::cout<<"Created map"<<std::endl;
+  
+  mNodeHandlePriv.getParam("save_folder", mSaveFolder);
+  
+  bool bLoadMap = false;
+  mNodeHandlePriv.getParam("load_map", bLoadMap);
+  
+  if(bLoadMap)
+  {
+    ROS_ASSERT(!mSaveFolder.empty());
+    LoadCamerasFromFolder(mSaveFolder);
+    mpMap->LoadFromFolder(mSaveFolder, mmPosesLoaded, mmCameraModelsLoaded);
+  }
+  
+  mmPoses = mmPosesLive;
+  mmCameraModels = mmCameraModelsLive;
+  
+  // Add the loaded poses, checking for duplicates
+  for(SE3Map::iterator pose_it = mmPosesLoaded.begin(); pose_it != mmPosesLoaded.end(); ++pose_it)
+  {
+    std::string camName = pose_it->first;
+    TooN::SE3<> se3Pose = pose_it->second;
+    
+    if(mmPoses.count(camName))  // Make sure that the poses obtained from live and loading are the same!
+    {
+      TooN::SE3<> se3Diff = mmPoses[camName] * se3Pose.inverse();
+      TooN::Vector<6> v6Diff = se3Diff.ln();
+      
+      double dDiffMagSquared = v6Diff * v6Diff;
+      
+      if(dDiffMagSquared > 1e-10)
+      {
+        ROS_FATAL_STREAM("Difference between live and loaded poses for camera "<<camName<<" too great! Diff mag squared: "<<dDiffMagSquared);
+        ros::shutdown();
+        return;
+      }
+    }
+    else  // insert the pose
+    {
+      mmPoses[camName] = se3Pose;
+    }
+  }
+  
+  // Add the loaded camera models, checking for duplicates
+  for(TaylorCameraMap::iterator cam_it = mmCameraModelsLoaded.begin(); cam_it != mmCameraModelsLoaded.end(); ++cam_it)
+  {
+    std::string camName = cam_it->first;
+    TaylorCamera& camera = cam_it->second;
+    
+    if(mmCameraModels.count(camName))  // Make sure that the model obtained from live and loading are the same!
+    {
+      TooN::Vector<9> v9Diff = mmCameraModels[camName].GetParams() - camera.GetParams();
+      
+      double dDiffMagSquared = v9Diff * v9Diff;
+      
+      if(dDiffMagSquared > 1e-10)
+      {
+        ROS_FATAL_STREAM("Difference between live and loaded calibration parameters for camera "<<camName<<" too great! Diff mag squared: "<<dDiffMagSquared);
+        ros::shutdown();
+        return;
+      }
+    }
+    else  // insert the pose
+    {
+      mmCameraModels[camName] = camera;
+    }
+  }
 }
 
 SystemBase::~SystemBase()
@@ -153,58 +224,6 @@ VideoSourceMulti* SystemBase::InitVideoSource()
   return new VideoSourceMulti(bGetPoseSeparately);
 }
 
-// Write the camera parameters to the given file name
-void SystemBase::DumpCamerasToFile(std::string filename)
-{
-  std::ofstream ofs(filename.c_str());
-  
-  if(!ofs.good())
-  {
-    ROS_ERROR_STREAM("Couldn't open "<<filename<<" to write cameras");
-    return;
-  }
-  
-  // Write camera data to file
-  ofs<<"% Camera calibration parameters, format:"<<std::endl;
-  ofs<<"% Total number of cameras"<<std::endl;
-  ofs<<"% Camera Name, image size (2 vector), projection center (2 vector), polynomial coefficients (5 vector), affine matrix components (3 vector), inverse polynomial coefficents (variable size)"<<std::endl;
-  
-  ofs<<mmCameraModels.size()<<std::endl;
-  
-  for(TaylorCameraMap::iterator cam_it = mmCameraModels.begin(); cam_it != mmCameraModels.end(); ++cam_it)
-  {
-    std::string camName = cam_it->first;
-    TaylorCamera& camera = cam_it->second;
-    
-    CVD::ImageRef irImageSize = camera.GetImageSize();
-    TooN::Vector<9> v9Params = camera.GetParams();
-    TooN::Vector<TooN::Resizable> vxInvPoly = camera.GetInvPoly();
-    
-    // The parameters (by index) are:
-    // 0 - a0 coefficient 
-    // 1 - a2 coefficient 
-    // 2 - a3 coefficient 
-    // 3 - a4 coefficient 
-    // 4 - center of projection xc 
-    // 5 - center of projection yc 
-    // 6 - affine transform param c 
-    // 7 - affine transform param d
-    // 8 - affine transform param e
-    
-    ofs<<camName<<", "<<irImageSize.x<<", "<<irImageSize.y<<", "<<v9Params[4]<<", "<<v9Params[5];
-    ofs<<", "<<v9Params[0]<<", "<<0<<", "<<v9Params[1]<<", "<<v9Params[2]<<", "<<v9Params[3];
-    ofs<<", "<<v9Params[6]<<", "<<v9Params[7]<<", "<<v9Params[8];
-    
-    for(int i=0; i < vxInvPoly.size(); ++i)
-      ofs<<", "<<vxInvPoly[i];
-      
-    ofs<<std::endl;
-  }
-  
-  ofs<<"% The end";
-  ofs.close();
-}
-
 // Load in the masks for the camera images to block certain portions from being searched for point features
 ImageBWMap SystemBase::LoadMasks()
 {
@@ -237,3 +256,235 @@ ImageBWMap SystemBase::LoadMasks()
   
   return masksMap;
 }
+
+// Saves all map information to a file
+void SystemBase::SaveCamerasToFolder(std::string folder)
+{ 
+  std::string calibrationsFile = folder + "/calibrations.dat";
+  std::ofstream ofs(calibrationsFile.c_str());
+  
+  if(!ofs.good())
+  {
+    ROS_ERROR_STREAM("Couldn't open "<<calibrationsFile<<" to write camera calibrations");
+    return;
+  }
+  
+  // First write camera data to file
+  ofs<<"% Camera calibration parameters, format:"<<std::endl;
+  ofs<<"% Total number of cameras"<<std::endl;
+  ofs<<"% Camera Name, image size (2 vector), projection center (2 vector), polynomial coefficients (5 vector), affine matrix components (3 vector)"<<std::endl;
+  
+  ofs<<mmCameraModels.size()<<std::endl;
+  
+  for(TaylorCameraMap::iterator cam_it = mmCameraModels.begin(); cam_it != mmCameraModels.end(); ++cam_it)
+  {
+    std::string camName = cam_it->first;
+    TaylorCamera& camera = cam_it->second;
+    
+    CVD::ImageRef irImageSize = camera.GetImageSize();
+    TooN::Vector<9> v9Params = camera.GetParams();
+    
+    // The parameters (by index) are:
+    // 0 - a0 coefficient 
+    // 1 - a2 coefficient 
+    // 2 - a3 coefficient 
+    // 3 - a4 coefficient 
+    // 4 - center of projection xc 
+    // 5 - center of projection yc 
+    // 6 - affine transform param c 
+    // 7 - affine transform param d
+    // 8 - affine transform param e
+    
+    ofs<<camName<<", "<<irImageSize.x<<", "<<irImageSize.y<<", "<<v9Params[4]<<", "<<v9Params[5];
+    ofs<<", "<<v9Params[0]<<", "<<0<<", "<<v9Params[1]<<", "<<v9Params[2]<<", "<<v9Params[3];
+    ofs<<", "<<v9Params[6]<<", "<<v9Params[7]<<", "<<v9Params[8];
+      
+    ofs<<std::endl;
+  }
+  
+  // Done writing
+  ofs<<"% The end";
+  ofs.close();
+  
+  std::string posesFile = folder + "/poses.dat";
+  ofs.open(posesFile.c_str());
+  
+  if(!ofs.good())
+  {
+    ROS_ERROR_STREAM("Couldn't open "<<posesFile<<" to write camera poses");
+    return;
+  }
+  
+  ofs<<"% Camera poses in MKF frame, format:"<<std::endl;
+  ofs<<"% Total number of cameras"<<std::endl;
+  ofs<<"% Camera Name, Position (3 vector), Orientation (quaternion, 4 vector)"<<std::endl;
+  
+  // Total number of cameras
+  ofs<<mmPoses.size()<<std::endl;
+  
+  for(SE3Map::iterator pose_it = mmPoses.begin(); pose_it != mmPoses.end(); ++pose_it)
+  {
+    std::string camName = pose_it->first;
+    TooN::SE3<> se3Pose = pose_it->second;
+    
+    // Store the conventional way of defining pose (ie inverse of PTAM)
+    geometry_msgs::Pose pose = util::SE3ToPoseMsg(se3Pose.inverse());
+    
+    ofs<<camName;
+    ofs<<", "<<pose.position.x<<", "<<pose.position.y<<", "<<pose.position.z;
+    ofs<<", "<<pose.orientation.x<<", "<<pose.orientation.y<<", "<<pose.orientation.z<<", "<<pose.orientation.w<<std::endl;
+  }
+  
+  // Done writing
+  ofs<<"% The end";
+  ofs.close();
+  
+}
+
+void SystemBase::LoadCamerasFromFolder(std::string folder)
+{
+  std::string calibrationsFile = folder + "/calibrations.dat";
+  std::ifstream file(calibrationsFile);
+  if(!file.is_open())
+  {
+    ROS_FATAL_STREAM("Couldn't open file ["<<calibrationsFile<<"]");
+    ros::shutdown();
+    return;
+  }
+  
+  std::string readline;
+  std::stringstream readlineSS;
+  
+  std::string conversion;
+  std::stringstream conversionSS;
+  
+  // First three lines are comments
+  std::getline(file, readline);
+  std::getline(file, readline);
+  std::getline(file, readline);
+  
+  // Next line is number of cameras
+  std::getline(file,readline);
+  readlineSS.clear();
+  readlineSS.str(readline);
+  
+  int numCams = 0;
+  readlineSS>>numCams;
+  
+  std::cout<<"Reading "<<numCams<<" camera models"<<std::endl;
+  
+  for(int i=0; i < numCams; ++i)
+  {
+    if(std::getline(file, readline))
+    {
+      readlineSS.clear();
+      readlineSS.str(readline);
+      
+      // Camera Name, image size (2 vector), projection center (2 vector), polynomial coefficients (5 vector), affine matrix components (3 vector), inverse polynomial coefficents (variable size)
+      
+      // First is camera name
+      std::string camName;
+      std::getline(readlineSS,conversion,',');
+      conversionSS.clear();
+      conversionSS.str(conversion);
+      conversionSS >> camName;
+      
+      std::cout<<"Read "<<camName<<std::endl;
+      
+      CVD::ImageRef irImageSize = CVD::ir(util::readVector<2>(readlineSS));
+      TooN::Vector<2> v2Center = util::readVector<2>(readlineSS);
+      TooN::Vector<5> v5Coeffs = util::readVector<5>(readlineSS);
+      TooN::Vector<3> v3Affine = util::readVector<3>(readlineSS);
+      
+      TooN::Vector<9> v9Params;
+      
+      // The parameters (by index) are:
+      // 0 - a0 coefficient 
+      // 1 - a2 coefficient 
+      // 2 - a3 coefficient 
+      // 3 - a4 coefficient 
+      // 4 - center of projection xc 
+      // 5 - center of projection yc 
+      // 6 - affine transform param c 
+      // 7 - affine transform param d
+      // 8 - affine transform param e
+      
+      v9Params[0] = v5Coeffs[0];
+      v9Params[1] = v5Coeffs[2];
+      v9Params[2] = v5Coeffs[3];
+      v9Params[3] = v5Coeffs[4];
+      v9Params[4] = v2Center[0];
+      v9Params[5] = v2Center[1];
+      v9Params[6] = v3Affine[0];
+      v9Params[7] = v3Affine[1];
+      v9Params[8] = v3Affine[2];
+      
+      mmCameraModelsLoaded.insert(std::pair<std::string,TaylorCamera>(camName, TaylorCamera(v9Params, irImageSize, irImageSize, irImageSize)));
+    }
+    else
+    {
+      ROS_FATAL_STREAM("Error reading camera calibration file, bailing");
+      ros::shutdown();
+      return;
+    }
+  }
+  
+  std::cout<<"Got "<<mmCameraModelsLoaded.size()<<" camera models"<<std::endl;
+  
+  file.close();
+  
+  std::string posesFile = folder + "/poses.dat";
+  file.open(posesFile);
+  if(!file.is_open())
+  {
+    ROS_FATAL_STREAM("Couldn't open file ["<<posesFile<<"]");
+    ros::shutdown();
+    return;
+  }
+  
+  // First three lines are comments
+  std::getline(file, readline);
+  std::getline(file, readline);
+  std::getline(file, readline);
+  
+  // Next line is number of poses
+  std::getline(file,readline);
+  readlineSS.clear();
+  readlineSS.str(readline);
+  
+  int numPoses = 0;
+  readlineSS>>numPoses;
+  
+  std::cout<<"Reading "<<numPoses<<" poses"<<std::endl;
+  
+  for(int i=0; i < numPoses; ++i)
+  {
+    if(std::getline(file, readline))
+    {
+      readlineSS.clear();
+      readlineSS.str(readline);
+      
+      // First is camera name
+      std::string camName;
+      std::getline(readlineSS,conversion,',');
+      conversionSS.clear();
+      conversionSS.str(conversion);
+      conversionSS >> camName;
+      
+      std::cout<<"Got cam name: "<<camName<<std::endl;
+      
+      // Next is pose
+      mmPosesLoaded[camName] = (util::readSE3(readlineSS)).inverse();
+    }
+    else
+    {
+      ROS_FATAL_STREAM("Error reading camera poses file, bailing");
+      ros::shutdown();
+      return;
+    }
+  }
+  
+  std::cout<<"Got "<<mmPosesLoaded.size()<<" poses"<<std::endl;
+  
+}
+

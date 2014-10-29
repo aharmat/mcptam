@@ -294,8 +294,7 @@ std::string PoseCalibrator::Track()
         
         if(!bSuccess)
         {
-          //std::cout<<"Dumping cameras to cameras.dat"<<std::endl;
-          //DumpCamerasToFile("cameras.dat");
+          ROS_ERROR("Couldn't initialize map from checkerboard image!");
           pFirstTracker->Reset(true);
         }
         else

@@ -398,6 +398,71 @@ inline bool Parse(XmlRpc::XmlRpcValue camGroupList, std::vector<std::vector<std:
   
   return true;
 }
+
+template <int size> 
+inline TooN::Vector<size> readVector(std::stringstream& readlineSS)
+{
+  std::stringstream conversionSS;
+  std::string conversion;
+  TooN::Vector<size> vxRead;
+  
+  for(int i=0; i < size; ++i)
+  {
+    std::getline(readlineSS,conversion,',');
+    conversionSS.clear();
+    conversionSS.str(conversion);
+    conversionSS >> vxRead[i];
+  }
+  
+  return vxRead;
+}
+
+inline TooN::SE3<> readSE3(std::stringstream& readlineSS)
+{
+  geometry_msgs::Pose readpose;
+  std::stringstream conversionSS;
+  std::string conversion;
+  
+  // First is position (3 vector)
+  std::getline(readlineSS,conversion,',');
+  conversionSS.clear();
+  conversionSS.str(conversion);
+  conversionSS >> readpose.position.x;
+  
+  std::getline(readlineSS,conversion,',');
+  conversionSS.clear();
+  conversionSS.str(conversion);
+  conversionSS >> readpose.position.y;
+  
+  std::getline(readlineSS,conversion,',');
+  conversionSS.clear();
+  conversionSS.str(conversion);
+  conversionSS >> readpose.position.z;
+  
+  // Next is orientation (quaternion, 4 vector)
+  std::getline(readlineSS,conversion,',');
+  conversionSS.clear();
+  conversionSS.str(conversion);
+  conversionSS >> readpose.orientation.x;
+  
+  std::getline(readlineSS,conversion,',');
+  conversionSS.clear();
+  conversionSS.str(conversion);
+  conversionSS >> readpose.orientation.y;
+  
+  std::getline(readlineSS,conversion,',');
+  conversionSS.clear();
+  conversionSS.str(conversion);
+  conversionSS >> readpose.orientation.z;
+  
+  std::getline(readlineSS,conversion,',');
+  conversionSS.clear();
+  conversionSS.str(conversion);
+  conversionSS >> readpose.orientation.w;
+  
+  return util::PoseMsgToSE3(readpose);
+}
+
  
 } // end namespace util
  

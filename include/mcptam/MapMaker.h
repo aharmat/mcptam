@@ -102,8 +102,8 @@ public:
   /// Rescale the map by the given scale factor
   void RequestRescaling(double dScale);
   
-  /// Request the map parameters be written to the given file name
-  void RequestFileDump(std::string filename);
+  /// Request the map parameters be written to the given folder
+  void RequestMapSave(std::string folder);
   
   /// Request that the initialization phase is completed early
   void RequestStopInit();
@@ -131,8 +131,8 @@ protected:
   double mdScale; ///< Amount to scale the map by
   
   //debug
-  bool mbFileDump;  ///< Dump map params to file requested
-  std::string mDumpFileName;  ///< File name to write map params to
+  bool mbMapSave;  ///< Map saving is requested
+  std::string mSaveFolder;  ///< Folder where map will be written
   
   //testing 
   bool mbStopInit;  ///< End of initialization phase requested

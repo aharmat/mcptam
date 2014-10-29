@@ -511,7 +511,6 @@ void MapMakerServerBase::AddInitDepthMapPoints(MultiKeyFrame& mkfSrc, int nLevel
       pPointNew->mpPatchSourceKF = &kfSrc;
       pPointNew->mbFixed = false;
       pPointNew->mnSourceLevel = nLevel;
-      pPointNew->mv3Normal_NC = makeVector( 0,0,-1);
       pPointNew->mirCenter = level.vCandidates[i].irLevelPos;
       pPointNew->mv3Center_NC = cameraSrc.UnProject(v2RootPos); 
       pPointNew->mv3OneRightFromCenter_NC = cameraSrc.UnProject(v2RootPos + vec(CVD::ImageRef(nLevelScale,0))); 
@@ -718,7 +717,6 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame &kfSrc, KeyFrame &kfTarget, i
   MapPoint point;
   point.mpPatchSourceKF = &kfSrc;
   point.mnSourceLevel = nLevel;
-  point.mv3Normal_NC = makeVector( 0,0,-1);
   point.mirCenter = irLevelPos;
   point.mv3Center_NC = cameraSrc.UnProject(v2RootPos);
   point.mv3OneRightFromCenter_NC = cameraSrc.UnProject(v2RootPos + vec(CVD::ImageRef(nLevelScale,0))); 
@@ -866,7 +864,6 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame &kfSrc, KeyFrame &kfTarget, i
   // Patch source stuff:
   pPointNew->mpPatchSourceKF = &kfSrc;
   pPointNew->mnSourceLevel = nLevel;
-  pPointNew->mv3Normal_NC = makeVector( 0,0,-1);
   pPointNew->mirCenter = irLevelPos;
   pPointNew->mv3Center_NC = cameraSrc.UnProject(v2RootPos); 
   pPointNew->mv3OneRightFromCenter_NC = cameraSrc.UnProject(v2RootPos + vec(CVD::ImageRef(nLevelScale,0))); 

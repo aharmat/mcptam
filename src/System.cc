@@ -73,7 +73,7 @@ System::System()
     // Debug commands for menu
     GUI.RegisterCommand("ScaleMapUp", GUICommandCallBack, this);
     GUI.RegisterCommand("ScaleMapDown", GUICommandCallBack, this);
-    GUI.RegisterCommand("ExportMapToFile", GUICommandCallBack, this);
+    GUI.RegisterCommand("SaveMap", GUICommandCallBack, this);
     GUI.RegisterCommand("ManualAddMKF", GUICommandCallBack, this);
     
     // Add menu groupings and buttons to the GL window
@@ -96,17 +96,18 @@ System::System()
       | +-> Level0 Points
       | +-> Glare Masks
       | +-> Draw Masks
+      +-> Map
+      | |
+      | +->Back
+      | +-> Add MKFs (on/off)
+      | +-> Update Points (on/off)
       +-> Keyframes
       | |
       | +-> Back
-      | +-> Add MKFs
-      | +-> View Keyframes
-      |   |
-      |   +-> Back
-      |   +-> Candidates (on/off)
-      |   +-> Show Next
-      |   +-> Show Prev
-      |   +-> Level
+      | +-> Candidates (on/off)
+      | +-> Show Next
+      | +-> Show Prev
+      | +-> Level
       +-> Level
       +-> Level Points
     */
@@ -121,6 +122,7 @@ System::System()
     GUI.ParseLine("GlareMasking=0");
     GUI.ParseLine("LevelZeroPoints=0");
     GUI.ParseLine("AddingMKFs=1");
+    GUI.ParseLine("UpdatingPoints=1");
     GUI.ParseLine("CrossCamera=1");
     
     static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN|SILENT);
@@ -131,6 +133,7 @@ System::System()
     GUI.ParseLine("Menu.AddMenuButton Root Init InitTracker Root");
     GUI.ParseLine("Menu.AddMenuButton Root \"Debug...\" \"\" Debug");
     GUI.ParseLine("Menu.AddMenuButton Root \"Images...\" \"\" Images");
+    GUI.ParseLine("Menu.AddMenuButton Root \"Map...\" \"\" Map");
     GUI.ParseLine("Menu.AddMenuButton Root \"Keyframes...\" \"\" Keyframes");
     GUI.ParseLine("Menu.AddMenuSlider Root \"Level\" DrawLevel 0 3 Root");
     GUI.ParseLine("Menu.AddMenuToggle Root \"Level Pts\" DrawOnlyLevel Root");
@@ -138,7 +141,7 @@ System::System()
     // Debug Menu
     GUI.ParseLine("Menu.AddMenuButton Debug \"< Back\" \"\" Root");
     GUI.ParseLine("Menu.AddMenuToggle Debug \"CrossCam\" CrossCamera Debug");
-    GUI.ParseLine("Menu.AddMenuButton Debug \"Export Map\" ExportMapToFile Debug");
+    GUI.ParseLine("Menu.AddMenuButton Debug \"Save Map\" SaveMap Debug");
     GUI.ParseLine("Menu.AddMenuButton Debug \"Scale Down\" ScaleMapDown Debug");
     GUI.ParseLine("Menu.AddMenuButton Debug \"Scale Up\" ScaleMapUp Debug");
     GUI.ParseLine("Menu.AddMenuButton Debug \"Add MKF\" ManualAddMKF Debug");
@@ -149,23 +152,28 @@ System::System()
     GUI.ParseLine("Menu.AddMenuToggle Images \"Draw Masks\" DrawMasks Images");
     GUI.ParseLine("Menu.AddMenuToggle Images \"Glare Mask\" GlareMasking Images");
 
+    // Map Menu
+    GUI.ParseLine("Menu.AddMenuButton Map \"< Back\" \"\" Root");
+    GUI.ParseLine("Menu.AddMenuToggle Map \"Adding MKFs\" AddingMKFs Map");
+    GUI.ParseLine("Menu.AddMenuToggle Map \"Update Pts\" UpdatingPoints Map");
+
     // Keyframes Menu
     GUI.ParseLine("Menu.AddMenuButton Keyframes \"< Back\" \"\" Root");
-    GUI.ParseLine("Menu.AddMenuToggle Keyframes \"Add MKFs\" AddingMKFs Keyframes");
-    GUI.ParseLine("Menu.AddMenuButton Keyframes \"View...\" \"\" View");
+    GUI.ParseLine("Menu.AddMenuToggle Keyframes \"Candidates\" DrawCandidates Keyframes");
+    GUI.ParseLine("Menu.AddMenuButton Keyframes \"Show Next\" ShowNextKeyFrame Keyframes");
+    GUI.ParseLine("Menu.AddMenuButton Keyframes \"Show Prev\" ShowPrevKeyFrame Keyframes");
+    GUI.ParseLine("Menu.AddMenuSlider Keyframes \"Level\" DrawLevel 0 3 Keyframes");
 
-    // View Keyframes
-    GUI.ParseLine("Menu.AddMenuButton View \"< Back\" \"\" Keyframes");
-    GUI.ParseLine("Menu.AddMenuToggle View \"Candidates\" DrawCandidates View");
-    GUI.ParseLine("Menu.AddMenuButton View \"Show Next\" ShowNextKeyFrame View");
-    GUI.ParseLine("Menu.AddMenuButton View \"Show Prev\" ShowPrevKeyFrame View");
-    GUI.ParseLine("Menu.AddMenuSlider View \"Level\" DrawLevel 0 3 View");
   }
   
   // Create the BundleAdjuster, MapMaker, and Tracker objects
+  std::cout<<"Creating Bundle adjuster"<<std::endl;
   mpBundleAdjuster = new BundleAdjusterMulti(*mpMap, mmCameraModels, true, false);
+  std::cout<<"Creating MapMaker"<<std::endl;
   mpMapMaker = new MapMaker(*mpMap, mmCameraModels, *mpBundleAdjuster);
-  mpTracker = new Tracker(*mpMap, *mpMapMaker, mmCameraModels, mmPoses, mmDrawOffsets, mpGLWindow);
+  std::cout<<"Creating Tracker"<<std::endl;
+  mpTracker = new Tracker(*mpMap, *mpMapMaker, mmCameraModels, mmPosesLive, mmDrawOffsets, mpGLWindow);
+   std::cout<<"Creating keyframe viewer"<<std::endl;
   mpKeyFrameViewer = new KeyFrameViewer(*mpMap, *mpGLWindow, mmDrawOffsets, mpVideoSourceMulti->GetSizes());
   
   ImageBWMap masksMap = LoadMasks(); 
@@ -331,15 +339,27 @@ void System::GUICommandHandler(std::string command, std::string params)
     return;
   }
 
-  if(command=="ExportMapToFile")
+  if(command=="SaveMap")
   {
-    std::string mapFileName = "map.dat";
-    std::string cameraFileName = "cameras.dat";
-
-    ROS_INFO_STREAM("> Requesting file dump to "<<mapFileName<<" and "<<cameraFileName);
-
-    mpMapMaker->RequestFileDump(mapFileName);
-    DumpCamerasToFile(cameraFileName);
+    ROS_ASSERT(!mSaveFolder.empty());
+    
+    ROS_INFO_STREAM("> Requesting save to "<<mSaveFolder);
+    
+    std::string execString = "exec rm -r " + mSaveFolder + "/*"; 
+    int nRet = std::system(execString.c_str());
+    
+    if(nRet < 0)
+    {
+      ROS_ERROR("=======================================================================");
+      ROS_ERROR("COULD NOT ERASE EXISTING CONTENTS OF SAVE FOLDER, NOT WRITING MAP DATA!");
+      ROS_ERROR("=======================================================================");
+    }
+    else
+    {
+      mpMapMaker->RequestMapSave(mSaveFolder);
+      SaveCamerasToFolder(mSaveFolder);
+    }
+    
     return;
   }
 
