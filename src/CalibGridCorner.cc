@@ -42,6 +42,7 @@
 #include <mcptam/OpenGL.h>
 #include <cvd/image.h>
 #include <cvd/vector_image_ref.h>
+#include <ros/assert.h>
 
 using namespace TooN;
 
@@ -124,4 +125,32 @@ Matrix<2> CalibGridCorner::GetSteps(std::vector<CalibGridCorner> &vgc)
   return m2Steps;
 }
 
-
+Matrix<2,3> CalibGridCorner::GetSteps3D(std::vector<CalibGridCorner> &vgc)
+{
+  ROS_ASSERT(mParams.v3Pos != Zeros);
+  Matrix<2,3> m23Steps;
+  for(int dirn=0; dirn<2; dirn++)
+  {
+    Vector<3> v3Dirn;
+    int nFound = 0;
+    v3Dirn = Zeros;
+    if(maNeighborStates[dirn].val >=0)
+    {
+      ROS_ASSERT(vgc[maNeighborStates[dirn].val].mParams.v3Pos != Zeros);
+      v3Dirn += vgc[maNeighborStates[dirn].val].mParams.v3Pos - mParams.v3Pos;
+      nFound++;
+    }
+    if(maNeighborStates[dirn+2].val >=0)
+    {
+      ROS_ASSERT(vgc[maNeighborStates[dirn+2].val].mParams.v3Pos != Zeros);
+      v3Dirn -= vgc[maNeighborStates[dirn+2].val].mParams.v3Pos - mParams.v3Pos;
+      nFound++;
+    }
+    
+    if(nFound == 0)
+      m23Steps[dirn] = mm23InheritedSteps[dirn];
+    else
+      m23Steps[dirn] = v3Dirn / nFound;
+  }
+  return m23Steps;
+}
