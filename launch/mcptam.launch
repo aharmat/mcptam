@@ -33,6 +33,7 @@
   <param name="mm_init_point_mode" type="string" value="$(arg init_mode)" />
   <param name="mm_init_point_max_num" type="int" value="200" />
 
+  <param name="kf_adaptive_thresh" type="bool" value="true" />
   <param name="kf_distance_mean_diff_fraction" type="double" value="0.5" /> 
   <param name="mm_max_scaled_mkf_dist" type="double" value="0.3" />
   <param name="mm_outlier_multiplier" type="double" value="1.1" />

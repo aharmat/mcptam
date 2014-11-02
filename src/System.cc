@@ -222,7 +222,7 @@ void System::Run()
     grabEndTime = ros::Time::now();
     
     static gvar3<std::string> gvsCurrentSubMenu("Menu.CurrentSubMenu", "", HIDDEN|SILENT);
-    bool bDrawKeyFrames = *gvsCurrentSubMenu == "View";
+    bool bDrawKeyFrames = *gvsCurrentSubMenu == "Keyframes";
     
     if(bLastGrabSuccess)
     {
