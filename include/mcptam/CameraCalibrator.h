@@ -85,7 +85,7 @@ protected:
    *  points around the current best to find the next best step. According to Scaramuzza's thesis, the sum
    *  of projection errors is minimum at the best center of projection and is uniformly decreasing towards
    *  that point. */
-  void InitOptimization();
+  void InitOptimization(bool bFindCenter);
   
   /** @brief Given a starting position and an area to test, finds the best center of projection
    *  
@@ -167,6 +167,7 @@ protected:
   double mdMeanPixelError;                 ///< Sum of errors divided by number of calibration images
   
   bool mbInit;                    ///< Has optimization been initialized?
+  bool mbFindCenter;
   
   double mdLambda;                ///< LM optimization parameter
   double mdLambdaFactor;          ///< LM optimization parameter
@@ -175,6 +176,8 @@ protected:
   ros::NodeHandle mNodeHandlePriv;   ///< ROS private node handle
   
   std::queue<Command> mqCommands;   ///< Queued commands received by GUICommandCallBack
+  
+  CVD::Image<CVD::byte> mimMask;
 };
 
 #endif

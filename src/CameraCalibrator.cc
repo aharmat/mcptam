@@ -44,6 +44,7 @@
 #include <gvars3/instances.h>
 #include <TooN/SVD.h>
 #include <TooN/Cholesky.h>
+#include <cvd/image_io.h>
 #include <ros/ros.h>
 
 using namespace TooN;
@@ -67,15 +68,22 @@ CameraCalibrator::CameraCalibrator()
   GUI.RegisterCommand("MouseDown", GUICommandCallBack, this);
   GUI.RegisterCommand("KeyPress", GUICommandCallBack, this);
   
+  GUI.ParseLine("UseExistingCalib=0");
+  GUI.ParseLine("Draw3DGrid=1");
+  GUI.ParseLine("DrawMask=0");
+  
   GUI.ParseLine("GLWindow.AddMenu CalibMenu");
   GUI.ParseLine("CalibMenu.AddMenuButton Live GrabFrame CameraCalibrator.GrabNextFrame");
   GUI.ParseLine("CalibMenu.AddMenuButton Live Reset CameraCalibrator.Reset");
   GUI.ParseLine("CalibMenu.AddMenuButton Live Optimize CameraCalibrator.Optimize");
+  GUI.ParseLine("CalibMenu.AddMenuToggle Live \"Use Existing\" UseExistingCalib Live");
+  GUI.ParseLine("CalibMenu.AddMenuToggle Live \"Draw Mask\" DrawMask Live");
   GUI.ParseLine("CalibMenu.AddMenuButton Opti \"Show Next\" CameraCalibrator.ShowNext");
   GUI.ParseLine("CalibMenu.AddMenuButton Opti \"Grab More\" CameraCalibrator.GrabMore ");
   GUI.ParseLine("CalibMenu.AddMenuButton Opti Reset CameraCalibrator.Reset");
   GUI.ParseLine("CalibMenu.AddMenuButton Opti Remove CameraCalibrator.Remove");
   GUI.ParseLine("CalibMenu.AddMenuButton Opti Save CameraCalibrator.SaveCalib");
+  GUI.ParseLine("CalibMenu.AddMenuToggle Opti \"3D Grid\" Draw3DGrid Opti");
   
   mCamName = mVideoSource.GetCamName();
   mirSize = mVideoSource.GetSize();
@@ -86,6 +94,18 @@ CameraCalibrator::CameraCalibrator()
     ROS_ERROR("CameraCalibrator: Can't calibrate camera with binning turned on, relaunch camera with binning off");
     ros::shutdown();
     return;
+  }
+  
+  std::string maskFile;
+  mNodeHandlePriv.getParam ("mask", maskFile);
+  
+  if(!maskFile.empty())
+  {
+    mimMask = CVD::img_load(maskFile);
+  }
+  else
+  {
+    mimMask = CVD::Image<CVD::byte>(mirSize, 255);
   }
   
   Reset();
@@ -106,8 +126,21 @@ CameraCalibrator::~CameraCalibrator()
 
 void CameraCalibrator::Run()
 {
+  static gvar3<int> gvnUseExistingCalib("UseExistingCalib", 0, HIDDEN|SILENT);
+  static gvar3<int> gvnDraw3DGrid("Draw3DGrid", 1, HIDDEN|SILENT);
+  static gvar3<int> gvnDrawMask("DrawMask", 0, HIDDEN|SILENT);
+  
+  int nPrevUseExisting = *gvnUseExistingCalib;
+  
   while(!mbDone)
   {
+    if(*gvnUseExistingCalib != nPrevUseExisting)
+    {
+      Reset();
+    }
+    
+    nPrevUseExisting = *gvnUseExistingCalib;
+    
     // Set up openGL
     mpGLWindow->SetupViewport();
     mpGLWindow->SetupVideoOrtho();
@@ -121,7 +154,11 @@ void CameraCalibrator::Run()
       // Show the capturing menu
       GUI.ParseLine("CalibMenu.ShowMenu Live");
       
-      if(bGotNewFrame)
+      if(*gvnDrawMask)
+      {
+        glDrawPixels(mimMask);
+      }
+      else if(bGotNewFrame)
       {
         // Clear screen with black
         glClearColor(0,0,0,1);
@@ -129,8 +166,10 @@ void CameraCalibrator::Run()
       
         glDrawPixels(imFrameBW);
         
-        CalibImageTaylor* pCalibImg = new CalibImageTaylor(CVD::ImageRef(), mpGLWindow);
-        if(pCalibImg->MakeFromImage(imFrameBW))
+        TaylorCamera* pCamera = *gvnUseExistingCalib ? mpCamera : NULL;
+        CalibImageTaylor* pCalibImg = new CalibImageTaylor(CVD::ImageRef(), mpGLWindow, pCamera, mimMask);
+        
+        if(pCalibImg->MakeFromImage(imFrameBW, CVD::ImageRef(), false))
         {
           if(mbGrabNextFrame)
           {
@@ -152,7 +191,7 @@ void CameraCalibrator::Run()
       
       if(!mbInit)
       {
-        InitOptimization();
+        InitOptimization(mbFindCenter);
         mbInit = true;
       }
       
@@ -160,7 +199,11 @@ void CameraCalibrator::Run()
         
       // Draw the currently selected image and the 3D grid overlay
       glDrawPixels(mvpCalibImgs[mnImageToShow]->mImage);
-      mvpCalibImgs[mnImageToShow]->Draw3DGrid(*mpCamera,true);
+      
+      if(*gvnDraw3DGrid)
+        mvpCalibImgs[mnImageToShow]->Draw3DGrid(*mpCamera,true);
+      else
+        mvpCalibImgs[mnImageToShow]->DrawImageGrid();
     }
     
     std::ostringstream ost;
@@ -207,9 +250,18 @@ void CameraCalibrator::Reset()
     
   mpCamera = new TaylorCamera(mirSize, mirSize, mirSize);
   
+  static gvar3<int> gvnUseExistingCalib("UseExistingCalib", 0, HIDDEN|SILENT);
+  if(*gvnUseExistingCalib)
+  {
+    TooN::Vector<9> v9Params = mVideoSource.GetParams();
+    std::cout<<"Setting params: "<<v9Params<<std::endl;
+    mpCamera->SetParams(v9Params);
+  }
+  
   mbGrabNextFrame =false;
   mbOptimizing = false;
   mbInit = false;
+  mbFindCenter = true;
   mnImageToShow = 0;
   
   for(unsigned i=0; i < mvpCalibImgs.size(); ++i)
@@ -242,6 +294,7 @@ void CameraCalibrator::GUICommandHandler(std::string command, std::string params
   {
     mbOptimizing = false;
     mbInit = false;
+    mbFindCenter = true;
     return;
   }
   
@@ -298,8 +351,10 @@ void CameraCalibrator::GUICommandHandler(std::string command, std::string params
     
     bool bSuccess = mVideoSource.SaveParams(v9Params);
     
-    if(bSuccess)
-      mbDone = true;
+    if(!bSuccess)
+    {
+      ROS_ERROR("Couldn't save params to camera!!");
+    }
   
     return;
   }
@@ -329,46 +384,49 @@ void CameraCalibrator::GUICommandHandler(std::string command, std::string params
 }
 
 // Finds the best image poses, camera polynomials and center of projection using linear methods
-void CameraCalibrator::InitOptimization()
+void CameraCalibrator::InitOptimization(bool bFindCenter)
 {  
-  // Find best center pose with exhaustive search, this many iterations
-  int nCenterSearchIterations = 20;
-  
-  // The center of the image
-  Vector<2> v2DefaultCenter;
-  v2DefaultCenter[0] = mpCamera->GetImageSize().x / 2.0; 
-  v2DefaultCenter[1] = mpCamera->GetImageSize().y / 2.0;
-  
-  // Start at image center for center of projection
-  Vector<2> v2StartCenter = v2DefaultCenter;
-  
-  // A reasonable spread to start
-  Vector<2> v2Spread = v2StartCenter/4;
-  
-  // Check 25 points at each level
-  CVD::ImageRef irNumPoints(5,5);
-  Vector<2> v2BestPos;
-  Vector<4> v4BestParams;
-  double dMinError;
-  
-  for(int i=0; i < nCenterSearchIterations; i++)
+  if(bFindCenter)
   {
-    FindBestCenter(v2StartCenter, v2Spread, irNumPoints, v2BestPos, v4BestParams, dMinError);
+    // Find best center pose with exhaustive search, this many iterations
+    int nCenterSearchIterations = 20;
     
-    // Update where to start for next iteration
-    v2StartCenter = v2BestPos;
-    v2Spread *= 0.5;  // Tighten the search area
+    // The center of the image
+    Vector<2> v2DefaultCenter;
+    v2DefaultCenter[0] = mpCamera->GetImageSize().x / 2.0; 
+    v2DefaultCenter[1] = mpCamera->GetImageSize().y / 2.0;
+    
+    // Start at image center for center of projection
+    Vector<2> v2StartCenter = v2DefaultCenter;
+    
+    // A reasonable spread to start
+    Vector<2> v2Spread = v2StartCenter/4;
+    
+    // Check 25 points at each level
+    CVD::ImageRef irNumPoints(5,5);
+    Vector<2> v2BestPos;
+    Vector<4> v4BestParams;
+    double dMinError;
+    
+    for(int i=0; i < nCenterSearchIterations; i++)
+    {
+      FindBestCenter(v2StartCenter, v2Spread, irNumPoints, v2BestPos, v4BestParams, dMinError);
+      
+      // Update where to start for next iteration
+      v2StartCenter = v2BestPos;
+      v2Spread *= 0.5;  // Tighten the search area
+    }
+    
+    ROS_INFO_STREAM("CameraCalibrator: Found best center of projection: "<<v2BestPos<<" with error: "<<dMinError);
+    
+    // Update camera parameters
+    Vector<9> v9CurrParams = mpCamera->GetParams();
+    v9CurrParams.slice<0,4>() = v4BestParams;
+    v9CurrParams.slice<4,2>() = v2BestPos;
+    mpCamera->SetParams(v9CurrParams);
   }
   
-  ROS_INFO_STREAM("CameraCalibrator: Found best center of projection: "<<v2BestPos<<" with error: "<<dMinError);
-  
-  // Update camera parameters
-  Vector<9> v9CurrParams = mpCamera->GetParams();
-  v9CurrParams.slice<0,4>() = v4BestParams;
-  v9CurrParams.slice<4,2>() = v2BestPos;
-  mpCamera->SetParams(v9CurrParams);
-  
-  ComputeParamsUpdatePoses(mvpCalibImgs, v2BestPos);
+  ComputeParamsUpdatePoses(mvpCalibImgs, mpCamera->GetCenter());
   
   // Initialize these in preparation for optimization
   mdLambda = 0.0001;

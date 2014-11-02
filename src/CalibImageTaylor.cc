@@ -57,7 +57,7 @@ using namespace TooN;
 // Static members
 int CalibImageTaylor::snCornerPatchSize = 20;
 double CalibImageTaylor::sdBlurSigma = 1.0;
-int CalibImageTaylor::snMeanGate = 10;
+int CalibImageTaylor::snMeanGate = 20;
 int CalibImageTaylor::snMinCornersForGrabbedImage = 20;
 double CalibImageTaylor::sdExpandByStepMaxDistFrac = 0.3;
 
@@ -158,15 +158,17 @@ inline Vector<2> GuessInitialAngles(CVD::Image<CVD::byte> &im, CVD::ImageRef irC
   return v2Ret;
 }
 
-CalibImageTaylor::CalibImageTaylor(CVD::ImageRef irDrawOffset, GLWindow2* pWindow) 
+CalibImageTaylor::CalibImageTaylor(CVD::ImageRef irDrawOffset, GLWindow2* pWindow, TaylorCamera* pCamera, CVD::Image<CVD::byte> imMask) 
 : mirDrawOffset(irDrawOffset)
 , mpGLWindow(pWindow)
+, mpCamera(pCamera)
+, mimMask(imMask)
 {
   
 }
 
 // Finds checkerboard in image, optionally orders the found corners according to the size/orientation of the checkerboard
-bool CalibImageTaylor::MakeFromImage(CVD::Image<CVD::byte> &im, CVD::ImageRef irPatternSize)
+bool CalibImageTaylor::MakeFromImage(CVD::Image<CVD::byte> &im, CVD::ImageRef irPatternSize, bool bRadial)
 {
   mvCorners.clear();
   mvGridCorners.clear();
@@ -190,6 +192,9 @@ bool CalibImageTaylor::MakeFromImage(CVD::Image<CVD::byte> &im, CVD::ImageRef ir
   int nGate = CalibImageTaylor::snMeanGate;
   do
   {
+    if(mimMask.totalsize() > 0 && mimMask[irCurr] < 127)
+      continue;
+    
     if(IsCorner(imBlurred, irCurr, nGate))
     {
       mvCorners.push_back(irCurr);
@@ -205,7 +210,30 @@ bool CalibImageTaylor::MakeFromImage(CVD::Image<CVD::byte> &im, CVD::ImageRef ir
     return false;
   
   // Pick a central corner point...
-  CVD::ImageRef irCenterOfImage = mImage.size()  / 2;
+  //CVD::ImageRef irCenterOfImage = mImage.size()  / 2;
+  
+  // Pick central corner to be median of found corners
+  std::vector<int> vXCoords, vYCoords;
+  vXCoords.reserve(mvCorners.size());
+  vYCoords.reserve(mvCorners.size());
+  
+  for(unsigned i=0; i < mvCorners.size(); ++i)
+  {
+    vXCoords.push_back(mvCorners[i].x);
+    vYCoords.push_back(mvCorners[i].y);
+  }
+  
+  std::sort(vXCoords.begin(), vXCoords.end());
+  std::sort(vYCoords.begin(), vYCoords.end());
+  
+  CVD::ImageRef irCenterOfImage(vXCoords[vXCoords.size()/2], vYCoords[vYCoords.size()/2]);
+  
+  glPointSize(6);
+  glColor3f(0,0,1);
+  glBegin(GL_POINTS);
+  CVD::glVertex(irCenterOfImage + mirDrawOffset);
+  glEnd();
+  
   CVD::ImageRef irBestCenterPos;
   unsigned int nBestDistSquared = 99999999;
   for(unsigned int i=0; i<mvCorners.size(); i++)
@@ -244,6 +272,19 @@ bool CalibImageTaylor::MakeFromImage(CVD::Image<CVD::byte> &im, CVD::ImageRef ir
   
   mvGridCorners[1].mm2InheritedSteps = mvGridCorners[2].mm2InheritedSteps = mvGridCorners[0].GetSteps(mvGridCorners);
   
+  if(mpCamera)
+  {
+    for(int i=0; i < 3; ++i)
+    {
+      mvGridCorners[i].mParams.v3Pos = mpCamera->UnProject(mvGridCorners[i].mParams.v2Pos);
+    }
+    
+    for(int i=1; i < 3; ++i)
+    {
+      mvGridCorners[i].mm23InheritedSteps = mvGridCorners[0].GetSteps3D(mvGridCorners);
+    }
+  }
+  
   // The three initial grid elements are enough to find the rest of the grid.
   int nNext;
   int nSanityCounter = 0; // Stop it getting stuck in an infinite loop...
@@ -257,19 +298,18 @@ bool CalibImageTaylor::MakeFromImage(CVD::Image<CVD::byte> &im, CVD::ImageRef ir
   if(nSanityCounter == nSanityCounterLimit)
     return false;
   
-  // If we weren't given a valid pattern, then we can just stop here because we don't need to check
-  // pattern size or reorder points
-  if(irPatternSize == CVD::ImageRef()) 
-  {
-    // Draw the grid before leaving. Do this here instead of before the "if" statement because 
-    // we'll modify the grid coordinates after this block, and the drawn grid should reflect that
-    DrawImageGrid();   
-    return true;
-  }
-  
   // Need to check x axis of the first corner (relative to image) to see if grid coordinates need to be rotated
   // We want x axis of the grid to be along x axis of image
   double dXAxisAngle = cFirst.mParams.v2Angles[0];
+  
+  if(bRadial)
+  {
+    // Figure out the angle of the radial vector at this location
+    TooN::Vector<2> v2Radial = cFirst.mParams.v2Pos - TooN::makeVector(im.size().x/2.0, im.size().y/2.0);
+    double dRadialAngle = atan2(v2Radial[1], v2Radial[0]);
+    dXAxisAngle -= dRadialAngle;
+  }
+  
   Matrix<2> m2GridRot;
   int nDirnShift;
  
@@ -351,6 +391,16 @@ bool CalibImageTaylor::MakeFromImage(CVD::Image<CVD::byte> &im, CVD::ImageRef ir
   }
   
   ROS_INFO_STREAM("irMinPos: "<<irMinPos<<"   irMaxPos: "<<irMaxPos);
+  
+  // If we weren't given a valid pattern, then we can just stop here because we don't need to check
+  // pattern size or reorder points
+  if(irPatternSize == CVD::ImageRef()) 
+  {
+    // Draw the grid before leaving. Do this here instead of before the "if" statement because 
+    // we'll modify the grid coordinates after this block, and the drawn grid should reflect that
+    DrawImageGrid();   
+    return true;
+  }
   
   CVD::ImageRef irSpan = irMaxPos - irMinPos + CVD::ImageRef(1,1);
   if(irSpan != irPatternSize) 
@@ -439,7 +489,7 @@ int CalibImageTaylor::NextToExpand()
 }
 
 // Find a new checkerboard corner from an already-found corner, by choosing the best expansion direction
-void CalibImageTaylor::ExpandByStep(int n)
+bool CalibImageTaylor::ExpandByStep(int n)
 {
   CalibGridCorner &gSrc = mvGridCorners[n];
   
@@ -463,12 +513,23 @@ void CalibImageTaylor::ExpandByStep(int n)
   
   ROS_ASSERT(nDirn != -10);
 
-  Vector<2> v2Step;
+
   CVD::ImageRef irGridStep = IR_from_dirn(nDirn);
+  Vector<2> v2SearchPos;
+  Vector<2> v2Step;
   
-  v2Step = gSrc.GetSteps(mvGridCorners).T() * CVD::vec(irGridStep);
-  
-  Vector<2> v2SearchPos = gSrc.mParams.v2Pos + v2Step;
+  if(mpCamera)
+  {
+    Vector<3> v3Step = gSrc.GetSteps3D(mvGridCorners).T() * CVD::vec(irGridStep);
+    ROS_ASSERT(gSrc.mParams.v3Pos != TooN::Zeros);
+    v2SearchPos = mpCamera->Project(gSrc.mParams.v3Pos + v3Step);
+    v2Step = v2SearchPos - gSrc.mParams.v2Pos;  // the equivalent v2step
+  }
+  else
+  {
+    v2Step = gSrc.GetSteps(mvGridCorners).T() * CVD::vec(irGridStep);
+    v2SearchPos = gSrc.mParams.v2Pos + v2Step;
+  }
   
   // Before the search: pre-fill the failure result for easy returns.
   gSrc.maNeighborStates[nDirn].val = N_FAILED;
@@ -487,7 +548,7 @@ void CalibImageTaylor::ExpandByStep(int n)
   
   double dStepDist= sqrt(v2Step * v2Step);
   if(dBestDist > CalibImageTaylor::sdExpandByStepMaxDistFrac * dStepDist)
-    return;
+    return false;
   
   CalibGridCorner gTarget(mirDrawOffset);
   gTarget.mParams = gSrc.mParams;
@@ -497,7 +558,13 @@ void CalibImageTaylor::ExpandByStep(int n)
   gTarget.mm2InheritedSteps = gSrc.GetSteps(mvGridCorners);
   CalibCornerPatch patch(CalibImageTaylor::snCornerPatchSize);
   if(!patch.IterateOnImageWithDrawing(gTarget.mParams, mImage))
-    return;
+    return false;
+    
+  if(mpCamera)
+  {
+    gTarget.mParams.v3Pos = mpCamera->UnProject(gTarget.mParams.v2Pos);
+    gTarget.mm23InheritedSteps = gSrc.GetSteps3D(mvGridCorners);
+  }
   
   // Update connection states:
   int nTargetNum = mvGridCorners.size();
@@ -515,6 +582,8 @@ void CalibImageTaylor::ExpandByStep(int n)
   }
   mvGridCorners.push_back(gTarget);
   mvGridCorners.back().Draw();
+  
+  return true;
 }
 
 // Draw a grid over the points that have been found
@@ -786,6 +855,7 @@ int CalibImageTaylor::FindCorrectRotation(std::vector< Matrix<3> > vRs, Vector<2
   // Save old transform in case someone else is using it
   SE3<> se3Backup = mse3CamFromWorld;
   int nCorrectIdx = -1;
+  double dSmallestCoeff = 1e100;
   
   // Try all the matrices in order
   // We'll try to find the camera parameters and t3 translation assuming a 2nd order polynomial, which will be enough
@@ -800,8 +870,11 @@ int CalibImageTaylor::FindCorrectRotation(std::vector< Matrix<3> > vRs, Vector<2
     
     if(vxParams[2] > 0) // This is the t3 term in a second order fit, if it's positive we have the right solution
     {
-      nCorrectIdx = i;
-      break;
+      if(vxParams[1] < dSmallestCoeff)
+      {
+        nCorrectIdx = i;
+        dSmallestCoeff = vxParams[1];
+      }
     }
   }
   
@@ -820,9 +893,11 @@ void CalibImageTaylor::GuessInitialPose(TooN::Vector<2> v2Center)
   int nPoints = mvGridCorners.size();
   Matrix<> mxN6(nPoints, 6);
   
+  /*
   double dFirstU = 0, dFirstV = 0;
   double minXt = 1e10;
   double minYt = 1e10;
+  */
   
   for(int n=0; n<nPoints; n++)
   {
@@ -832,6 +907,7 @@ void CalibImageTaylor::GuessInitialPose(TooN::Vector<2> v2Center)
     double Xt = mvGridCorners[n].mirGridPos.x;
     double Yt = mvGridCorners[n].mirGridPos.y;
     
+    /*
     if(Xt < minXt || Yt < minYt)
     {
       dFirstU = u;
@@ -839,6 +915,7 @@ void CalibImageTaylor::GuessInitialPose(TooN::Vector<2> v2Center)
       minXt = Xt;
       minYt = Yt;
     }
+    */
     
     mxN6[n][0] = -1*v*Xt;
     mxN6[n][1] = -1*v*Yt;
@@ -878,6 +955,7 @@ void CalibImageTaylor::GuessInitialPose(TooN::Vector<2> v2Center)
   }
   
   double dLambda = 1/sqrt(r11*r11 + r21*r21 + r31*r31);
+  /*
   int nLambdaSign = 0;
   
   int nSignOfFirstU = dFirstU >= 0 ? 1 : -1;
@@ -896,25 +974,27 @@ void CalibImageTaylor::GuessInitialPose(TooN::Vector<2> v2Center)
   // Therefore leave it as an "else" condition
   
   ROS_ASSERT(nLambdaSign != 0);
+  */
   
   Vector<3> r1 = makeVector(r11,r21,r31);
   Vector<3> r2 = makeVector(r12,r22,r32);
   Vector<3> t = makeVector(t1,t2,0);
   
-  std::vector< Matrix<3> > vRs(2);
+  std::vector< Matrix<3> > vRs(4);
   int signs[] = {1,-1};
+  int lambdaSigns[] = {1,-1};
   
   // Fill the two possible R matrices
   for(unsigned i=0; i < vRs.size(); ++i)
   {
     Matrix<3>& m3R = vRs[i];
-    m3R.T()[0] = dLambda * nLambdaSign * r1;
-    m3R.T()[1] = dLambda * nLambdaSign * r2;
-    m3R.T()[2] = dLambda * nLambdaSign * t;
+    m3R.T()[0] = dLambda * lambdaSigns[i%2] * r1;
+    m3R.T()[1] = dLambda * lambdaSigns[i%2] * r2;
+    m3R.T()[2] = dLambda * lambdaSigns[i%2] * t;
     
     // Two possible choice of sign for r31 and r32
-    m3R[2][0] *= signs[i];
-    m3R[2][1] *= signs[i];
+    m3R[2][0] *= signs[i/2];
+    m3R[2][1] *= signs[i/2];
     m3R[2][2] = 1;  // Set t3 to 1 for now
   }
   

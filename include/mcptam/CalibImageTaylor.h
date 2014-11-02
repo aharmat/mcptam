@@ -74,7 +74,7 @@ public:
   /** @brief Need to call constructor with arguments to ensure a valid object
    *  @param irDrawOffset The screen offset where the image associated with this CalibImageTaylor will be drawn 
    *  @param pWindow Pointer to the GL window */
-  CalibImageTaylor(CVD::ImageRef irDrawOffset, GLWindow2* pWindow);
+  CalibImageTaylor(CVD::ImageRef irDrawOffset, GLWindow2* pWindow, TaylorCamera* pCamera = NULL, CVD::Image<CVD::byte> imMask = CVD::Image<CVD::byte>());
   
   /** @brief Finds checkerboard in image, optionally orders the found corners according to the size/orientation of the checkerboard
    *  @param im The image to process
@@ -82,7 +82,7 @@ public:
    *                       grid coordinates in different images correspond to the same physical point on the checkerboard. This is necessary for pose calibration. If
    *                       not specified, will just find all available corners and return true, used for camera parameter calibration where it is not necessary to find
    *                       all checkerboard corners. */
-  bool MakeFromImage(CVD::Image<CVD::byte> &im, CVD::ImageRef irPatternSize = CVD::ImageRef());
+  bool MakeFromImage(CVD::Image<CVD::byte> &im, CVD::ImageRef irPatternSize = CVD::ImageRef(), bool bRadial = false);
   
   /** @brief Draw the current grid (as defined by the current found checkerboard corners), projected into a given camera at the current pose of the CalibImageTaylor
    * 
@@ -92,6 +92,9 @@ public:
    *  @param camera The camera model used for projection
    *  @param bDrawErrors Should I draw lines indicating the point projection errors? */
   void Draw3DGrid(TaylorCamera &camera, bool bDrawErrors);
+  
+    /// Draw a grid over the points that have been found
+  void DrawImageGrid();
   
   /** @brief Calculates an initial guess for the pose of the image, based on the given projection center. 
    * 
@@ -151,8 +154,6 @@ public:
 protected:
   
   // Functions called by MakeFromImage
-  /// Draw a grid over the points that have been found
-  void DrawImageGrid();
   
   /** @brief Try to find a new checkerboard corner by stepping from an already-found corner, based on the given direction
    *  @param nSrc The index of the corner to step from
@@ -165,8 +166,9 @@ protected:
   int NextToExpand();
   
   /** @brief Find a new checkerboard corner from an already-found corner, by choosing the best expansion direction
-   *  @param n The index of the corner to step from */
-  void ExpandByStep(int n);
+   *  @param n The index of the corner to step from 
+   *  @return Succeeded in expanding?*/
+  bool ExpandByStep(int n);
   
   /** @brief Helper function to convert the direction 0-3 to an ImageRef
    *  @param nDirn The direction to convert
@@ -207,6 +209,8 @@ protected:
   
   CVD::ImageRef mirDrawOffset;                 ///< The drawing offset
   GLWindow2* mpGLWindow;                       ///< Pointer to the OpenGL window
+  TaylorCamera* mpCamera;
+  CVD::Image<CVD::byte> mimMask;
   
   //friend class CameraCalibrator;
   //friend class CalibratorCommon;
