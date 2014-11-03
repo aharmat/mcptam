@@ -169,7 +169,7 @@ void CameraCalibrator::Run()
         TaylorCamera* pCamera = *gvnUseExistingCalib ? mpCamera : NULL;
         CalibImageTaylor* pCalibImg = new CalibImageTaylor(CVD::ImageRef(), mpGLWindow, pCamera, mimMask);
         
-        if(pCalibImg->MakeFromImage(imFrameBW, CVD::ImageRef(), true))
+        if(pCalibImg->MakeFromImage(imFrameBW, CVD::ImageRef(), false))
         {
           if(mbGrabNextFrame)
           {
@@ -294,7 +294,7 @@ void CameraCalibrator::GUICommandHandler(std::string command, std::string params
   {
     mbOptimizing = false;
     mbInit = false;
-    mbFindCenter = false;
+    mbFindCenter = true;
     return;
   }
   
