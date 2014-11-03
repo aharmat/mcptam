@@ -313,15 +313,19 @@ void TrackerCalib::TrackFrame(CVD::Image<CVD::byte>& imFrame, ros::Time timestam
       
       static gvar3<int> gvnAddingMKFs("AddingMKFs", 1, HIDDEN|SILENT);
       // Heuristics to check if a key-frame should be added to the map:
-      if(*gvnAddingMKFs &&
+      if(mbAddNext || (*gvnAddingMKFs &&
          mOverallTrackingQuality == GOOD &&
          mnLostFrames == 0 &&
-         ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(1.0)  &&
-         mMapMaker.NeedNewKeyFrame(*mpCurrentKF, true))
+         ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.1)  &&
+         mMapMaker.NeedNewKeyFrame(*mpCurrentKF, true)))
       {
+		if(mbAddNext)
+          ROS_INFO("Signalling because add next was clicked");
+          
         mMessageForUser << " SHOULD BE Adding MultiKeyFrame to Map";
         RecordMeasurements(); // We've decided to add, so make measurements
         SignalNewKeyFrame();  // Make our desire known
+        mbAddNext = false;
       }
       
       ReleasePointLock();  // Important! Do this whenever tracking step has finished

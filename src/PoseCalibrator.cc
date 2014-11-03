@@ -73,6 +73,7 @@ PoseCalibrator::PoseCalibrator()
   GUI.RegisterCommand("Optimize", GUICommandCallBack, this);
   GUI.RegisterCommand("KeyPress", GUICommandCallBack, this);
   GUI.RegisterCommand("InitTracker", GUICommandCallBack, this);
+  GUI.RegisterCommand("ManualAddMKF", GUICommandCallBack, this);
   
   // Add menu groupings and buttons to the GL window
   /* Menu
@@ -114,6 +115,7 @@ PoseCalibrator::PoseCalibrator()
   GUI.ParseLine("Menu.AddMenuButton Root Init InitTracker Root");
   GUI.ParseLine("Menu.AddMenuButton Root \"Images...\" \"\" Images");
   GUI.ParseLine("Menu.AddMenuButton Root \"Keyframes...\" \"\" View");
+  GUI.ParseLine("Menu.AddMenuButton Root \"Debug...\" \"\" Debug");
   GUI.ParseLine("Menu.AddMenuButton Root Optimize Optimize Opti");
   GUI.ParseLine("Menu.AddMenuSlider Root \"Level\" DrawLevel 0 3 Root");
   
@@ -133,6 +135,10 @@ PoseCalibrator::PoseCalibrator()
   // Optimize Menu
   GUI.ParseLine("Menu.AddMenuButton Opti \"Grab More\" GrabMore Root");
   GUI.ParseLine("Menu.AddMenuButton Opti \"Save Calib\" SaveCalib Opti");
+  
+  // Debug Menu
+  GUI.ParseLine("Menu.AddMenuButton Debug \"< Back\" \"\" Root");
+  GUI.ParseLine("Menu.AddMenuButton Debug \"Add MKF\" ManualAddMKF Debug");
   
   mNodeHandlePriv.param<int>("pattern_width", mirPatternSize[0],0);
   mNodeHandlePriv.param<int>("pattern_height", mirPatternSize[1],0);
@@ -537,6 +543,14 @@ void PoseCalibrator::GUICommandHandler(std::string command, std::string params)
     
     for(TrackerCalibPtrMap::iterator it = mmTrackers.begin(); it != mmTrackers.end(); it++)
       it->second->Reset(false);
+    
+    return;
+  }
+  
+  if(command=="ManualAddMKF")
+  {
+    ROS_INFO_STREAM("> Forcing adding of next MKF");
+    mmTrackers.begin()->second->AddNext();  // Signalling with only the first is enough, will grab kfs from all trackers
     
     return;
   }
