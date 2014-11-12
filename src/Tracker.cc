@@ -50,6 +50,8 @@
 #include <mcptam/Utility.h>
 #include <mcptam/TrackerState.h>
 
+#include <std_srvs/Empty.h>
+
 #include <cvd/utility.h>
 #include <cvd/gl_helpers.h>
 #include <cvd/fast_corner.h>
@@ -97,6 +99,7 @@ Tracker::Tracker(Map &map, MapMakerClientBase &mapmaker, TaylorCameraMap &camera
   , mmFixedPoses(poses)
   , mNodeHandlePrivate("~")
   , mpGLWindow(pWindow)
+  , mTrackerCovariance("cov_analysis.csv", {100,200,300,500,750,1000}, 3)
 {
   ROS_DEBUG("Tracker: In constructor");
   
@@ -119,6 +122,8 @@ Tracker::Tracker(Map &map, MapMakerClientBase &mapmaker, TaylorCameraMap &camera
   
   maskPub = mNodeHandlePrivate.advertise<sensor_msgs::Image>("mask", 1);
   timingPub = mNodeHandlePrivate.advertise<mcptam::TrackerTiming>("timing", 1);
+  
+  mPauseClient = mNodeHandlePrivate.serviceClient<std_srvs::Empty>("/rosbag/pause");
 }
 
 Tracker::~Tracker()
@@ -146,6 +151,7 @@ void Tracker::Reset(bool bSavePose, bool bResetMap)
   mbAddNext = false;
   mmSimpleMeas.clear();
   mRunMode = NORMAL;
+  mbDoAnalysis = false;
    
   mLastProcessTime = ros::Time::now();
   mse3StartPose = SE3<>();  
@@ -1243,7 +1249,19 @@ void Tracker::TrackMap()
   
   SaveSimpleMeasurements(mvIterationSets);
   
-  mm6PoseCovarianceExperimental = CalcCovariance2(mvIterationSets);
+  // Pause (presumed) rosbag play if we're going to do the covariance analysis
+  if(mbDoAnalysis)
+  {
+    mbDoAnalysis = false;
+    std_srvs::Empty srv;
+    mPauseClient.call(srv);
+    // First do the calculation with limited cross covariance computation time
+    mm6PoseCovarianceExperimental = CalcCovariance2(mvIterationSets, Tracker::sdCrossCovDur);
+    // Then repeat with significantly more time
+    //mm6PoseCovarianceExperimental = CalcCovariance2(mvIterationSets, 30);
+    mPauseClient.call(srv);
+  }
+  
   //std::cout<<"mm6PoseCovarianceExperimental: "<<std::endl<<mm6PoseCovarianceExperimental<<std::endl;
   
   //RecordMeasurements();
@@ -1524,7 +1542,7 @@ int Tracker::SearchForPoints(TrackerDataPtrVector& vTD, std::string cameraName, 
   return nFound;
 }
 
-Matrix<6> Tracker::CalcCovariance2(std::vector<TrackerDataPtrVector>& vIterationSets)
+Matrix<6> Tracker::CalcCovariance2(std::vector<TrackerDataPtrVector>& vIterationSets, double dCrossCovDur)
 {
   std::unordered_set<MapPoint*> spParticipatingPoints;
   TrackerDataPtrVector vpAllMeas;
@@ -1554,10 +1572,11 @@ Matrix<6> Tracker::CalcCovariance2(std::vector<TrackerDataPtrVector>& vIteration
   // Update as many cross covariances as possible within the given time budget
   std::cerr<<"Calling UpdateCrossCovariances"<<std::endl;
   ros::Time updateStart = ros::Time::now();
-  mMapMaker.UpdateCrossCovariances(spParticipatingPoints, ros::Duration(Tracker::sdCrossCovDur));
+  mMapMaker.UpdateCrossCovariances(spParticipatingPoints, ros::Duration(dCrossCovDur));
   std::cerr<<"Took "<<ros::Time::now() - updateStart<<" seconds to update cross covariances"<<std::endl;
   
-  return mTrackerCovariance.CalcCovariance(vpAllMeas);
+  TooN::Matrix<6> m6Cov = mTrackerCovariance.CalcCovariance(vpAllMeas, true);
+  return m6Cov;
 }
 
 Matrix<6> Tracker::CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationSets)
@@ -2226,4 +2245,9 @@ void Tracker::SetCurrentPose(TooN::SE3<> se3Pose)
   mv6BaseVelocity = Zeros;
   mdMSDScaledVelocityMagnitude = 0;
   mbJustRecoveredSoUseCoarse = true;
+}
+
+void Tracker::DoCovAnalysis()
+{
+  mbDoAnalysis = true;
 }

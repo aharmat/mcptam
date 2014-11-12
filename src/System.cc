@@ -75,6 +75,7 @@ System::System()
     GUI.RegisterCommand("ScaleMapDown", GUICommandCallBack, this);
     GUI.RegisterCommand("ExportMapToFile", GUICommandCallBack, this);
     GUI.RegisterCommand("ManualAddMKF", GUICommandCallBack, this);
+    GUI.RegisterCommand("CovNormAnalysis", GUICommandCallBack, this);
     
     // Add menu groupings and buttons to the GL window
     /* Menu
@@ -142,6 +143,7 @@ System::System()
     GUI.ParseLine("Menu.AddMenuButton Debug \"Scale Down\" ScaleMapDown Debug");
     GUI.ParseLine("Menu.AddMenuButton Debug \"Scale Up\" ScaleMapUp Debug");
     GUI.ParseLine("Menu.AddMenuButton Debug \"Add MKF\" ManualAddMKF Debug");
+    GUI.ParseLine("Menu.AddMenuButton Debug \"Cov Analysis\" CovNormAnalysis Debug");
 
     // Images Menu
     GUI.ParseLine("Menu.AddMenuButton Images \"< Back\" \"\" Root");
@@ -394,6 +396,12 @@ void System::GUICommandHandler(std::string command, std::string params)
       ROS_INFO_STREAM("> Forcing adding of next MKF");
       mpTracker->AddNext();
     }
+    return;
+  }
+  
+  if(command=="CovNormAnalysis")
+  {
+    mpTracker->DoCovAnalysis();
     return;
   }
   

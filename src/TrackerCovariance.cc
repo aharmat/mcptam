@@ -1,6 +1,8 @@
 #include <mcptam/TrackerCovariance.h>
 #include <mcptam/TrackerData.h>
 #include <mcptam/linear_solver_cholmod_custom.h>
+#include <TooN/Cholesky.h>
+#include <TooN/SVD.h>
 #include <unordered_set>
 
 //#include <Eigen/Core>
@@ -8,9 +10,14 @@
 
 #include <g2o/core/sparse_block_matrix.h>
 
-TrackerCovariance::TrackerCovariance()
+TrackerCovariance::TrackerCovariance(std::string fileName, std::vector<int> vAnalysisMeasNum, int nNumPredPoints)
 {
   mpLinearSolver = new g2o::LinearSolverCholmodCustom<Eigen::Matrix2d>(6);
+  mFileName = fileName;
+  mvAnalysisMeasNum = vAnalysisMeasNum;
+  mnNumPredPoints = nNumPredPoints;
+  
+  std::sort(mvAnalysisMeasNum.begin(), mvAnalysisMeasNum.end());
 }
 
 TrackerCovariance::~TrackerCovariance()
@@ -18,7 +25,7 @@ TrackerCovariance::~TrackerCovariance()
   delete mpLinearSolver;
 }
 
-TooN::Matrix<6> TrackerCovariance::CalcCovariance(TrackerDataPtrVector& vpAllMeas)
+TooN::Matrix<6> TrackerCovariance::CalcCovariance(TrackerDataPtrVector& vpAllMeas, bool bDoAnalysis)
 {
   int nMeasNum = vpAllMeas.size();
   int* blockIndices = new int[nMeasNum];
@@ -100,10 +107,127 @@ TooN::Matrix<6> TrackerCovariance::CalcCovariance(TrackerDataPtrVector& vpAllMea
   Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> result = J2.transpose() * Zinv_J2; 
   std::cerr<<"Solved cross cov system in "<<ros::Time::now() - solveStart<<" seconds"<<std::endl;
   
-  TooN::Matrix<6,6,double> m6Cov = TooN::wrapMatrix<6,6,double>(result.data());
+  TooN::Matrix<6,6,double> m6Info = TooN::wrapMatrix<6,6,double>(result.data());
+  TooN::Cholesky<6> cholInfo(m6Info);
+  TooN::Matrix<6,6,double> m6CovRet = cholInfo.get_inverse();
   
+  if(bDoAnalysis)
+  {
+    ROS_ASSERT(!mFileName.empty());
+    ROS_ASSERT(mvAnalysisMeasNum.size() > 0);
+    ROS_ASSERT(mnNumPredPoints > 1);
+    
+    std::vector<std::pair<int, double> > vData;
+    std::vector<TooN::Matrix<6> > vCov;
+    
+    // The TrackerDataPtrVector we were given for the measurements is already randomly shuffled, 
+    // so don't bother doing anything other than taking slices of J1_Sigma_J1t and J2 from 0 to
+    // analysis meas num
+    for(unsigned i=0; i < mvAnalysisMeasNum.size(); ++i)
+    {
+      int nAnalysisMeasNum = mvAnalysisMeasNum[i];
+      if(nAnalysisMeasNum > (int)vpAllMeas.size())
+        continue;
+      
+      int nEndBlockIdx = vpAllMeas[nAnalysisMeasNum-1]->mnBlockIdx;
+      
+      g2o::SparseBlockMatrix<Eigen::Matrix2d>* J1_Sigma_J1t_analysis = J1_Sigma_J1t->slice(0, nEndBlockIdx, 0, nEndBlockIdx, false);
+      Eigen::MatrixXd J2_analysis = J2.block(0,0,nAnalysisMeasNum*2,6);
+      Eigen::MatrixXd Zinv_J2_analysis(nAnalysisMeasNum*2, 6);
+      
+      mpLinearSolver->init();
+      mpLinearSolver->solve(*J1_Sigma_J1t_analysis, Zinv_J2_analysis.data(), J2_analysis.data());
+      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> result_analysis = J2_analysis.transpose() * Zinv_J2_analysis; 
+      TooN::Matrix<6,6,double> m6Info_analysis = TooN::wrapMatrix<6,6,double>(result_analysis.data());
+      
+      cholInfo.compute(m6Info_analysis);
+      
+      TooN::Matrix<6,6,double> m6Cov_analysis = cholInfo.get_inverse();
+      
+      vCov.push_back(m6Cov_analysis);
+      vData.push_back(std::make_pair(nAnalysisMeasNum, TooN::norm_fro(m6Cov_analysis)));
+    }
+    
+    int nNumPredPoints = mnNumPredPoints;
+    
+    if(nNumPredPoints > (int)vData.size())
+      nNumPredPoints = vData.size();
+      
+    TooN::Vector<> vX(nNumPredPoints);
+    TooN::Vector<> vY(nNumPredPoints);
+    
+    for(int i=0; i < nNumPredPoints; ++i)
+    {
+      vX[i] = log(vData[i].first);
+      vY[i] = log(vData[i].second);
+    }
+    
+    TooN::Vector<> vCoeff = PolyFit(vX, vY, 1);
+    double b = vCoeff[1];
+    double c = exp(vCoeff[0]);
+    
+    std::ofstream ofs(mFileName, std::ofstream::app);  // append to file rather than overwrite
+    ROS_ASSERT(ofs.is_open());
+    
+    ofs << "--------------------------" << std::endl;
+    ofs << "Used "<<nNumPredPoints<<" points for prediction"<<std::endl;
+    ofs << "MeasNum, CovNorm, PredCovNorm, DiffNorm" << std::endl;
+    
+    for(unsigned i=0; i < vData.size(); ++i)
+    {
+      double dPredicted = c * pow(vData[i].first, b);
+      double dRatio = dPredicted/vData[nNumPredPoints-1].second;
+      TooN::Matrix<6> m6CovPredicted = vCov[nNumPredPoints-1] * dRatio;
+      TooN::Matrix<6> m6Diff = m6CovPredicted - vCov[i];
+      
+      ofs << vData[i].first << ", " << vData[i].second << ", " << dPredicted << ", " << TooN::norm_fro(m6Diff) << std::endl;
+    }
+    
+    /*
+    ofs << "vX, vY" << std::endl;
+    for(int i=0; i < nNumPredPoints; ++i)
+    {
+      ofs << vX[i] <<", "<< vY[i] << std::endl;
+    }
+    */
+    
+    ofs.close();
+  }
   
-  //TooN::Matrix<6> m6Cov = TooN::Zeros;
   delete J1_Sigma_J1t; 
-  return m6Cov;
+  return m6CovRet;
+}
+
+TooN::Vector<> TrackerCovariance::PolyFit(TooN::Vector<> vX, TooN::Vector<> vY, int nDegree)
+{
+  TooN::Vector<> vEmpty(0);
+  
+  if(vX.size() != vY.size())
+    return vEmpty;
+    
+  if(nDegree < 1)
+    return vEmpty;
+    
+  int nDimensions = vX.size();
+  
+  if(nDimensions <= nDegree)
+    return vEmpty;
+    
+  // Uses the Vandermonde matrix method of fitting a least squares polynomial to a set of data
+  TooN::Matrix<> mxVandermondeTrans(nDegree+1,nDimensions);
+  
+  mxVandermondeTrans[0] = TooN::Ones(nDimensions);
+  mxVandermondeTrans[1] = vX;
+  
+  for(int i=2; i <= nDegree; ++i)
+  {
+    mxVandermondeTrans[i] = mxVandermondeTrans[i-1] * vX.as_diagonal();
+  }
+  
+  // create the SVD decomposition
+  TooN::SVD<> svd(mxVandermondeTrans.T());
+  
+  TooN::Vector<> a = svd.backsub(vY);
+  
+  return a;
 }

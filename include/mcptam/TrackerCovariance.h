@@ -48,13 +48,19 @@ namespace g2o{
 class TrackerCovariance
 {
 public:
-  TrackerCovariance();
+  TrackerCovariance( std::string fileName = "", std::vector<int> vAnalysisMeasNum = std::vector<int>(), int nNumPredPoints = 2);
   ~TrackerCovariance();
   
-  TooN::Matrix<6> CalcCovariance(TrackerDataPtrVector& vpAllMeas);
+  TooN::Matrix<6> CalcCovariance(TrackerDataPtrVector& vpAllMeas, bool bDoAnalysis);
 
 protected:
+
+  TooN::Vector<> PolyFit(TooN::Vector<> vX, TooN::Vector<> vY, int nDegree);
+
   g2o::LinearSolverCholmodCustom<Eigen::Matrix2d>* mpLinearSolver;
+  std::string mFileName;
+  std::vector<int> mvAnalysisMeasNum;
+  int mnNumPredPoints;
 };
 
 #endif

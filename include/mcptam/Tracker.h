@@ -211,6 +211,8 @@ public:
   
   bool NextTrial();
   
+  void DoCovAnalysis();
+  
   // Static members
   static double sdRotationEstimatorBlur; ///< Amount of blur when constructing SmallBlurryImage
   static bool sbUseRotationEstimator; ///< Should pre-estimate the rotation using SmallBlurryImages
@@ -401,7 +403,7 @@ protected:
   
   TooN::Matrix<6> CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationSets);
   
-  TooN::Matrix<6> CalcCovariance2(std::vector<TrackerDataPtrVector>& vIterationSets);
+  TooN::Matrix<6> CalcCovariance2(std::vector<TrackerDataPtrVector>& vIterationSets, double dCrossCovDur);
          
   
   MultiKeyFrame* mpCurrentMKF;       ///< The current processing space as a MultiKeyFrame
@@ -484,6 +486,8 @@ protected:
   bool mbTrialAdding;
   
   TrackerCovariance mTrackerCovariance;
+  ros::ServiceClient mPauseClient;
+  bool mbDoAnalysis;
   
 };
 
