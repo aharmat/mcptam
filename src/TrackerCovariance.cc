@@ -1,6 +1,7 @@
 #include <mcptam/TrackerCovariance.h>
 #include <mcptam/TrackerData.h>
 #include <mcptam/linear_solver_cholmod_custom.h>
+#include <mcptam/Sample.h>
 #include <TooN/Cholesky.h>
 #include <TooN/SVD.h>
 #include <unordered_set>
@@ -129,10 +130,12 @@ TooN::Matrix<6> TrackerCovariance::CalcCovariance(TrackerDataPtrVector& vpAllMea
       if(nAnalysisMeasNum > (int)vpAllMeas.size())
         continue;
       
-      int nEndBlockIdx = vpAllMeas[nAnalysisMeasNum-1]->mnBlockIdx;
+      int nStartMeasIdx = Sample::uniform(0, vpAllMeas.size()-nAnalysisMeasNum);
+      int nStartBlockIdx = vpAllMeas[nStartMeasIdx]->mnBlockIdx;
+      int nEndBlockIdx = vpAllMeas[nStartMeasIdx+nAnalysisMeasNum-1]->mnBlockIdx;
       
-      g2o::SparseBlockMatrix<Eigen::Matrix2d>* J1_Sigma_J1t_analysis = J1_Sigma_J1t->slice(0, nEndBlockIdx, 0, nEndBlockIdx, false);
-      Eigen::MatrixXd J2_analysis = J2.block(0,0,nAnalysisMeasNum*2,6);
+      g2o::SparseBlockMatrix<Eigen::Matrix2d>* J1_Sigma_J1t_analysis = J1_Sigma_J1t->slice(nStartBlockIdx, nEndBlockIdx, nStartBlockIdx, nEndBlockIdx, false);
+      Eigen::MatrixXd J2_analysis = J2.block(nStartMeasIdx*2,0,nAnalysisMeasNum*2,6);
       Eigen::MatrixXd Zinv_J2_analysis(nAnalysisMeasNum*2, 6);
       
       mpLinearSolver->init();
@@ -148,6 +151,7 @@ TooN::Matrix<6> TrackerCovariance::CalcCovariance(TrackerDataPtrVector& vpAllMea
       vData.push_back(std::make_pair(nAnalysisMeasNum, TooN::norm_fro(m6Cov_analysis)));
     }
     
+    /*
     int nNumPredPoints = mnNumPredPoints;
     
     if(nNumPredPoints > (int)vData.size())
@@ -165,22 +169,27 @@ TooN::Matrix<6> TrackerCovariance::CalcCovariance(TrackerDataPtrVector& vpAllMea
     TooN::Vector<> vCoeff = PolyFit(vX, vY, 1);
     double b = vCoeff[1];
     double c = exp(vCoeff[0]);
-    
+    */
     std::ofstream ofs(mFileName, std::ofstream::app);  // append to file rather than overwrite
     ROS_ASSERT(ofs.is_open());
     
     ofs << "--------------------------" << std::endl;
-    ofs << "Used "<<nNumPredPoints<<" points for prediction"<<std::endl;
-    ofs << "MeasNum, CovNorm, PredCovNorm, DiffNorm" << std::endl;
+    //ofs << "Used "<<nNumPredPoints<<" points for prediction"<<std::endl;
+    //ofs << "MeasNum, CovNorm, PredCovNorm, DiffNorm" << std::endl;
+    ofs << "MeasNum, CovNorm" << std::endl;
     
     for(unsigned i=0; i < vData.size(); ++i)
     {
+      /*
       double dPredicted = c * pow(vData[i].first, b);
       double dRatio = dPredicted/vData[nNumPredPoints-1].second;
       TooN::Matrix<6> m6CovPredicted = vCov[nNumPredPoints-1] * dRatio;
       TooN::Matrix<6> m6Diff = m6CovPredicted - vCov[i];
       
       ofs << vData[i].first << ", " << vData[i].second << ", " << dPredicted << ", " << TooN::norm_fro(m6Diff) << std::endl;
+      */
+      
+      ofs << vData[i].first << ", " << vData[i].second << std::endl;
     }
     
     /*

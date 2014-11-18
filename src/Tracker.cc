@@ -99,7 +99,16 @@ Tracker::Tracker(Map &map, MapMakerClientBase &mapmaker, TaylorCameraMap &camera
   , mmFixedPoses(poses)
   , mNodeHandlePrivate("~")
   , mpGLWindow(pWindow)
-  , mTrackerCovariance("cov_analysis.csv", {100,200,300,500,750,1000}, 3)
+  , mTrackerCovariance("cov_analysis.csv", {10,10,10,10,10,10,10,10,10,10,
+                                            20,20,20,20,20,20,20,20,20,20,
+                                            30,30,30,30,30,30,30,30,30,30,
+                                            50,50,50,50,50,50,50,50,50,50,
+                                            70,70,70,70,70,70,70,70,70,70,
+                                            100,100,100,100,100,
+                                            200,200,200,200,200,
+                                            300,300,300,
+                                            500,500,500,
+                                            750,1000}, 3)
 {
   ROS_DEBUG("Tracker: In constructor");
   
@@ -1256,10 +1265,10 @@ void Tracker::TrackMap()
     std_srvs::Empty srv;
     mPauseClient.call(srv);
     // First do the calculation with limited cross covariance computation time
-    mm6PoseCovarianceExperimental = CalcCovariance2(mvIterationSets, Tracker::sdCrossCovDur);
+    //mm6PoseCovarianceExperimental = CalcCovariance2(mvIterationSets, Tracker::sdCrossCovDur);
     // Then repeat with significantly more time
-    //mm6PoseCovarianceExperimental = CalcCovariance2(mvIterationSets, 30);
-    mPauseClient.call(srv);
+    mm6PoseCovarianceExperimental = CalcCovariance2(mvIterationSets, 60);
+    //mPauseClient.call(srv);
   }
   
   //std::cout<<"mm6PoseCovarianceExperimental: "<<std::endl<<mm6PoseCovarianceExperimental<<std::endl;
@@ -1565,14 +1574,22 @@ Matrix<6> Tracker::CalcCovariance2(std::vector<TrackerDataPtrVector>& vIteration
         continue;
       
       vpAllMeas.push_back(vIterationSets[i][j]);
-      spParticipatingPoints.insert(&td.mPoint);
+      //spParticipatingPoints.insert(&td.mPoint);
     }
+  }
+  
+  std::random_shuffle(vpAllMeas.begin(), vpAllMeas.end());
+  //vpAllMeas.resize(100);
+  
+  for(unsigned i=0; i < vpAllMeas.size(); ++i)
+  {
+    spParticipatingPoints.insert(&vpAllMeas[i]->mPoint);
   }
   
   // Update as many cross covariances as possible within the given time budget
   std::cerr<<"Calling UpdateCrossCovariances"<<std::endl;
   ros::Time updateStart = ros::Time::now();
-  mMapMaker.UpdateCrossCovariances(spParticipatingPoints, ros::Duration(dCrossCovDur));
+  mMapMaker.UpdateCrossCovariances(spParticipatingPoints, ros::Duration(dCrossCovDur), 0.1);
   std::cerr<<"Took "<<ros::Time::now() - updateStart<<" seconds to update cross covariances"<<std::endl;
   
   TooN::Matrix<6> m6Cov = mTrackerCovariance.CalcCovariance(vpAllMeas, true);

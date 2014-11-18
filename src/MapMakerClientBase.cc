@@ -546,7 +546,7 @@ bool CompCrossCov(const std::pair<double, PointCrossCov*>& cov1, const std::pair
   return cov1.first > cov2.first;
 }
 
-void MapMakerClientBase::UpdateCrossCovariances(std::unordered_set<MapPoint*> spParticipatingPoints, ros::Duration allowedDur)
+void MapMakerClientBase::UpdateCrossCovariances(std::unordered_set<MapPoint*> spParticipatingPoints, ros::Duration allowedDur, double dPriorityThresh)
 {
   boost::mutex::scoped_lock lock(mCovMutex);
   CovHelper& helper = mvCovHelpers[mnCurrCov];
@@ -559,6 +559,8 @@ void MapMakerClientBase::UpdateCrossCovariances(std::unordered_set<MapPoint*> sp
     
   std::vector<std::pair<double, PointCrossCov*> > vCrossCov;
   vCrossCov.reserve(spParticipatingPoints.size() * spParticipatingPoints.size() * 0.5);
+  
+  int nNumSkipped = 0;
   
   std::cerr<<"About to build vCrossCov"<<std::endl;
   ros::Time startBuild = ros::Time::now();
@@ -581,9 +583,13 @@ void MapMakerClientBase::UpdateCrossCovariances(std::unordered_set<MapPoint*> sp
         ROS_ASSERT(pCrossCov->mdPriority >= 0);
         
         // Don't bother adding anything with priority zero since it doesn't need to be updated
-        if(pCrossCov->mdPriority > 0)
+        if(pCrossCov->mdPriority > dPriorityThresh)
         {
           vCrossCov.push_back(std::make_pair(pCrossCov->mdPriority, pCrossCov));
+        }
+        else
+        {
+          ++nNumSkipped;
         }
       }
       else
@@ -623,6 +629,7 @@ void MapMakerClientBase::UpdateCrossCovariances(std::unordered_set<MapPoint*> sp
   std::random_shuffle(vCrossCov.begin(), vCrossCov.end());
   std::cerr<<"Done shuffling, took "<<ros::WallTime::now() - shuffleStart <<" seconds"<<std::endl;
   
+  ros::Duration crossCovDuration(0);
   ros::Time startTime = ros::Time::now();
   
   int nNumProcessed = 0;
@@ -649,7 +656,9 @@ void MapMakerClientBase::UpdateCrossCovariances(std::unordered_set<MapPoint*> sp
     int nPoint2_BundleID = helper.mmPoint_BundleID[&pCrossCov->mPoint2]; 
   
     TooN::Matrix<3> m3Cov = TooN::Zeros;
+    ros::Time crossCovStartTime = ros::Time::now();
     bool bSuccess = helper.mpCovBundle->GetPointsCrossCov(nPoint1_BundleID, nPoint2_BundleID, m3Cov);
+    crossCovDuration += (ros::Time::now() - crossCovStartTime);
     
     if(bSuccess)
     {
@@ -658,7 +667,9 @@ void MapMakerClientBase::UpdateCrossCovariances(std::unordered_set<MapPoint*> sp
   }
   
   std::cerr<<"Processed "<<nNumProcessed<<" cross cov in alotted time of "<<allowedDur<<" seconds"<<std::endl;
-  
+  std::cerr<<"Actually spent "<<crossCovDuration<<" on GetPointsCrossCov()"<<std::endl;
+  std::cerr<<"Skipped "<<nNumSkipped<<" cross cov whose priority was too small"<<std::endl;
+  std::cerr<<"There are "<<nNumSkipped+nNumProcessed<<" cross cov ready out of a total of "<<vCrossCov.size()+nNumSkipped<<std::endl;
 }
 
 void MapMakerClientBase::ComputeSelectedPointsCrossCov()

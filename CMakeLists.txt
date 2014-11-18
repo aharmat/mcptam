@@ -52,7 +52,7 @@ add_executable(mcptam src/Main.cc src/GLWindow2.cc src/GLWindowMenu.cc src/Video
                       src/PatchFinder.cc src/Relocaliser.cc src/Tracker.cc src/KeyFrameViewer.cc 
                       src/BundleAdjusterBase.cc src/MiniPatch.cc src/BundleAdjusterMulti.cc src/ChainBundle.cc
                       src/ChainBundleIncrementalCovariance.cc src/sparse_optimizer_incremental_covariance.cc
-                      src/TrackerCovariance.cc)
+                      src/TrackerCovariance.cc src/Sample.cc)
 add_dependencies(mcptam ${PROJECT_NAME}_gencpp)
 target_link_libraries(mcptam ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OpenCV_LIBS} ${OPENGL_gl_LIBRARY} ${GVars3_LIBRARIES}
                              ${G2O_STUFF_LIBRARY} ${G2O_CORE_LIBRARY} ${G2O_SOLVER_CHOLMOD}                             )
