@@ -140,7 +140,9 @@ public:
   TooN::Matrix<6> GetTrackerCovFull(MultiKeyFrame* pTrackerMKF);
   
   // testing
-  void UpdateCrossCovariances(std::unordered_set<MapPoint*> spParticipatingPoints, ros::Duration allowedDur, double dPriorityThresh=0);
+  void UpdateCrossCovariances(std::unordered_set<MapPoint*>& spParticipatingPoints, ros::Duration allowedDur, double dPriorityThresh=0);
+  void UpdateCrossCovariances2(std::unordered_set<MapPoint*> spParticipatingPoints, ros::Duration allowedDur, double dPriorityThresh=0);
+  
   
   /// Checks to see if the given KeyFrame is a candidate to be added to the Map
   /** @param kf The KeyFrame to check

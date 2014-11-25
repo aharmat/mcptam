@@ -546,7 +546,7 @@ bool CompCrossCov(const std::pair<double, PointCrossCov*>& cov1, const std::pair
   return cov1.first > cov2.first;
 }
 
-void MapMakerClientBase::UpdateCrossCovariances(std::unordered_set<MapPoint*> spParticipatingPoints, ros::Duration allowedDur, double dPriorityThresh)
+void MapMakerClientBase::UpdateCrossCovariances2(std::unordered_set<MapPoint*> spParticipatingPoints, ros::Duration allowedDur, double dPriorityThresh)
 {
   boost::mutex::scoped_lock lock(mCovMutex);
   CovHelper& helper = mvCovHelpers[mnCurrCov];
@@ -558,7 +558,7 @@ void MapMakerClientBase::UpdateCrossCovariances(std::unordered_set<MapPoint*> sp
   }
     
   std::vector<std::pair<double, PointCrossCov*> > vCrossCov;
-  vCrossCov.reserve(spParticipatingPoints.size() * spParticipatingPoints.size() * 0.5);
+  vCrossCov.reserve(spParticipatingPoints.size() * spParticipatingPoints.size());
   
   int nNumSkipped = 0;
   
@@ -670,6 +670,113 @@ void MapMakerClientBase::UpdateCrossCovariances(std::unordered_set<MapPoint*> sp
   std::cerr<<"Actually spent "<<crossCovDuration<<" on GetPointsCrossCov()"<<std::endl;
   std::cerr<<"Skipped "<<nNumSkipped<<" cross cov whose priority was too small"<<std::endl;
   std::cerr<<"There are "<<nNumSkipped+nNumProcessed<<" cross cov ready out of a total of "<<vCrossCov.size()+nNumSkipped<<std::endl;
+}
+
+void MapMakerClientBase::UpdateCrossCovariances(std::unordered_set<MapPoint*>& spParticipatingPoints, ros::Duration allowedDur, double dPriorityThresh)
+{
+  boost::mutex::scoped_lock lock(mCovMutex);
+  CovHelper& helper = mvCovHelpers[mnCurrCov];
+  
+  if(helper.mpCovBundle == NULL)
+  {
+    std::cerr<<"No CovBundle found in helper!"<<std::endl;
+    return;
+  }
+  
+  std::unordered_set<MapPoint*> spTempPoints;
+  
+  // Remove any points from the set of participating points that aren't found in the helper's cov bundle
+  for(std::unordered_set<MapPoint*>::iterator point_it = spParticipatingPoints.begin(); point_it != spParticipatingPoints.end(); ++point_it)
+  {
+    if(helper.mmPoint_BundleID.count(*point_it))
+    {
+      spTempPoints.insert(*point_it);
+    }
+  }
+  
+  spParticipatingPoints.swap(spTempPoints);
+  
+  std::unordered_set<MapPoint*> spGoodPoints;
+  std::unordered_set<MapPoint*> spBadPoints;
+  
+  bool bCheckDur = allowedDur > ros::Duration(0);
+  
+  ros::Duration crossCovDuration(0);
+  ros::Time startTime = ros::Time::now();
+  
+  for(std::unordered_set<MapPoint*>::iterator point1_it = spParticipatingPoints.begin(); point1_it != spParticipatingPoints.end(); ++point1_it)
+  {    
+    MapPoint* pPoint1 = *point1_it;
+    bool bOutOfTime = false;
+    
+    for(std::unordered_set<MapPoint*>::iterator point2_it = spParticipatingPoints.begin(); point2_it != point1_it; ++point2_it)
+    {
+      if(bCheckDur && ros::Time::now() - startTime > allowedDur)
+      {
+        bOutOfTime = true;
+        break;
+      }
+      
+      MapPoint* pPoint2 = *point2_it;
+      
+      CrossCovPtrMap::iterator x_it1 = pPoint1->mmpCrossCov.find(pPoint2);
+      PointCrossCov* pCrossCov;
+      if(x_it1 != pPoint1->mmpCrossCov.end())
+      {
+        pCrossCov = x_it1->second;
+        ROS_ASSERT(pCrossCov->mdPriority >= 0);
+        
+        // Don't bother adding anything with priority zero since it doesn't need to be updated
+        if(pCrossCov->mdPriority < dPriorityThresh)
+          continue;
+      }
+      else
+      {
+        pCrossCov = new PointCrossCov(*pPoint1, *pPoint2);
+        
+        pPoint1->AddCrossCov(pPoint2, pCrossCov);
+        pPoint2->AddCrossCov(pPoint1, pCrossCov);
+      }
+      
+      int nPoint1_BundleID = helper.mmPoint_BundleID[pPoint1];
+      int nPoint2_BundleID = helper.mmPoint_BundleID[pPoint2]; 
+    
+      TooN::Matrix<3> m3Cov = TooN::Zeros;
+      ros::Time crossCovStartTime = ros::Time::now();
+      bool bSuccess = helper.mpCovBundle->GetPointsCrossCov(nPoint1_BundleID, nPoint2_BundleID, m3Cov);
+      crossCovDuration += (ros::Time::now() - crossCovStartTime);
+      
+      if(bSuccess)
+      {
+        pCrossCov->SetCrossCov(m3Cov);
+      }
+      else
+      {
+        spBadPoints.insert(pPoint1);
+        spBadPoints.insert(pPoint2);
+      }
+    }
+    
+    // Check if overtime
+    if(bOutOfTime)
+      break;
+    
+    spGoodPoints.insert(pPoint1);
+  }
+  
+  spTempPoints.clear();
+  
+  for(std::unordered_set<MapPoint*>::iterator point_it = spGoodPoints.begin(); point_it != spGoodPoints.end(); ++point_it)
+  {
+    if(spBadPoints.count(*point_it))
+      continue;
+      
+    spTempPoints.insert(*point_it);
+  }
+  
+  spParticipatingPoints.swap(spTempPoints);
+  // Now, spParticipatingPoints only contains points for which the cross covariance has
+  // been updated for all points in the set
 }
 
 void MapMakerClientBase::ComputeSelectedPointsCrossCov()

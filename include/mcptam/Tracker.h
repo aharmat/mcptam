@@ -401,9 +401,7 @@ protected:
   
   double CalcMAD();
   
-  TooN::Matrix<6> CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationSets);
-  
-  TooN::Matrix<6> CalcCovariance2(std::vector<TrackerDataPtrVector>& vIterationSets, double dCrossCovDur);
+  TooN::Matrix<6> CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationSets, bool bFull, std::string fileName=std::string());
          
   
   MultiKeyFrame* mpCurrentMKF;       ///< The current processing space as a MultiKeyFrame

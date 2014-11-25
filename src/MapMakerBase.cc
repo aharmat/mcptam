@@ -395,7 +395,7 @@ void MapMakerBase::PublishMapPoints()
   pointMsg->height = 1;
   pointMsg->is_dense = false;
   
-#if ROS_VERSION_MINIMUM(1, 9, 54)   // Hydro or above, uses new PCL library
+#if ROS_VERSION_MINIMUM(1, 9, 56)   // Hydro or above, uses new PCL library
   pointMsg->header.stamp = nowTime.toNSec();
 #else
   pointMsg->header.stamp = nowTime;
