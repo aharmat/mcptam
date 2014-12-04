@@ -236,6 +236,13 @@ class VertexRelPoint : public g2o::BaseVertex<3, TooN::Vector<3> >
 
     virtual void oplusImpl(const double* update)
     {
+      // Use this for XYZ update parameterization
+      // Make sure the same thing is done in EdgeChainMeas::linearizeOplus
+      // The logic here is that the update in XYZ parameterization can be simply added
+      // to the point estimate rather than converting from bearing+inverse depth
+      //_estimate += TooN::makeVector(update[0], update[1], update[2]);
+      //return;
+      
       // The update is specified in a coordinate frame where the _estimate
       // vector is first rotated to align with the z axis. This is done because
       // then we don't have to deal with singularities arising from
@@ -243,8 +250,9 @@ class VertexRelPoint : public g2o::BaseVertex<3, TooN::Vector<3> >
       // that the size of the update vector is small enough to stay away from
       // these areas, which should be the case)
       
-      TooN::Vector<3> v3PointInCamDir = _estimate;
-      TooN::normalize(v3PointInCamDir);
+      double dDistBefore = TooN::norm(_estimate);
+      double dRhoBefore = 1.0/dDistBefore;
+      TooN::Vector<3> v3PointInCamDir = _estimate * dRhoBefore;
       
       // Get the axis of rotation between the the point direction and the z axis
       TooN::Vector<3> v3Axis = v3PointInCamDir ^ TooN::makeVector(0,0,1);
@@ -261,16 +269,15 @@ class VertexRelPoint : public g2o::BaseVertex<3, TooN::Vector<3> >
       double d_rho = update[2];   // displacement along z axis
       
       // To update the estimate, first rotate it to align with z axis, apply rotation update, rotate back, then apply scaling update
-      _estimate = (1/(1+d_rho)) * (Rp.inverse() * TooN::SO3<>::exp(TooN::makeVector(d_beta,d_alpha,0)) * Rp * _estimate);
+      _estimate = (1/(dRhoBefore + d_rho)) * (Rp.inverse() * TooN::SO3<>::exp(TooN::makeVector(d_beta,d_alpha,0)) * Rp * v3PointInCamDir);
       
       // If the point is poorly constrained, the estimate can run away easily, making it hard the optimize properly
       // when the next round of optimization is done (potentially with more/better constraints)
-      double dDist = TooN::norm(_estimate);
-      if(dDist > 1e5)
-        _estimate *= 1e5/dDist;
-      if(dDist < 1e-5)
-        _estimate *= 1e-5/dDist;
-
+      double dDistAfter = TooN::norm(_estimate);
+      if(dDistAfter > 1e5)
+        _estimate *= 1e5/dDistAfter;
+      if(dDistAfter < 1e-5)
+        _estimate *= 1e-5/dDistAfter;
     }
     
     // The current point estimate transformed into global cartesian coordinates
@@ -559,8 +566,9 @@ class EdgeChainMeas : public g2o::BaseMultiEdge<2, TooN::Vector<2> >
           
         // The following computations are the same as in VertexRelPoint::oplusImpl
         TooN::Vector<3> v3PointInCam = pPointVertex->estimate();
-        TooN::Vector<3> v3PointInCamDir = v3PointInCam;
-        TooN::normalize(v3PointInCamDir);
+        double dLength = TooN::norm(v3PointInCam);
+        double dRho = 1.0/dLength;
+        TooN::Vector<3> v3PointInCamDir = v3PointInCam * dRho;
         
         TooN::Vector<3> v3Axis = v3PointInCamDir ^ TooN::makeVector(0,0,1);
         double angle = asin(TooN::norm(v3Axis));
@@ -582,7 +590,13 @@ class EdgeChainMeas : public g2o::BaseMultiEdge<2, TooN::Vector<2> >
         m3Jac.T()[1] = Rp.inverse() * (TooN::SO3<>::generator_field(1,Rp*v3PointInCam));
         
         // d_rho, change in inverse depth
-        m3Jac.T()[2] = -1*v3PointInCam;
+        m3Jac.T()[2] = -1*v3PointInCam / dRho;
+        
+        // If you want to use XYZ parameterization for the updates, use this instead
+        // Make sure that the same thing is done in VertexRelPoint::oplusImpl
+        // The logic behind this is that the perturbations in the XYZ frame are simply the unit vectors
+        // rather than the bearing+inverse depth perturbations that we computed in m3Jac above
+        // m3Jac = TooN::Identity;
         
         // At this point, we have 3 motion vectors for each of the 3 perturbation dimensions. However,
         // they are defined in the point's source frame. We are interested in the 3 motion vectors in the
