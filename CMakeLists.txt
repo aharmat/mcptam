@@ -15,6 +15,7 @@ find_package(Boost REQUIRED COMPONENTS system thread)
 find_package(SUITESPARSE REQUIRED)
 find_package(CVD REQUIRED)
 find_package(OpenGL REQUIRED)
+find_package(OpenCV REQUIRED)
 find_package(GLUT REQUIRED)
 find_package(G2O REQUIRED)
 find_package(GVars3 REQUIRED)
@@ -22,6 +23,7 @@ find_package(OpenCV REQUIRED)
 
 include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${SUITESPARSE_INCLUDE_DIRS} ${CVD_INCLUDE_DIR} 
                     ${GVars3_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS})
+
 link_directories(${catkin_LIBRARY_DIRS} ${Boost_LIBRARY_DIRS} ${SUITESPARSE_LIBRARY_DIRS} ${OpenCV_LIB_DIR})
 
 add_message_files(

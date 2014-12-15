@@ -63,6 +63,7 @@ public:
     Params();
     TooN::Matrix<2> m2Warp();
     TooN::Vector<2> v2Pos;
+    TooN::Vector<3> v3Pos;
     TooN::Vector<2> v2Angles;
     double dMean;
     double dGain;

@@ -76,6 +76,9 @@ public:
   TooN::Matrix<2> GetSteps(std::vector<CalibGridCorner> &vgc); 
   TooN::Matrix<2> mm2InheritedSteps;
   
+  TooN::Matrix<2,3> GetSteps3D(std::vector<CalibGridCorner> &vgc); 
+  TooN::Matrix<2,3> mm23InheritedSteps;
+  
   void Draw();
   
   double ExpansionPotential();

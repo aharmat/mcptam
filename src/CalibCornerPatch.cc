@@ -244,6 +244,7 @@ CalibCornerPatch::Params::Params()
   v2Angles[1] = M_PI / 2.0;
   dMean = 0.0;
   dGain = 1.0;
+  v3Pos = Zeros;
 }
 
 Matrix<2> CalibCornerPatch::Params::m2Warp()
