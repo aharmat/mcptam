@@ -182,21 +182,23 @@ public:
 class PointCrossCov
 {
 public:
-  PointCrossCov(MapPoint& point1, MapPoint& point2);
+  PointCrossCov(MapPoint& pointRow, MapPoint& pointCol);
   
   // DEBUG
-  ~PointCrossCov(){ ROS_BREAK(); }
+  ~PointCrossCov()
+  { 
+    //ROS_BREAK(); 
+  }
   
-  // Row: point1, Col: point2
-  void SetCrossCov(const TooN::Matrix<3>& m3CrossCov);
+  void SetCrossCov(MapPoint* pPointRow, const TooN::Matrix<3>& m3CrossCov);
 
   /// point: the querying point
-  TooN::Matrix<3> GetCrossCov(MapPoint* pPoint);
+  TooN::Matrix<3> GetCrossCov(MapPoint* pPointRow);
   
   void EraseLinks();
   
-  MapPoint& mPoint1;
-  MapPoint& mPoint2;
+  MapPoint& mPointRow;
+  MapPoint& mPointCol;
   
   double mdPriority;
 

@@ -208,7 +208,7 @@ void Map::EmptyTrash()
     if(point.mnUsing == 0 && point.mMMData.spMeasurementKFs.size() == 0)
     {
       //BAD: put this back after testing!!!
-      //point.EraseAllCrossCov();
+      point.EraseAllCrossCov();
       delete (&point);
       mlpPointsTrash.erase(point_it++);
     }

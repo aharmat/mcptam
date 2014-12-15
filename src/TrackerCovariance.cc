@@ -11,9 +11,27 @@
 
 #include <g2o/core/sparse_block_matrix.h>
 
-int TrackerCovariance::snNumFitPoints = 3;
+
+Eigen::MatrixXd TooN2Eigen(TooN::Matrix<> matrixIn)
+{
+  Eigen::MatrixXd matrixOut(matrixIn.num_rows(), matrixIn.num_cols());
+  
+  for(int r=0; r < matrixIn.num_rows(); ++r)
+  {
+    for(int c=0; c < matrixIn.num_cols(); ++c)
+    {
+      matrixOut(r,c) = matrixIn(r,c);
+    }
+  }
+  
+  return matrixOut;
+}
+
+
+
+int TrackerCovariance::snNumFitPoints = 21;
 int TrackerCovariance::snNumEvalPerMeasNum = 10;
-int TrackerCovariance::snNumRandomFits = 50;
+int TrackerCovariance::snNumRandomFits = 100;
 int TrackerCovariance::snMinMeasNum = 10;
 
 TrackerCovariance::TrackerCovariance()
@@ -26,7 +44,7 @@ TrackerCovariance::~TrackerCovariance()
   delete mpLinearSolver;
 }
 
-void TrackerCovariance::CreateMatrices(TrackerDataPtrVector& vpMeas, g2o::SparseBlockMatrix<Eigen::Matrix2d>* J1_Sigma_J1t, Eigen::MatrixXd* J2)
+void TrackerCovariance::CreateMatrices(TrackerDataPtrVector& vpMeas, g2o::SparseBlockMatrix<Eigen::Matrix2d>*& J1_Sigma_J1t, Eigen::MatrixXd*& J2)
 {
   int nMeasNum = vpMeas.size();
   int* blockIndices = new int[nMeasNum];
@@ -89,6 +107,164 @@ void TrackerCovariance::CreateMatrices(TrackerDataPtrVector& vpMeas, g2o::Sparse
   }
 }
 
+void TrackerCovariance::CreateMatrices(TrackerDataPtrVector& vpDenseMeas, TrackerDataPtrVector& vpSparseMeas, std::vector<int> vDenseContent, 
+                                        std::vector<g2o::SparseBlockMatrix<Eigen::Matrix2d>*>& vJ1_Sigma_J1t, Eigen::MatrixXd*& J2, bool bFillNonexistant)
+{
+  int nDenseNum = vpDenseMeas.size();
+  int nMeasNum = vpDenseMeas.size() + vpSparseMeas.size();
+  int* blockIndices = new int[nMeasNum];
+  
+  for(int i=0; i < nMeasNum; ++i)
+  {
+    if(i < nDenseNum)
+      vpDenseMeas[i]->mnBlockIdx = i;
+    else
+      vpSparseMeas[i-nDenseNum]->mnBlockIdx = i;
+    
+    blockIndices[i] = (i+1)*2;
+  }
+  
+  for(unsigned i=0; i <vDenseContent.size(); ++i)
+  {
+    vJ1_Sigma_J1t.push_back(new g2o::SparseBlockMatrix<Eigen::Matrix2d>(blockIndices, blockIndices, nMeasNum, nMeasNum));
+  }
+  delete[] blockIndices;
+  
+  J2 = new Eigen::MatrixXd(nMeasNum*2, 6);
+  
+  // First do the dense measurements. The off diagonal elements will be included
+  // depending on the content of vDenseContent
+  TooN::Matrix<3> m3TempCov;
+  TooN::Matrix<3> m3CrossCovSum = TooN::Zeros;
+  int nCrossCovNum = 0;
+  for(unsigned i=0; i < vpDenseMeas.size(); ++i)
+  {
+    TrackerData &td = *vpDenseMeas[i];
+    
+    // Diagonal element
+    Eigen::Matrix2d m2PixelCov = Eigen::Matrix2d::Identity() * (1.0/td.mdSqrtInvNoise);
+    
+    // NOTE: Eigen's default ordering is column major. TooN's is row major. I don't know if any of 
+    // g2o's internals assume column major ordering when working with Eigen matrices, so I don't want
+    // to set that.     
+    Eigen::Matrix<double, 2, 3, Eigen::RowMajor> m23Jac = Eigen::Map<Eigen::Matrix<double, 2, 3, Eigen::RowMajor> >(td.mm23Jacobian.get_data_ptr());
+    Eigen::Matrix<double, 3, 3, Eigen::RowMajor> m3WorldCov = Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> >(td.mPoint.mm3WorldCov.get_data_ptr());
+    Eigen::Matrix2d m2Cov = m23Jac * m3WorldCov * m23Jac.transpose() + m2PixelCov;
+    
+    for(unsigned k=0; k < vJ1_Sigma_J1t.size(); ++k)
+    {
+      Eigen::Matrix2d* pm2Diag = vJ1_Sigma_J1t[k]->block(td.mnBlockIdx, td.mnBlockIdx, true);
+      *pm2Diag = m2Cov; 
+    }
+    
+    Eigen::Matrix<double, 2, 6, Eigen::RowMajor> m26Jac = Eigen::Map<Eigen::Matrix<double, 2, 6, Eigen::RowMajor> >(td.mm26Jacobian.get_data_ptr());
+    J2->block(i*2, 0, 2, 6) = m26Jac;
+    
+    // Off diagonal elements
+    for(unsigned j=i+1; j < vpDenseMeas.size(); ++j)
+    {
+      TrackerData& td_other = *vpDenseMeas[j];
+    
+      // They refer to the same point
+      if(&td.mPoint == &td_other.mPoint)
+      {
+        m3TempCov = td.mPoint.mm3WorldCov;
+      }
+      else  // They refer to different points
+      {
+        // Cross cov with other 
+        bool bExists = td.mPoint.CrossCov(&td_other.mPoint, m3TempCov);
+        ROS_ASSERT(bExists);
+        
+        m3CrossCovSum += m3TempCov;
+        nCrossCovNum++;
+      }
+      
+      Eigen::Matrix<double, 2, 3, Eigen::RowMajor> m23OtherJac = Eigen::Map<Eigen::Matrix<double, 2, 3, Eigen::RowMajor> >(td_other.mm23Jacobian.get_data_ptr());
+      
+      for(unsigned k=0; k < vJ1_Sigma_J1t.size(); ++k)
+      {
+        int nCutoff = vDenseContent[k];
+        if((int)j > nCutoff)
+        {
+          if(!bFillNonexistant)
+            continue;
+          else
+          {
+            if(nCrossCovNum > 0)
+              m3TempCov = m3CrossCovSum / nCrossCovNum;
+            else
+              m3TempCov = TooN::Zeros;
+          }
+        }
+          
+        Eigen::Matrix<double, 3, 3, Eigen::RowMajor> m3CrossCov = Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> >(m3TempCov.get_data_ptr());
+        Eigen::Matrix2d m2CrossCov = m23Jac * m3CrossCov * m23OtherJac.transpose();
+        
+        Eigen::Matrix2d* pm2OffDiag = vJ1_Sigma_J1t[k]->block(td.mnBlockIdx, td_other.mnBlockIdx, true);
+        *pm2OffDiag = m2CrossCov; 
+      }
+    }
+  }
+  
+  // Now do the sparse measurements
+  for(unsigned i=0; i < vpSparseMeas.size(); ++i)
+  {
+    TrackerData &td = *vpSparseMeas[i];
+    
+    // Diagonal element
+    Eigen::Matrix2d m2PixelCov = Eigen::Matrix2d::Identity() * (1.0/td.mdSqrtInvNoise);
+    
+    // NOTE: Eigen's default ordering is column major. TooN's is row major. I don't know if any of 
+    // g2o's internals assume column major ordering when working with Eigen matrices, so I don't want
+    // to set that.     
+    Eigen::Matrix<double, 2, 3, Eigen::RowMajor> m23Jac = Eigen::Map<Eigen::Matrix<double, 2, 3, Eigen::RowMajor> >(td.mm23Jacobian.get_data_ptr());
+    Eigen::Matrix<double, 3, 3, Eigen::RowMajor> m3WorldCov = Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> >(td.mPoint.mm3WorldCov.get_data_ptr());
+    Eigen::Matrix2d m2Cov = m23Jac * m3WorldCov * m23Jac.transpose() + m2PixelCov;
+    
+    for(unsigned k=0; k < vJ1_Sigma_J1t.size(); ++k)
+    {
+      Eigen::Matrix2d* pm2Diag = vJ1_Sigma_J1t[k]->block(td.mnBlockIdx, td.mnBlockIdx, true);
+      *pm2Diag = m2Cov; 
+    }
+    
+    Eigen::Matrix<double, 2, 6, Eigen::RowMajor> m26Jac = Eigen::Map<Eigen::Matrix<double, 2, 6, Eigen::RowMajor> >(td.mm26Jacobian.get_data_ptr());
+    J2->block((nDenseNum+i)*2, 0, 2, 6) = m26Jac;
+    
+    // Off diagonal elements, only included if bFillNonexistant true
+    if(bFillNonexistant)
+    {
+      for(unsigned j=i+1; j < vpSparseMeas.size(); ++j)
+      {
+        TrackerData& td_other = *vpSparseMeas[j];
+      
+        // They refer to the same point
+        if(&td.mPoint == &td_other.mPoint)
+        {
+          m3TempCov = td.mPoint.mm3WorldCov;
+        }
+        else  // They refer to different points
+        {
+          if(nCrossCovNum > 0)
+            m3TempCov = m3CrossCovSum / nCrossCovNum;
+          else
+            m3TempCov = TooN::Zeros;
+        }
+        
+        Eigen::Matrix<double, 3, 3, Eigen::RowMajor> m3CrossCov = Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> >(m3TempCov.get_data_ptr());
+        Eigen::Matrix<double, 2, 3, Eigen::RowMajor> m23OtherJac = Eigen::Map<Eigen::Matrix<double, 2, 3, Eigen::RowMajor> >(td_other.mm23Jacobian.get_data_ptr());
+        Eigen::Matrix2d m2CrossCov = m23Jac * m3CrossCov * m23OtherJac.transpose();
+      
+        for(unsigned k=0; k < vJ1_Sigma_J1t.size(); ++k)
+        {
+          Eigen::Matrix2d* pm2OffDiag = vJ1_Sigma_J1t[k]->block(td.mnBlockIdx, td_other.mnBlockIdx, true);
+          *pm2OffDiag = m2CrossCov; 
+        }
+      }
+    }
+  }
+}
+
 TooN::Matrix<6> TrackerCovariance::CalcCovarianceFull(TrackerDataPtrVector& vpAllMeas)
 {
   g2o::SparseBlockMatrix<Eigen::Matrix2d>* J1_Sigma_J1t;
@@ -121,8 +297,64 @@ TooN::Matrix<6> TrackerCovariance::CalcCovarianceFull(TrackerDataPtrVector& vpAl
   return m6CovRet;
 }
 
+void TrackerCovariance::SavePointCovMatrix(std::string fileName, std::unordered_set<MapPoint*> spParticipatingPoints)
+{
+  // put into vector for easier handling
+  std::vector<std::pair<int,MapPoint*> > vpPoints;
+  vpPoints.reserve(spParticipatingPoints.size());
+  
+  for(std::unordered_set<MapPoint*>::iterator point_it = spParticipatingPoints.begin(); point_it != spParticipatingPoints.end(); ++point_it)
+  {
+    MapPoint* pPoint = *point_it;
+    vpPoints.push_back(std::make_pair(pPoint->mnID, pPoint));
+  }
+  
+  std::sort(vpPoints.begin(), vpPoints.end());
+  
+  int nPointNum = vpPoints.size();
+  int* blockIndices = new int[nPointNum];
+  
+  for(int i=0; i < nPointNum; ++i)
+  {
+    blockIndices[i] = (i+1)*3;
+  }
+  
+  g2o::SparseBlockMatrix<Eigen::Matrix3d> sigma(blockIndices, blockIndices, nPointNum, nPointNum);
+  delete[] blockIndices;
+  
+  for(unsigned i=0; i < vpPoints.size(); ++i)
+  {
+    MapPoint* pPoint1 = vpPoints[i].second;
+    Eigen::Matrix3d* pm3Diag = sigma.block(i, i, true);
+    Eigen::Matrix<double, 3, 3, Eigen::RowMajor> m3WorldCov = Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> >(pPoint1->mm3WorldCov.get_data_ptr());
+    *pm3Diag = m3WorldCov;
+    //*pm3Diag = TooN2Eigen(pPoint1->mm3WorldCov);
+    
+    for(unsigned j=i+1; j < vpPoints.size(); ++j)
+    {
+      MapPoint* pPoint2 = vpPoints[j].second;
+      TooN::Matrix<3> m3TempCov;
+      bool bExists = pPoint1->CrossCov(pPoint2, m3TempCov);
+      ROS_ASSERT(bExists);
+      
+      Eigen::Matrix3d* pm3OffDiag = sigma.block(i, j, true);
+      Eigen::Matrix<double, 3, 3, Eigen::RowMajor> m3CrossCov = Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> >(m3TempCov.get_data_ptr());
+      *pm3OffDiag = m3CrossCov;
+      //*pm3OffDiag = TooN2Eigen(m3TempCov);
+    }
+  }
+  
+  sigma.writeOctave(fileName.c_str(), false);
+}
+
 TooN::Matrix<6> TrackerCovariance::CalcCovarianceEstimate(TrackerDataPtrVector& vpTruncMeas, int nQueryPoint, std::string fileName)
 {
+  if((int)vpTruncMeas.size() < TrackerCovariance::snMinMeasNum * TrackerCovariance::snNumFitPoints)
+  {
+    ROS_WARN_STREAM("TrackerCovariance::CalcCovarianceEstimate: given "<<vpTruncMeas.size()<<", need at least "<<TrackerCovariance::snMinMeasNum * TrackerCovariance::snNumFitPoints);
+    return TooN::Zeros;
+  }
+  
   g2o::SparseBlockMatrix<Eigen::Matrix2d>* J1_Sigma_J1t;
   Eigen::MatrixXd* J2;
   
@@ -132,13 +364,16 @@ TooN::Matrix<6> TrackerCovariance::CalcCovarianceEstimate(TrackerDataPtrVector& 
   CreateMatrices(vpTruncMeas, J1_Sigma_J1t, J2);
   
   std::cerr<<"Built cross cov system in "<<ros::Time::now() - buildStart<<" seconds"<<std::endl;
+  std::cerr<<"Dimensions of J1_Sigma_J1t: "<<J1_Sigma_J1t->rows()<<", "<<J1_Sigma_J1t->cols()<<std::endl;
+  std::cerr<<"Dimensions of J2: "<<J2->rows()<<", "<<J2->cols()<<std::endl;
   
   int nTotalMeasNum = vpTruncMeas.size();
-  
-  int nFitMaxMeas = nTotalMeasNum - TrackerCovariance::snNumRandomFits;
+  int nNumEvals = TrackerCovariance::snNumEvalPerMeasNum;
+  int nFitMaxMeas = nTotalMeasNum - nNumEvals;
   int nFitMinMeas = TrackerCovariance::snMinMeasNum;
   double dFitDeltaMeas = (nFitMaxMeas - nFitMinMeas) / (TrackerCovariance::snNumFitPoints - 1.0);
-  int nNumEvals = TrackerCovariance::snNumEvalPerMeasNum;
+  
+  std::cerr<<"nFitMinMeas: "<<nFitMinMeas<<"  nFitMaxMeas: "<<nFitMaxMeas<<"  dFitDeltaMeas: "<<dFitDeltaMeas<<std::endl;
   
   // Vector of measurement numbers that we'll generate cov norms for
   std::vector<int> vFitMeasNum;
@@ -154,6 +389,15 @@ TooN::Matrix<6> TrackerCovariance::CalcCovarianceEstimate(TrackerDataPtrVector& 
   // Make sure we put largest meas num at end since we'll index into it later
   std::sort(vFitMeasNum.begin(), vFitMeasNum.end());
   
+  std::cerr<<"Evaluating at the following measurement nums: ";
+  for(unsigned i=0; i < vFitMeasNum.size(); ++i)
+  {
+    std::cerr<<vFitMeasNum[i];
+    if(i < vFitMeasNum.size()-1)
+      std::cerr<<", ";
+  }
+  std::cerr<<std::endl;
+  
   // This will hold, for each tried measurement number, the vector of resulting cov norms and matrices
   std::vector<std::vector<std::pair<double, TooN::Matrix<6> > > > vEvals(vFitMeasNum.size());
   TooN::Cholesky<6> cholInfo;  // used to invert the information matrix
@@ -167,29 +411,75 @@ TooN::Matrix<6> TrackerCovariance::CalcCovarianceEstimate(TrackerDataPtrVector& 
     int nMatrixDelta = nFitMeasNum - std::ceil((nFitMeasNum*nNumEvals - nTotalMeasNum)/(nNumEvals - 1.0));
     ROS_ASSERT((nNumEvals-1)*nMatrixDelta + nFitMeasNum <= nTotalMeasNum);
     
-    vEvals[i].resize(nNumEvals);
-    
     for(int j=0; j < nNumEvals; ++j)
     {
       int nStartMeasIdx = j*nMatrixDelta;
       int nStartBlockIdx = vpTruncMeas[nStartMeasIdx]->mnBlockIdx;
+      //std::cerr<<"vpTruncMeas size: "<<vpTruncMeas.size()<<"  nStartMeasIdx: "<<nStartMeasIdx<<"  nFitMeasNum: "<<nFitMeasNum<<std::endl;
       int nEndBlockIdx = vpTruncMeas[nStartMeasIdx+nFitMeasNum-1]->mnBlockIdx;
       
-      g2o::SparseBlockMatrix<Eigen::Matrix2d>* J1_Sigma_J1t_eval = J1_Sigma_J1t->slice(nStartBlockIdx, nEndBlockIdx, nStartBlockIdx, nEndBlockIdx, false);
+      g2o::SparseBlockMatrix<Eigen::Matrix2d>* J1_Sigma_J1t_eval = J1_Sigma_J1t->slice(nStartBlockIdx, nEndBlockIdx+1, nStartBlockIdx, nEndBlockIdx+1, false);
       Eigen::MatrixXd J2_eval = J2->block(nStartMeasIdx*2,0,nFitMeasNum*2,6);
       Eigen::MatrixXd Zinv_J2_eval(nFitMeasNum*2, 6);
       
       mpLinearSolver->init();
-      mpLinearSolver->solve(*J1_Sigma_J1t_eval, Zinv_J2_eval.data(), J2_eval.data());
+      bool bSuccess = mpLinearSolver->solve(*J1_Sigma_J1t_eval, Zinv_J2_eval.data(), J2_eval.data());
+      
+      if(!bSuccess)
+        continue;
+      
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> result_eval = J2_eval.transpose() * Zinv_J2_eval; 
       TooN::Matrix<6,6,double> m6Info_eval = TooN::wrapMatrix<6,6,double>(result_eval.data());
       
       cholInfo.compute(m6Info_eval);
       
       TooN::Matrix<6,6,double> m6Cov_eval = cholInfo.get_inverse();
+      double dNorm = TooN::norm_fro(m6Cov_eval);
       
-      // Store at appropriate location for lookup later
-      vEvals[i][j] = std::make_pair(TooN::norm_fro(m6Cov_eval), m6Cov_eval);
+      if(std::isfinite(dNorm))  // sometimes we get a bad solution (singular system?). Don't use those results
+      {
+        // Store at appropriate location for lookup later
+        vEvals[i].push_back(std::make_pair(dNorm, m6Cov_eval));
+        //std::cerr<<"Meas num: "<<nFitMeasNum<<"  Eval: "<<j+1<<"  Norm: "<<dNorm<<std::endl;
+      }
+      else
+      {
+       // std::cerr<<"============= dNorm: "<<dNorm<<std::endl;
+       // std::cerr<<"m6Info_eval: "<<std::endl<<m6Info_eval<<std::endl;
+       // std::cerr<<"nStartBlockIdx: "<<nStartBlockIdx<<"  nEndBlockIdx: "<<nEndBlockIdx<<std::endl;
+        
+        bool bIsFinite = true;
+        for(int r=0; r < J1_Sigma_J1t_eval->rows(); ++r)
+        {
+          for(int c=0; c < J1_Sigma_J1t_eval->cols(); ++c)
+          {
+            Eigen::Matrix2d* pMatrix = J1_Sigma_J1t_eval->block(r, c, false);
+            if(pMatrix == NULL)
+              continue;
+              
+            for(int i=0; i < pMatrix->rows()*pMatrix->cols(); ++i)
+            {
+              bIsFinite &= std::isfinite(*(pMatrix->data()+i));
+            }
+          }
+        }
+        
+      //  std::cerr<<"J1_Sigma_J1t_eval finite: "<<(bIsFinite ? "YES" : "NO")<<std::endl;
+        
+        bIsFinite = true;
+        for(int i=0; i < J2_eval.rows()*J2_eval.cols(); ++i)
+        {
+          bIsFinite &= std::isfinite(*(J2_eval.data()+i));
+        }
+        
+       // std::cerr<<"J2_eval finite: "<<(bIsFinite ? "YES" : "NO")<<std::endl;
+      }
+      
+    }
+    
+    if(vEvals[i].empty())  // failed on all evaluations?
+    {
+      return TooN::Zeros;
     }
   }
   
@@ -204,11 +494,11 @@ TooN::Matrix<6> TrackerCovariance::CalcCovarianceEstimate(TrackerDataPtrVector& 
     for(unsigned j=0; j < vFitMeasNum.size(); ++j)
     {
       // Choose a random result for each measurement number
-      int nRandIdx = Sample::uniform(0, nNumEvals-1);
+      int nRandIdx = Sample::uniform(0, vEvals[j].size()-1);
       
       // Logs because we're fitting y = c * x^b using standard linear regression
       vX[j] = log(vFitMeasNum[j]);
-      vY[j] = log(vEvals[j][nRandIdx]);
+      vY[j] = log(vEvals[j][nRandIdx].first);
     }
     
     TooN::Vector<> vCoeff = PolyFit(vX, vY, 1);
@@ -243,18 +533,34 @@ TooN::Matrix<6> TrackerCovariance::CalcCovarianceEstimate(TrackerDataPtrVector& 
   double b_median = vCurveCoeffs[nMedianCurveIdx].second;
   double c_median = vCurveCoeffs[nMedianCurveIdx].first;
   
+  TooN::Matrix<6> m6Mean = TooN::Zeros;
+  std::vector<std::pair<double, TooN::Matrix<6> > >& vLargestMeasEvals = vEvals[vEvals.size()-1];
+  for(unsigned i=0; i < vLargestMeasEvals.size(); ++i)
+  {
+    m6Mean += vLargestMeasEvals[i].second;
+  }
+  
+  m6Mean /= vLargestMeasEvals.size();
+  double dMeanNorm = TooN::norm_fro(m6Mean);
+  double dRatio = dMedianValue/dMeanNorm;
+  TooN::Matrix<6> m6CovPredicted = m6Mean * dRatio;
+  
   // Find the point amongst the ones with the largest meas num that best fits
   // this curve. We'll then scale that point's covariance matrix by the appropriate amount
-  
-  std::vector<std::pair<double, TooN::Matrix<6> > >& vLargestMeasNumEvals = vEvals[vEvals.size()-1];
+  /*
+  std::vector<std::pair<double, TooN::Matrix<6> > >& vLargestMeasEvals = vEvals[vEvals.size()-1];
   double dCurveAtLargest = c_median * pow(vFitMeasNum[vFitMeasNum.size()-1], b_median);
+  
+  std::cout<<"dCurveAtLargest: "<<dCurveAtLargest<<std::endl;
   
   double dSmallestAbsError = std::numeric_limits<double>::max();
   int nSmallestErrorIdx = -1;
   
-  for(unsigned i=0; i < vLargestMeasNumEvals.size(); ++i)
+  for(unsigned i=0; i < vLargestMeasEvals.size(); ++i)
   {
-    double dAbsError = fabs(vLargestMeasNumEvals[i].first - dCurveAtLargest);
+    double dAbsError = fabs(vLargestMeasEvals[i].first - dCurveAtLargest);
+    
+    ROS_ASSERT(std::isfinite(dAbsError));
     
     if(dAbsError < dSmallestAbsError)
     {
@@ -265,31 +571,32 @@ TooN::Matrix<6> TrackerCovariance::CalcCovarianceEstimate(TrackerDataPtrVector& 
   
   ROS_ASSERT(nSmallestErrorIdx != -1);
   
-  double dSmallestErrorNorm = vLargestMeasNumEvals[nSmallestErrorIdx].first;
-  TooN::Matrix<6> m6SmallestErrorCov = vLargestMeasNumEvals[nSmallestErrorIdx].second;
+  double dSmallestErrorNorm = vLargestMeasEvals[nSmallestErrorIdx].first;
+  TooN::Matrix<6> m6SmallestErrorCov = vLargestMeasEvals[nSmallestErrorIdx].second;
   
   double dRatio = dMedianValue/dSmallestErrorNorm;
   TooN::Matrix<6> m6CovPredicted = m6SmallestErrorCov * dRatio;
+  */
   
   if(!fileName.empty())
   {
     std::ofstream ofs(fileName, std::ofstream::app);  // append to file rather than overwrite
     ROS_ASSERT(ofs.is_open());
     
-    ofs << "--------------------------" << std::endl;
+    ofs << "-----------------------------------------------" << std::endl;
     ofs << "------- Points (meas num, cov norm) -----------" << std::endl;
     
     for(unsigned i=0; i < vFitMeasNum.size(); ++i)
     {
       int nFitMeasNum = vFitMeasNum[i];
-      for(int j=0; j < nNumEvals; ++j)
+      for(unsigned j=0; j < vEvals[i].size(); ++j)
       {
         double dEvalNorm = vEvals[i][j].first;
         ofs << nFitMeasNum <<", " << dEvalNorm << std::endl;
       }
     }
     
-    ofs << "------- Curves (c,b as in y = c * x^b)-----------" << std::endl;
+    ofs << "------- Curves (c,b as in y = c * x^b)---------" << std::endl;
     
     for(unsigned i=0; i < vCurveCoeffs.size(); ++i)
     {
@@ -298,6 +605,123 @@ TooN::Matrix<6> TrackerCovariance::CalcCovarianceEstimate(TrackerDataPtrVector& 
       
       ofs << c << ", " << b << std::endl;
     }
+    
+    ofs.close();
+  }
+
+  return m6CovPredicted;
+}
+
+TooN::Matrix<6> TrackerCovariance::CalcCovarianceEstimate(TrackerDataPtrVector& vpDenseMeas, TrackerDataPtrVector& vpSparseMeas, bool bFillNonexistant, std::string fileName)
+{  
+  std::vector<g2o::SparseBlockMatrix<Eigen::Matrix2d>* > vJ1_Sigma_J1t;
+  Eigen::MatrixXd* J2;
+  
+  std::vector<int> vDenseContent(TrackerCovariance::snNumFitPoints);
+  std::vector<double> vDenseRatio(vDenseContent.size());
+  int nRemoveDelta = vpDenseMeas.size() / (vDenseContent.size()-1);
+  int nAllMeasNum = vpDenseMeas.size() + vpSparseMeas.size();
+  int nFullMatrixSize = nAllMeasNum * nAllMeasNum;
+  for(unsigned i=0; i < vDenseContent.size(); ++i)
+  {
+    int nRemove = i*nRemoveDelta;
+    vDenseContent[i] = vpDenseMeas.size() - nRemove;
+    vDenseRatio[i] = (double)(vDenseContent[i]*vDenseContent[i] + (nAllMeasNum-vDenseContent[i])) / nFullMatrixSize;
+  }
+  
+  ros::Time buildStart = ros::Time::now();
+  std::cerr<<"About to build cross cov system with "<<nAllMeasNum<<" measurements"<<std::endl;
+  
+  CreateMatrices(vpDenseMeas, vpSparseMeas, vDenseContent, vJ1_Sigma_J1t, J2, bFillNonexistant);
+  
+  std::cerr<<"Built cross cov system in "<<ros::Time::now() - buildStart<<" seconds"<<std::endl;
+  std::cerr<<"Dimensions of J1_Sigma_J1t: "<<vJ1_Sigma_J1t[0]->rows()<<", "<<vJ1_Sigma_J1t[0]->cols()<<std::endl;
+  std::cerr<<"Dimensions of J2: "<<J2->rows()<<", "<<J2->cols()<<std::endl;
+  
+  // This will hold, for each tried dense ratio, the vector of resulting cov norms and matrices
+  std::vector<std::pair<double, TooN::Matrix<6> > > vEvals(vDenseRatio.size());
+  TooN::Cholesky<6> cholInfo;  // used to invert the information matrix
+  
+  for(unsigned i=0; i < vJ1_Sigma_J1t.size(); ++i)
+  {    
+    g2o::SparseBlockMatrix<Eigen::Matrix2d>* J1_Sigma_J1t_eval = vJ1_Sigma_J1t[i];
+    Eigen::MatrixXd Zinv_J2_eval(J2->rows(), J2->cols());  // Z = J1 * Sigma * J1^T
+        
+    mpLinearSolver->init();
+    std::cerr<<"About to solve system"<<std::endl;
+    bool bSuccess = mpLinearSolver->solve(*J1_Sigma_J1t_eval, Zinv_J2_eval.data(), J2->data());
+    
+    if(!bSuccess)
+    {
+      ROS_ERROR("TrackerCovariance::CalcCovarianceEstimate: Couldn't solve system!");
+      return TooN::Zeros;
+    }
+      
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> result_eval = J2->transpose() * Zinv_J2_eval; 
+    TooN::Matrix<6,6,double> m6Info_eval = TooN::wrapMatrix<6,6,double>(result_eval.data());
+      
+    cholInfo.compute(m6Info_eval);
+      
+    TooN::Matrix<6,6,double> m6Cov_eval = cholInfo.get_inverse();
+    double dNorm = TooN::norm_fro(m6Cov_eval);
+      
+    if(std::isfinite(dNorm))  // sometimes we get a bad solution (singular system?). Don't use those results
+    {
+      // Store at appropriate location for lookup later
+      vEvals[i] = std::make_pair(dNorm, m6Cov_eval);
+      //std::cerr<<"Meas num: "<<nFitMeasNum<<"  Eval: "<<j+1<<"  Norm: "<<dNorm<<std::endl;
+    }
+    else
+    {
+      ROS_ERROR("TrackerCovariance::CalcCovarianceEstimate: Got nan or inf in solution!");
+      return TooN::Zeros;
+    }
+  }
+  
+  // Now it's time to fit some curves
+  TooN::Vector<> vX(vDenseRatio.size());
+  TooN::Vector<> vY(vEvals.size());
+  
+  ROS_ASSERT(vX.size() == vY.size());
+
+  for(int i=0; i < vX.size(); ++i)
+  {
+    // Logs because we're fitting y = c * x^b using standard linear regression
+    vX[i] = log(vDenseRatio[i]);
+    vY[i] = log(vEvals[i].first);
+    std::cerr<<"vX["<<i<<"]: "<<vX[i]<<"   vY["<<i<<"]: "<<vY[i]<<std::endl;
+  }
+  
+  std::cerr<<"Fitting polynomial"<<std::endl;
+  TooN::Vector<> vCoeff = PolyFit(vX, vY, 1);
+  double b = vCoeff[1];
+  double c = exp(vCoeff[0]);
+  std::cerr<<"Got fit c: "<<c<<" b: "<<b<<std::endl;
+  
+  // Evaluate this curve at a density ratio of 1
+  double dPredicted = c * pow(1.0, b);
+  
+  double dRatio = dPredicted/vEvals[0].first;
+  TooN::Matrix<6> m6CovPredicted = vEvals[0].second * dRatio;
+  
+  if(!fileName.empty())
+  {
+    std::cerr<<"Writing to file"<<std::endl;
+    std::ofstream ofs(fileName, std::ofstream::app);  // append to file rather than overwrite
+    ROS_ASSERT(ofs.is_open());
+    
+    //ofs << "-----------------------------------------------" << std::endl;
+    //ofs << "------- Points (density ratio, cov norm) -----------" << std::endl;
+    
+    for(unsigned j=0; j < vEvals.size(); ++j)
+    {
+      double dEvalNorm = vEvals[j].first;
+      ofs << vDenseRatio[j] <<", " << dEvalNorm << std::endl;
+    }
+    
+    
+    //ofs << "------- Curves (c,b as in y = c * x^b)---------" << std::endl;
+    //ofs << c << ", " << b << std::endl;
     
     ofs.close();
   }
@@ -480,9 +904,11 @@ TooN::Vector<> TrackerCovariance::PolyFit(TooN::Vector<> vX, TooN::Vector<> vY, 
   }
   
   // create the SVD decomposition
+  std::cerr<<"Doing SVD"<<std::endl;
   TooN::SVD<> svd(mxVandermondeTrans.T());
-  
+  std::cerr<<"Done, starting backsub"<<std::endl;
   TooN::Vector<> a = svd.backsub(vY);
+  std::cerr<<"Done"<<std::endl;
   
   return a;
 }

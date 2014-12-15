@@ -105,6 +105,9 @@ void MapPoint::EraseAllMeasurements()
 
 void MapPoint::EraseAllCrossCov()
 {
+  //DEBUG! ERASE!
+  //ROS_BREAK();
+  
   std::set<PointCrossCov*> spCrossCov;
   //boost::mutex::scoped_lock lock(mCrossCovMutex);
   
@@ -158,32 +161,40 @@ void MapPoint::UpdateCrossCovPriorities(double dVal)
 void MapPoint::AddCrossCov(MapPoint* pOther, PointCrossCov* pCrossCov)
 {
   boost::mutex::scoped_lock lock(mCrossCovMutex);
+  
+  ROS_ASSERT(mmpCrossCov.count(pOther) == 0);
+  
   mmpCrossCov[pOther] = pCrossCov;
 }
 
 // -----------------------------------------------------------------------------------------------------------
 
-PointCrossCov::PointCrossCov(MapPoint& point1, MapPoint& point2)
-: mPoint1(point1)
-, mPoint2(point2)
+PointCrossCov::PointCrossCov(MapPoint& pointRow, MapPoint& pointCol)
+: mPointRow(pointRow)
+, mPointCol(pointCol)
 {
   mm3CrossCov = TooN::Zeros;
   mdPriority = 1e10;
 }
 
-// Row: point1, Col: point2
-void PointCrossCov::SetCrossCov(const TooN::Matrix<3>& m3CrossCov)
+void PointCrossCov::SetCrossCov(MapPoint* pPointRow, const TooN::Matrix<3>& m3CrossCov)
 {
-  mm3CrossCov = m3CrossCov;
+  if(pPointRow == &mPointRow)
+    mm3CrossCov = m3CrossCov;
+  else if(pPointRow == &mPointCol)
+    mm3CrossCov = m3CrossCov.T();
+  else
+    ROS_BREAK();
+  
   mdPriority = 0;
 }
 
 /// point: the querying point
-TooN::Matrix<3> PointCrossCov::GetCrossCov(MapPoint* pPoint)
+TooN::Matrix<3> PointCrossCov::GetCrossCov(MapPoint* pPointRow)
 {
-  if(pPoint == &mPoint1)
+  if(pPointRow == &mPointRow)
     return mm3CrossCov;
-  else if(pPoint == &mPoint2)
+  else if(pPointRow == &mPointCol)
     return mm3CrossCov.T();
   
   ROS_BREAK();
@@ -192,14 +203,17 @@ TooN::Matrix<3> PointCrossCov::GetCrossCov(MapPoint* pPoint)
 
 void PointCrossCov::EraseLinks()
 {
-  //boost::mutex::scoped_lock lock1(mPoint1.mCrossCovMutex);
-  CrossCovPtrMap::iterator it1 = mPoint1.mmpCrossCov.find(&mPoint2);
-  ROS_ASSERT(it1 != mPoint1.mmpCrossCov.end());
-  mPoint1.mmpCrossCov.erase(it1);
+  //DEBUG! ERASE!
+  //ROS_BREAK();
+  
+  //boost::mutex::scoped_lock lock1(mPointRow.mCrossCovMutex);
+  CrossCovPtrMap::iterator it_row = mPointRow.mmpCrossCov.find(&mPointCol);
+  ROS_ASSERT(it_row != mPointRow.mmpCrossCov.end());
+  mPointRow.mmpCrossCov.erase(it_row);
   //lock1.unlock();
   
-  //boost::mutex::scoped_lock lock2(mPoint2.mCrossCovMutex);
-  CrossCovPtrMap::iterator it2 = mPoint2.mmpCrossCov.find(&mPoint1);
-  ROS_ASSERT(it2 != mPoint2.mmpCrossCov.end());
-  mPoint2.mmpCrossCov.erase(it2);
+  //boost::mutex::scoped_lock lock2(mPointCol.mCrossCovMutex);
+  CrossCovPtrMap::iterator it_col = mPointCol.mmpCrossCov.find(&mPointRow);
+  ROS_ASSERT(it_col != mPointCol.mmpCrossCov.end());
+  mPointCol.mmpCrossCov.erase(it_col);
 }

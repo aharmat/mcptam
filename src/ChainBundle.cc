@@ -1368,7 +1368,7 @@ int ChainBundle::Compute(bool *pAbortSignal, int nNumIter, double dUserLambda)
           
           VertexRelPoint* pPointVertex = dynamic_cast<VertexRelPoint*>(vAllVertices[i]);
           
-          pPointVertex->_m3CartesianCov = pPointVertex->_m3SphericalToCartesianJac * m3Cov * pPointVertex->_m3SphericalToCartesianJac.T(); 
+          pPointVertex->_m3CartesianCov = m3Cov; //pPointVertex->_m3SphericalToCartesianJac * m3Cov * pPointVertex->_m3SphericalToCartesianJac.T(); 
           
           if(!bPrinted)
           {

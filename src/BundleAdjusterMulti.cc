@@ -318,7 +318,7 @@ int BundleAdjusterMulti::AdjustAndUpdate(ChainBundle& multiBundle, std::set<Mult
             TooN::Matrix<3> m3NewCov = multiBundle.GetPointCov(point_it->second);
             double dChange = TooN::norm_fro(m3NewCov - point.mm3WorldCov);
             
-            point.mm3WorldCov = m3NewCov;
+            //point.mm3WorldCov = m3NewCov;
             point.UpdateCrossCovPriorities(dChange);
           }
         }
