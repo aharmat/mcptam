@@ -137,6 +137,10 @@ protected:
   //testing 
   bool mbStopInit;  ///< End of initialization phase requested
   
+  ros::Publisher mCreationTimingPub;
+  ros::Publisher mLocalTimingPub;
+  ros::Publisher mGlobalTimingPub;
+  
 };
 
 #endif

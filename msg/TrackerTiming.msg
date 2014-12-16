@@ -12,3 +12,5 @@ float32 pose
 float32 depth
 float32 add
 float32 total
+int32 map_num_mkfs
+int32 map_num_points

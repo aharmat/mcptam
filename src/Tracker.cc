@@ -114,7 +114,7 @@ Tracker::Tracker(Map &map, MapMakerClientBase &mapmaker, TaylorCameraMap &camera
   ROS_DEBUG("Tracker: In constructor, done");
   
   maskPub = mNodeHandlePrivate.advertise<sensor_msgs::Image>("mask", 1);
-  timingPub = mNodeHandlePrivate.advertise<mcptam::TrackerTiming>("timing", 1);
+  timingPub = mNodeHandlePrivate.advertise<mcptam::TrackerTiming>("timing_tracker", 1);
 }
 
 Tracker::~Tracker()
@@ -511,6 +511,8 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
   }
   
   timingMsg.total = (ros::WallTime::now() - startTimeTotal).toSec();
+  timingMsg.map_num_points = mMap.mlpPoints.size();
+  timingMsg.map_num_mkfs = mMap.mlpMultiKeyFrames.size();
   timingMsg.header.stamp = ros::Time::now();
   timingPub.publish(timingMsg);
 }

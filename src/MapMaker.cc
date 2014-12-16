@@ -43,12 +43,17 @@
 #include <mcptam/SmallBlurryImage.h>
 #include <mcptam/Map.h>
 #include <mcptam/BundleAdjusterBase.h>
+#include <mcptam/MapMakerTiming.h>
 
 MapMaker::MapMaker(Map &map, TaylorCameraMap &cameras, BundleAdjusterBase &bundleAdjuster)
 : MapMakerBase(map, true)
 , MapMakerClientBase(map)
 , MapMakerServerBase(map, cameras, bundleAdjuster)
 {
+  mCreationTimingPub = mNodeHandlePriv.advertise<mcptam::MapMakerTiming>("timing_mkf_creation", 1, true);
+  mLocalTimingPub = mNodeHandlePriv.advertise<mcptam::MapMakerTiming>("timing_local_ba", 1,true);
+  mGlobalTimingPub = mNodeHandlePriv.advertise<mcptam::MapMakerTiming>("timing_global_ba", 1,true);
+  
   Reset();
   start();
 }
@@ -189,8 +194,18 @@ void MapMaker::run()
       mBundleAdjuster.UseTukey((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2));
       mBundleAdjuster.UseTwoStep((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2));
       
+      mcptam::MapMakerTiming timingMsg;
+      timingMsg.map_num_mkfs = mMap.mlpMultiKeyFrames.size();
+      timingMsg.map_num_points = mMap.mlpPoints.size();
+      
+      ros::Time start = ros::Time::now();
+      
       int nAccepted = mBundleAdjuster.BundleAdjustRecent(vOutliers);
       //mdMaxCov = mBundleAdjuster.GetMaxCov();
+      
+      ros::Time nowTime = ros::Time::now();
+      timingMsg.elapsed = (nowTime - start).toSec();
+      timingMsg.header.stamp = nowTime;
       
       ROS_DEBUG_STREAM("Accepted iterations: "<<nAccepted);
       ROS_DEBUG_STREAM("Number of outliers: "<<vOutliers.size());
@@ -210,6 +225,9 @@ void MapMaker::run()
         mnNumConsecutiveFailedBA = 0;
         HandleOutliers(vOutliers);
         PublishMapVisualization();
+        
+        timingMsg.elapsed /= nAccepted;
+        mLocalTimingPub.publish(timingMsg);
       }
     }
     
@@ -233,7 +251,18 @@ void MapMaker::run()
       mBundleAdjuster.UseTukey(mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2);
       mBundleAdjuster.UseTwoStep((mState == MM_RUNNING && mMap.mlpMultiKeyFrames.size() > 2));
       
+      mcptam::MapMakerTiming timingMsg;
+      timingMsg.map_num_mkfs = mMap.mlpMultiKeyFrames.size();
+      timingMsg.map_num_points = mMap.mlpPoints.size();
+      
+      ros::Time start = ros::Time::now();
+      
       int nAccepted = mBundleAdjuster.BundleAdjustAll(vOutliers);
+      
+      ros::Time nowTime = ros::Time::now();
+      timingMsg.elapsed = (nowTime - start).toSec();
+      timingMsg.header.stamp = nowTime;
+      
       mdMaxCov = mBundleAdjuster.GetMaxCov();
       
       ROS_DEBUG_STREAM("Accepted iterations: "<<nAccepted);
@@ -254,6 +283,9 @@ void MapMaker::run()
         mnNumConsecutiveFailedBA = 0;
         HandleOutliers(vOutliers);
         PublishMapVisualization();
+        
+        timingMsg.elapsed /= nAccepted;
+        mGlobalTimingPub.publish(timingMsg);
         
         if(mState == MM_INITIALIZING && (mdMaxCov < MapMakerServerBase::sdInitCovThresh || mbStopInit)) 
         {
@@ -401,6 +433,12 @@ void MapMaker::AddMultiKeyFrameFromTopOfQueue()
   }
 */
   
+  mcptam::MapMakerTiming timingMsg;
+  timingMsg.map_num_mkfs = mMap.mlpMultiKeyFrames.size();
+  timingMsg.map_num_points = mMap.mlpPoints.size();
+  
+  ros::Time start = ros::Time::now();
+  
   if(mState == MM_RUNNING)
   {
     if(pMKF->NoImages()) // leftovers from Tracker, don't bother adding these
@@ -426,6 +464,11 @@ void MapMaker::AddMultiKeyFrameFromTopOfQueue()
     AddMultiKeyFrameAndMarkLastDeleted(pMKF, false);
     mMap.MoveDeletedMultiKeyFramesToTrash();
   }
+  
+  ros::Time nowTime = ros::Time::now();
+  timingMsg.elapsed = (nowTime - start).toSec();
+  timingMsg.header.stamp = nowTime;
+  mCreationTimingPub.publish(timingMsg);
   
   lock.lock();
   mqpMultiKeyFramesFromTracker.pop_front(); 

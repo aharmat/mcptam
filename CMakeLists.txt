@@ -28,7 +28,7 @@ link_directories(${catkin_LIBRARY_DIRS} ${Boost_LIBRARY_DIRS} ${SUITESPARSE_LIBR
 
 add_message_files(
   DIRECTORY msg
-  FILES MapInfo.msg NetworkMapPoint.msg NetworkMeasurement.msg NetworkKeyFrame.msg NetworkMultiKeyFrame.msg NetworkOutlier.msg
+  FILES MapInfo.msg MapMakerTiming.msg NetworkMapPoint.msg NetworkMeasurement.msg NetworkKeyFrame.msg NetworkMultiKeyFrame.msg NetworkOutlier.msg
         SystemInfo.msg TrackerTiming.msg TrackerState.msg
 )
 
