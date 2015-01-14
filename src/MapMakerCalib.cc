@@ -138,6 +138,7 @@ bool MapMakerCalib::InitFromCalibImage(CalibImageTaylor &calibImage, double dSqu
     }
   }
   
+  pMKF->mnID = mMap.mlpMultiKeyFrames.size();
   mMap.mlpMultiKeyFrames.push_back(pMKF);
   
   

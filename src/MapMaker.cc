@@ -114,6 +114,13 @@ void MapMaker::Reset()
   MapMakerBase::Reset();  // reset the actual map
   std::cout<<"Done MapMakerBase::Reset()"<<std::endl;
   
+  /*
+  if(mMap.mbGood)
+  {
+    ApplyGlobalTransformationToMap(CalcPlaneAligner()); 
+  }
+  */
+  
   //debug
   mbRescale = false;
   mdScale = 1.0;

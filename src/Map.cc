@@ -252,6 +252,9 @@ void Map::SaveToFolder(std::string folder)
     return;
   }
   
+  // IMPORTANT! Set precision so that the discrepancy between saved and then reloaded maps is very very small
+  ofs.precision(20);
+  
   boost::mutex::scoped_lock lock(mMutex);
   
   // First write BaseFromWorld for each MKF in system
@@ -345,25 +348,10 @@ void Map::SaveToFolder(std::string folder)
       std::stringstream ss;
       std::ofstream imageStream;
       
-      ss<<folder<<"/mkf"<<mkf.mnID<<"_"<<camName<<"_image.jpg";
-      imageStream.open(ss.str().c_str());
-      if(!imageStream.is_open())
+      if(kf.maLevels[0].image.totalsize() > 0)
       {
-        ROS_FATAL_STREAM("Couldn't open file ["<<ss.str()<<"]");
-        ros::shutdown();
-        return;
-      }
-      
-      CVD::img_save<CVD::byte>(kf.maLevels[0].image, imageStream, CVD::ImageType::JPEG, param);
-      
-      imageStream.close();
-      
-      if(kf.maLevels[0].mask.totalsize() > 0)
-      {
-        ss.clear();
-        ss<<folder<<"/mkf"<<mkf.mnID<<"_"<<camName<<"_mask.jpg";
+        ss<<folder<<"/mkf"<<mkf.mnID<<"_"<<camName<<"_image.jpg";
         imageStream.open(ss.str().c_str());
-        
         if(!imageStream.is_open())
         {
           ROS_FATAL_STREAM("Couldn't open file ["<<ss.str()<<"]");
@@ -371,7 +359,26 @@ void Map::SaveToFolder(std::string folder)
           return;
         }
         
-        CVD::img_save<CVD::byte>(kf.maLevels[0].mask, imageStream, CVD::ImageType::JPEG, param);
+        CVD::img_save<CVD::byte>(kf.maLevels[0].image, imageStream, CVD::ImageType::JPEG, param);
+        
+        imageStream.close();
+        
+        if(kf.maLevels[0].mask.totalsize() > 0)
+        {
+          ss.str(std::string());
+          ss.clear();
+          ss<<folder<<"/mkf"<<mkf.mnID<<"_"<<camName<<"_mask.jpg";
+          imageStream.open(ss.str().c_str());
+          
+          if(!imageStream.is_open())
+          {
+            ROS_FATAL_STREAM("Couldn't open file ["<<ss.str()<<"]");
+            ros::shutdown();
+            return;
+          }
+          
+          CVD::img_save<CVD::byte>(kf.maLevels[0].mask, imageStream, CVD::ImageType::JPEG, param);
+        }
       }
     }
   }
@@ -379,7 +386,7 @@ void Map::SaveToFolder(std::string folder)
 }
 
 // Load all map information to a file
-void Map::LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCameraModels)
+void Map::LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCameraModels, bool bFix)
 { 
   Reset();
   
@@ -431,7 +438,7 @@ void Map::LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCam
       
       // MKF number, Position (3 vector), Orientation (quaternion, 4 vector)
       MultiKeyFrame* pMKF = new MultiKeyFrame;
-      pMKF->mbFixed = (i == 0);
+      pMKF->mbFixed = bFix ? true : (i == 0);
       
       // First is MKF id
       std::getline(readlineSS,conversion,',');
@@ -462,25 +469,28 @@ void Map::LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCam
         imageFile.open(ss.str().c_str());
         if(!imageFile.is_open())
         {
-          ROS_FATAL_STREAM("Couldn't open image file ["<<ss.str()<<"]");
-          ros::shutdown();
-          return;
-        }
-        imImage = CVD::img_load(imageFile);
-        ROS_ASSERT(imImage.totalsize() > 0);
-        
-        ss.clear();
-        imageFile.close();
-        ss<<folder<<"/mkf"<<pMKF->mnID<<"_"<<camName<<"_mask.jpg";
-        imageFile.open(ss.str().c_str());
-        if(!imageFile.is_open())
-        {
-          ROS_WARN_STREAM("Couldn't open mask file ["<<ss.str()<<"], assuming no mask exists");
+          ROS_WARN_STREAM("Couldn't open image file ["<<ss.str()<<"], not assigning KF any image! This could be ok if KF was used during IDP init");
+          ROS_WARN_STREAM("If any points try to set this KF as a source, we're gonna make a fuss");
         }
         else
         {
-          imMask = CVD::img_load(imageFile);
-        }
+		  imImage = CVD::img_load(imageFile);
+		  ROS_ASSERT(imImage.totalsize() > 0);
+        
+		  ss.str(std::string());
+		  ss.clear();
+		  imageFile.close();
+		  ss<<folder<<"/mkf"<<pMKF->mnID<<"_"<<camName<<"_mask.jpg";
+		  imageFile.open(ss.str().c_str());
+	      if(!imageFile.is_open())
+		  {
+		    ROS_WARN_STREAM("Couldn't open mask file ["<<ss.str()<<"], assuming no mask exists");
+		  }
+		  else
+		  {
+		    imMask = CVD::img_load(imageFile);
+		  }
+	    }
         
         // Set mask before creating rest of keyframe internals
         if(imMask.totalsize() > 0)
@@ -489,8 +499,11 @@ void Map::LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCam
         // Don't do deep copy of image since we just created it and nobody else will use it
         // The handling of the mask is not right at the moment, since glare masking is decided 
         // on the tracker side and not saved into the KF, so just don't do it for now....
-        pKF->MakeKeyFrame_Lite(imImage, false, false);
-        pKF->MakeKeyFrame_Rest();
+        if(imImage.totalsize() > 0)
+        {
+          pKF->MakeKeyFrame_Lite(imImage, false, false);
+          pKF->MakeKeyFrame_Rest();
+	    }
       }
       
       mlpMultiKeyFrames.push_back(pMKF);
@@ -562,7 +575,7 @@ void Map::LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCam
       conversionSS.clear();
       conversionSS.str(conversion);
       conversionSS >> nFixed;
-      pPointNew->mbFixed = static_cast<bool>(nFixed);
+      pPointNew->mbFixed = bFix ? true : static_cast<bool>(nFixed);
       
       // Optimized flag
       std::getline(readlineSS,conversion,',');
@@ -572,6 +585,7 @@ void Map::LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCam
       pPointNew->mbOptimized = static_cast<bool>(nOptimized);
       
       pPointNew->mpPatchSourceKF = mID_To_MKF[nParentMKF]->mmpKeyFrames[camName];
+      ROS_ASSERT(pPointNew->mpPatchSourceKF->maLevels[0].image.totalsize() > 0);  // make sure we loaded an image if this KF is considered a patch source
       
       mlpPoints.push_back(pPointNew);
     }
@@ -691,6 +705,13 @@ void Map::LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCam
   std::cout<<"Got "<<measCounter<<" measurements"<<std::endl;
   
   file.close();
+  
+  // Refresh the scene depths for the MKFs
+  for(MultiKeyFramePtrList::iterator mkf_it = mlpMultiKeyFrames.begin(); mkf_it != mlpMultiKeyFrames.end(); ++mkf_it)
+  {
+    MultiKeyFrame& mkf = *(*mkf_it);
+    mkf.RefreshSceneDepthRobust();
+  }
   
   mbGood = true;
   MakeSnapshot();
@@ -894,5 +915,16 @@ void Map::Restore()
   // Need to overwrite the new stuff in the "snapshot" variables with copies
   // of the restored map
   MakeSnapshot();
+}
+
+bool Map::Contains(MultiKeyFrame* pMKF)
+{
+  for(MultiKeyFramePtrList::iterator mkf_it = mlpMultiKeyFrames.begin(); mkf_it != mlpMultiKeyFrames.end(); ++mkf_it)
+  {
+    if(pMKF == *mkf_it)
+      return true;
+  }
+  
+  return false;
 }
 

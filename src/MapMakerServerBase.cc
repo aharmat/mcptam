@@ -160,6 +160,7 @@ bool MapMakerServerBase::InitFromMultiKeyFrame(MultiKeyFrame* pMKF, bool bPutPla
     kf.MakeKeyFrame_Rest();
   } 
 
+  pMKF->mnID = mMap.mlpMultiKeyFrames.size();
   mMap.mlpMultiKeyFrames.push_back(pMKF);
   
   int nNumCams = pMKF->mmpKeyFrames.size();
@@ -336,6 +337,7 @@ void MapMakerServerBase::AddMultiKeyFrameAndMarkLastDeleted(MultiKeyFrame *pMKF,
       kf.MakeKeyFrame_Rest();
   }
     
+  pMKF->mnID = mMap.mlpMultiKeyFrames.size();
   mMap.mlpMultiKeyFrames.push_back(pMKF);
   
   mBundleAdjuster.SetNotConverged();
@@ -376,6 +378,7 @@ bool MapMakerServerBase::AddMultiKeyFrameAndCreatePoints(MultiKeyFrame *pMKF)
     if(*gvnLevelZeroPoints)
       AddStereoMapPoints(*pMKF, 0, std::numeric_limits<int>::max(), -1.0, KF_ONLY_OTHER);
   
+    pMKF->mnID = mMap.mlpMultiKeyFrames.size();
     mMap.mlpMultiKeyFrames.push_back(pMKF);
     ROS_INFO("Just added MKF to map");
   
@@ -1079,7 +1082,7 @@ SE3<> MapMakerServerBase::CalcPlaneAligner()
     return SE3<>();
   };
   
-  int nRansacs = 100;
+  int nRansacs = 500;
   Vector<3> v3BestMean = Zeros;
   Vector<3> v3BestNormal = Zeros;
   double dBestDistSquared = 9999999999999999.9;
@@ -1194,7 +1197,7 @@ void MapMakerServerBase::HandleOutliers(std::vector<std::pair<KeyFrame*, MapPoin
   {
     KeyFrame& kf = *(vOutliers[i].first);
     MapPoint& point = *(vOutliers[i].second);
-    Measurement &meas = *(kf.mmpMeasurements[&point]);
+    Measurement& meas = *(kf.mmpMeasurements[&point]);
     
     if(point.mbFixed) // fixed points can't be considered bad, but count them
     {

@@ -70,6 +70,7 @@ void LoadStaticParamsGeneral()
   nh_priv.getParam("pose_topic", CameraGroupSubscriber::sPoseTopic);
   nh_priv.getParam("camera_prefix", CameraGroupSubscriber::sCameraPrefix);
   nh_priv.getParam("dynamic_sync", CameraGroupSubscriber::sbDynamicSync);
+  nh_priv.getParam("max_sync_window", CameraGroupSubscriber::sdMaxSyncWindow);
 }
 
 

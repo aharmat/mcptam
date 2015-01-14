@@ -16,19 +16,19 @@
   <param name="image_transport" type="string" value="compressed"/>
   
   <param name="get_pose_separately" type="bool" value="$(arg separate_pose)" />   
-  <param name="dynamic_sync" type="bool" value="true" />
+  <param name="dynamic_sync" type="bool" value="false" />
+  <param name="max_sync_window" type="double" value="0.1" />
   
   <param name="save_folder" type="string" value="$(find mcptam)/saved" />
   <param name="load_map" type="bool" value="$(arg load)" />
+  <param name="fix_loaded_map" type="bool" value="false" />
   
   <!--
   <param name="camera_pose_file" type="string" value="$(find mcptam)/poses/poses.dat" />
   -->
 
-  <!--
-  <rosparam command="load" file="$(find mcptam)/masks/masks_1,2,3,4.yaml" />
+  <rosparam command="load" file="$(find mcptam)/masks/masks_1,2.yaml" />
   <param name="masks_dir" type="string" value="$(find mcptam)/masks" />
-  -->
 
   <param name="mm_init_point_mode" type="string" value="$(arg init_mode)" />
   <param name="mm_init_point_max_num" type="int" value="200" />

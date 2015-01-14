@@ -786,6 +786,7 @@ MultiKeyFrame::MultiKeyFrame()
   mbBad = false;
   mbDeleted = false;
   mnUsing = 0;
+  mnID = -1;
 }
 
 MultiKeyFrame::~MultiKeyFrame()

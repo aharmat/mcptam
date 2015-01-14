@@ -50,6 +50,7 @@
 #include <mcptam/BundleAdjusterMulti.h>
 #include <mcptam/VideoSourceMulti.h>
 #include <mcptam/Types.h>
+#include <mcptam/Map.h>
 #include <gvars3/instances.h>
 
 using namespace GVars3;
@@ -127,6 +128,16 @@ System::System()
     
     static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN|SILENT);
     *gvnLevelZeroPoints = SystemBase::sbLevelZeroPoints;
+    
+    static gvar3<int> gvnAddingMKFs("AddingMKFs", 1, HIDDEN|SILENT);
+    static gvar3<int> gvnUpdatingPoints("UpdatingPoints", 1, HIDDEN|SILENT);
+    
+    // If we loaded a map, disable adding MKFs and updating points by default
+    if(mpMap->mbGood)
+    {
+      *gvnAddingMKFs = 0;
+      *gvnUpdatingPoints = 0;
+    }
     
     // Main Menu
     GUI.ParseLine("Menu.AddMenuButton Root Reset Reset Root");

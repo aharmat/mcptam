@@ -16,7 +16,7 @@ find_package(SUITESPARSE REQUIRED)
 find_package(CVD REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(OpenCV REQUIRED)
-find_package(GLUT REQUIRED)
+# find_package(GLUT REQUIRED)
 find_package(G2O REQUIRED)
 find_package(GVars3 REQUIRED)
 
@@ -36,6 +36,10 @@ add_service_files(
 )
 
 generate_messages(DEPENDENCIES std_msgs sensor_msgs)
+
+generate_dynamic_reconfigure_options(
+  cfg/PoseGenerator.cfg
+)
 
 catkin_package(
   INCLUDE_DIRS include
@@ -84,6 +88,10 @@ add_executable(pose_calibrator src/MainPoseCalibrator.cc src/GLWindow2.cc src/GL
 add_dependencies(pose_calibrator ${PROJECT_NAME}_gencpp)
 target_link_libraries(pose_calibrator ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OpenCV_LIBS} ${OPENGL_gl_LIBRARY} ${GVars3_LIBRARIES}
                                      ${G2O_STUFF_LIBRARY} ${G2O_CORE_LIBRARY} ${G2O_SOLVER_CHOLMOD})
+                                     
+add_executable(pose_generator utils/PoseGenerator.cc)
+add_dependencies(pose_generator ${PROJECT_NAME}_gencpp)
+target_link_libraries(pose_generator ${catkin_LIBRARIES})                                     
                              
 # Start of test and/or experimental programs
 #~ add_executable(bundle_test_file_2 experimental/tests/BundleTestFile2.cc src/TaylorCamera.cc src/Map.cc src/KeyFrame.cc src/MapPoint.cc

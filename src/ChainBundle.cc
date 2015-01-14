@@ -266,10 +266,10 @@ class VertexRelPoint : public g2o::BaseVertex<3, TooN::Vector<3> >
       // If the point is poorly constrained, the estimate can run away easily, making it hard the optimize properly
       // when the next round of optimization is done (potentially with more/better constraints)
       double dDist = TooN::norm(_estimate);
-      if(dDist > 1e5)
-        _estimate *= 1e5/dDist;
-      if(dDist < 1e-5)
-        _estimate *= 1e-5/dDist;
+      if(dDist > 1e3)
+        _estimate *= 1e3/dDist;
+      if(dDist < 1e-2)
+        _estimate *= 1e-2/dDist;
 
     }
     

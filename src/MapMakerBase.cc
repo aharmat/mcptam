@@ -76,6 +76,9 @@ void MapMakerBase::Reset()
   mbResetRequested = false;
   mState = MM_INITIALIZING;
   mdMaxCov = -1;
+  
+  if(mMap.mbGood)  // If map is good after a reset, it means we have a saved map loaded, so switch to running
+    mState = MM_RUNNING;
 }
 
 void MapMakerBase::RequestReset()

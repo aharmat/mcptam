@@ -114,11 +114,14 @@ SystemBase::SystemBase(std::string windowName, bool bFullSize, bool bDrawWindow)
   bool bLoadMap = false;
   mNodeHandlePriv.getParam("load_map", bLoadMap);
   
+  bool bFixLoadedMap = true;
+  mNodeHandlePriv.getParam("fix_loaded_map", bFixLoadedMap);
+  
   if(bLoadMap)
   {
     ROS_ASSERT(!mSaveFolder.empty());
     LoadCamerasFromFolder(mSaveFolder);
-    mpMap->LoadFromFolder(mSaveFolder, mmPosesLoaded, mmCameraModelsLoaded);
+    mpMap->LoadFromFolder(mSaveFolder, mmPosesLoaded, mmCameraModelsLoaded, bFixLoadedMap);
   }
   
   mmPoses = mmPosesLive;
@@ -137,7 +140,7 @@ SystemBase::SystemBase(std::string windowName, bool bFullSize, bool bDrawWindow)
       
       double dDiffMagSquared = v6Diff * v6Diff;
       
-      if(dDiffMagSquared > 1e-10)
+      if(dDiffMagSquared > 1e-12)
       {
         ROS_FATAL_STREAM("Difference between live and loaded poses for camera "<<camName<<" too great! Diff mag squared: "<<dDiffMagSquared);
         ros::shutdown();
@@ -162,16 +165,18 @@ SystemBase::SystemBase(std::string windowName, bool bFullSize, bool bDrawWindow)
       
       double dDiffMagSquared = v9Diff * v9Diff;
       
-      if(dDiffMagSquared > 1e-10)
+      if(dDiffMagSquared > 1e-12)
       {
         ROS_FATAL_STREAM("Difference between live and loaded calibration parameters for camera "<<camName<<" too great! Diff mag squared: "<<dDiffMagSquared);
+        ROS_FATAL_STREAM("Live params: "<<mmCameraModels[camName].GetParams());
+        ROS_FATAL_STREAM("Loaded params: "<<camera.GetParams());
         ros::shutdown();
         return;
       }
     }
     else  // insert the pose
     {
-      mmCameraModels[camName] = camera;
+      mmCameraModels.insert(std::pair<std::string,TaylorCamera>(camName, camera));
     }
   }
 }
@@ -269,6 +274,9 @@ void SystemBase::SaveCamerasToFolder(std::string folder)
     return;
   }
   
+  // IMPORTANT! Set precision so that the discrepancy between saved and then reloaded maps is very very small
+  ofs.precision(20);
+  
   // First write camera data to file
   ofs<<"% Camera calibration parameters, format:"<<std::endl;
   ofs<<"% Total number of cameras"<<std::endl;
@@ -314,6 +322,9 @@ void SystemBase::SaveCamerasToFolder(std::string folder)
     ROS_ERROR_STREAM("Couldn't open "<<posesFile<<" to write camera poses");
     return;
   }
+  
+  // IMPORTANT! Set precision so that the discrepancy between saved and then reloaded maps is very very small
+  ofs.precision(20);
   
   ofs<<"% Camera poses in MKF frame, format:"<<std::endl;
   ofs<<"% Total number of cameras"<<std::endl;

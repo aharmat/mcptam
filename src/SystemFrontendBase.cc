@@ -74,9 +74,7 @@ SystemFrontendBase::SystemFrontendBase(std::string windowName, bool bFullSize)
   
   if(nGroups == nCams && nCams > 1)  // no group has more than one camera and more than 1 group
   {
-    ROS_FATAL("System: More than one camera group and none have more than one camera, won't be able to initialize");
-    ros::shutdown();
-    return;
+    ROS_WARN("SystemFrontendBase: More than one camera group and none have more than one camera, won't be able to initialize! Need to load map.");
   }
   
   mInitSystemServer = mNodeHandlePriv.advertiseService("init", &SystemFrontendBase::InitSystemCallback, this);

@@ -110,6 +110,7 @@ void Relocaliser::ScoreKFs(KeyFrame &kfCurrent)
       }
       
       double dSSD = kfCurrent.mpSBI->ZMSSD(*(kf.mpSBI));
+      std::cout<<"ZMSSD for "<<kf.mCamName<<" looking at MKF "<<mkf.mnID<<": "<<dSSD<<std::endl;
       if(dSSD < mdBestScore)
       {
         mdBestScore = dSSD;

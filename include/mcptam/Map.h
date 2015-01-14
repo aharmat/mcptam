@@ -131,7 +131,9 @@ public:
   
   void SaveToFolder(std::string folder);
   
-  void LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCameraModels);
+  void LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCameraModels, bool bFix);
+  
+  bool Contains(MultiKeyFrame* pMKF);
   
   MapPointPtrList mlpPoints;  ///< List of MapPoint pointers that are in the live map
   MapPointPtrList mlpPointsTrash;  ///< List of MapPoint pointers that are in the trash

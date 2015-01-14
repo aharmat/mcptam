@@ -38,6 +38,7 @@
 
 // Static members
 bool CameraGroupSubscriber::sbDynamicSync = false;
+double CameraGroupSubscriber::sdMaxSyncWindow = 100;
 std::string CameraGroupSubscriber::sImageTopic = "image_raw";
 std::string CameraGroupSubscriber::sInfoTopic = "camera_info";
 std::string CameraGroupSubscriber::sPoseTopic = "pose";
@@ -204,6 +205,10 @@ CameraGroupSubscriber::CameraGroupSubscriber(std::vector<std::string> vCameraNam
   // At this point we have mmSavedInfos and mmSavedPoses filled, 
   // and all of mvInfoSubs and mvPoseSubs have been shutdown so 
   // we won't get any more messages from them
+  
+  // If specified, set the maximum interval in a given synchronized set
+  ApproxTimePolicy* policy = dynamic_cast<ApproxTimePolicy*>( mpSync->getPolicy() );
+  policy->setMaxIntervalDuration(ros::Duration(CameraGroupSubscriber::sdMaxSyncWindow)); 
 }
 
 CameraGroupSubscriber::~CameraGroupSubscriber()
