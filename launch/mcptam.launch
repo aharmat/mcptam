@@ -21,10 +21,8 @@
   <param name="camera_pose_file" type="string" value="$(find mcptam)/poses/poses.dat" />
   -->
 
-  <!--
   <rosparam command="load" file="$(find mcptam)/masks/masks_1,2,3,4.yaml" />
   <param name="masks_dir" type="string" value="$(find mcptam)/masks" />
-  -->
 
   <param name="mm_init_point_mode" type="string" value="$(arg init_mode)" />
   <param name="mm_init_point_max_num" type="int" value="200" />
