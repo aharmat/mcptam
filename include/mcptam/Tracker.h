@@ -232,6 +232,7 @@ public:
   static bool sbCollectAllPoints;  ///< Should we project the whole map or do something smarter? (affects CollectNearestPoints)
   
   static double sdCrossCovDur;
+  static double sdCrossCovPriorityThresh;
   
 protected:
   
@@ -401,7 +402,7 @@ protected:
   
   double CalcMAD();
   
-  TooN::Matrix<6> CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationSets, bool bFull, std::string fileName=std::string());
+  TooN::Matrix<6> CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationSets, bool bFull, double dDuration, std::string fileName=std::string());
          
   
   MultiKeyFrame* mpCurrentMKF;       ///< The current processing space as a MultiKeyFrame

@@ -137,12 +137,13 @@ public:
   
   // testing
   TooN::Matrix<6> GetTrackerCov(TooN::SE3<> se3BaseFromWorld, std::vector<std::string>& vCamNames, std::vector<TrackerDataPtrVector>& vIterationSets);
-  TooN::Matrix<6> GetTrackerCovFull(MultiKeyFrame* pTrackerMKF);
+  TooN::Matrix<6> GetTrackerCovFull(TooN::SE3<> se3BaseFromWorld, std::vector<std::string>& vCamNames, std::vector<TrackerDataPtrVector>& vIterationSets);
   
   // testing
   void UpdateCrossCovariances(std::unordered_set<MapPoint*>& spParticipatingPoints, ros::Duration allowedDur, double dPriorityThresh=0);
-  void UpdateCrossCovariances2(std::unordered_set<MapPoint*> spParticipatingPoints, ros::Duration allowedDur, double dPriorityThresh=0);
-  
+  //void UpdateCrossCovariances2(std::unordered_set<MapPoint*> spParticipatingPoints, ros::Duration allowedDur, double dPriorityThresh=0);
+  void SavePointCovMatrix(std::string fileName);
+  void SavePointCovMatrix(std::string fileName, std::unordered_set<MapPoint*> spParticipatingPoints);
   
   /// Checks to see if the given KeyFrame is a candidate to be added to the Map
   /** @param kf The KeyFrame to check

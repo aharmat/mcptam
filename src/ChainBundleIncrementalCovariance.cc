@@ -1470,7 +1470,7 @@ int ChainBundleIncrementalCovariance::Compute(bool *pAbortSignal, int nNumIter, 
         TooN::Matrix<3,3,double> m3Cov = TooN::wrapMatrix<3,3,double>(pData);
         
         VertexRelPoint* pPointVertex = dynamic_cast<VertexRelPoint*>(pVertex);
-        pPointVertex->_m3CartesianCov = pPointVertex->_m3SphericalToCartesianJac * m3Cov * pPointVertex->_m3SphericalToCartesianJac.T(); 
+        pPointVertex->_m3CartesianCov = m3Cov; //pPointVertex->_m3SphericalToCartesianJac * m3Cov * pPointVertex->_m3SphericalToCartesianJac.T(); 
         
         //std::cout<<"Cov from g2o: "<<std::endl<<m3Cov<<std::endl;
         //std::cout<<"Spherical to cartesian jac: "<<std::endl<<pPointVertex->_m3SphericalToCartesianJac<<std::endl;
@@ -1641,4 +1641,115 @@ double ChainBundleIncrementalCovariance::GetLambda()
 {
   ROS_ASSERT(mpOptimizer && mpOptimizer->solver()); 
   return dynamic_cast<OptimizationAlgorithmLevenberg*>(mpOptimizer->solver())->currentLambda();
+}
+
+void ChainBundleIncrementalCovariance::SavePointCovMatrix(std::string fileName)
+{
+  g2o::OptimizableGraph::VertexContainer vAllVertices;
+  for(g2o::OptimizableGraph::VertexContainer::const_iterator vertex_it = mpOptimizer->activeVertices().begin(); vertex_it != mpOptimizer->activeVertices().end(); vertex_it++)
+  {
+    if((*vertex_it)->fixed())
+      continue;
+      
+    if((*vertex_it)->dimension() != 3)
+      continue;
+  
+    vAllVertices.push_back(*vertex_it);
+  }
+  
+  std::vector<std::pair<int, int> > vBlockIndices;
+  vBlockIndices.reserve(vAllVertices.size() * vAllVertices.size() * 0.5);
+  
+  int nSmallestHessian = std::numeric_limits<int>::max();
+  int nLargestHessian = std::numeric_limits<int>::min();
+  
+  for(unsigned i=0; i < vAllVertices.size(); ++i)
+  {
+    if(vAllVertices[i]->hessianIndex() > nLargestHessian)
+    {
+      nLargestHessian = vAllVertices[i]->hessianIndex(); 
+    }
+    
+    if(vAllVertices[i]->hessianIndex() < nSmallestHessian)
+    {
+      nSmallestHessian = vAllVertices[i]->hessianIndex(); 
+    }
+    
+    for(unsigned j=i; j < vAllVertices.size(); ++j)
+    {
+      vBlockIndices.push_back(std::make_pair(vAllVertices[i]->hessianIndex(), vAllVertices[j]->hessianIndex()));
+    }
+  }
+  
+  SparseBlockMatrix<MatrixXd> spinv;  // This will hold the covariance matrix
+  
+  bool bSuccess = mpOptimizer->computeMarginals(spinv, vBlockIndices);
+  
+  if(!bSuccess)
+  {
+    ROS_ERROR("ChainBundleIncrementalCovariance::SavePointCovMatrix: Failed call to computeMarginals");
+    return;
+  }
+  
+  spinv.slice(nSmallestHessian, nLargestHessian, nSmallestHessian, nLargestHessian, false)->writeOctave(fileName.c_str(), false);
+}
+
+void ChainBundleIncrementalCovariance::SavePointCovMatrix(std::string fileName, std::vector<int> vPointIDs)
+{
+  std::vector<std::pair<int, int> > vBlockIndices;
+  vBlockIndices.reserve(vPointIDs.size() * vPointIDs.size() * 0.5);
+  
+  for(unsigned i=0; i < vPointIDs.size(); ++i)
+  {
+    const VertexRelPoint* pPoint1 = dynamic_cast<const VertexRelPoint*>(mpOptimizer->vertex(vPointIDs[i]));
+    ROS_ASSERT(pPoint1);
+    
+    for(unsigned j=i; j < vPointIDs.size(); ++j)
+    {
+      const VertexRelPoint* pPoint2 = dynamic_cast<const VertexRelPoint*>(mpOptimizer->vertex(vPointIDs[j]));
+      ROS_ASSERT(pPoint2);
+      
+      vBlockIndices.push_back(std::make_pair(pPoint1->hessianIndex(), pPoint2->hessianIndex()));
+    }
+  }
+  
+  SparseBlockMatrix<MatrixXd> spinv;  // This will hold the covariance matrix
+  
+  bool bSuccess = mpOptimizer->computeMarginals(spinv, vBlockIndices);
+  
+  if(!bSuccess)
+  {
+    ROS_ERROR("ChainBundleIncrementalCovariance::SavePointCovMatrix: Failed call to computeMarginals");
+    return;
+  }
+  
+  // Now extract the relevant sub-blocks
+  int nPointNum = vPointIDs.size();
+  int* blockIndices = new int[nPointNum];
+  
+  for(int i=0; i < nPointNum; ++i)
+  {
+    blockIndices[i] = (i+1)*3;
+  }
+  
+  SparseBlockMatrix<MatrixXd> spinv_relevant(blockIndices, blockIndices, nPointNum, nPointNum);
+  delete[] blockIndices;
+  
+  // Loop over the points, pull the sub blocks out of spinv and put into spinv_relevant
+  for(unsigned i=0; i < vPointIDs.size(); ++i)
+  {
+    const VertexRelPoint* pPoint1 = dynamic_cast<const VertexRelPoint*>(mpOptimizer->vertex(vPointIDs[i]));
+    ROS_ASSERT(pPoint1);
+    
+    for(unsigned j=i; j < vPointIDs.size(); ++j)
+    {
+      const VertexRelPoint* pPoint2 = dynamic_cast<const VertexRelPoint*>(mpOptimizer->vertex(vPointIDs[j]));
+      ROS_ASSERT(pPoint2);
+      
+      MatrixXd* pMatrix = spinv.block(pPoint1->hessianIndex(), pPoint2->hessianIndex());
+      *spinv_relevant.block(i,j,true) = *pMatrix;
+    }
+  }
+  
+  spinv_relevant.writeOctave(fileName.c_str(), false);
 }

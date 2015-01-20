@@ -193,8 +193,8 @@ void SystemFrontendBase::PublishPose()
   int nMeasNum = mpTracker->GetMeasNum();
   
   mcptam::TrackerCovInfo cov_info_msg;
-  cov_info_msg.cov_norm = TooN::norm_fro(cov_exp);
-  cov_info_msg.cov_norm_approx = cov_norm_msg.data;
+  cov_info_msg.cov_norm_exp = TooN::norm_fro(cov_exp);
+  cov_info_msg.cov_norm = cov_norm_msg.data;
   cov_info_msg.cov_norm_old = TooN::norm_fro(cov_old);
   cov_info_msg.calc_dur = cov_dur.toSec();
   cov_info_msg.map_size = nMapSize;

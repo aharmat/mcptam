@@ -100,16 +100,6 @@ Tracker::Tracker(Map &map, MapMakerClientBase &mapmaker, TaylorCameraMap &camera
   , mmFixedPoses(poses)
   , mNodeHandlePrivate("~")
   , mpGLWindow(pWindow)
-  , mTrackerCovariance("cov_analysis.csv", {10,10,10,10,10,10,10,10,10,10,
-                                            20,20,20,20,20,20,20,20,20,20,
-                                            30,30,30,30,30,30,30,30,30,30,
-                                            50,50,50,50,50,50,50,50,50,50,
-                                            70,70,70,70,70,70,70,70,70,70,
-                                            100,100,100,100,100,
-                                            200,200,200,200,200,
-                                            300,300,300,
-                                            500,500,500,
-                                            750,1000}, 3)
 {
   ROS_DEBUG("Tracker: In constructor");
   
@@ -1265,16 +1255,31 @@ void Tracker::TrackMap()
     mbDoAnalysis = false;
     std_srvs::Empty srv;
     mPauseClient.call(srv);
-    // First do the calculation with limited cross covariance computation time
-    //mm6PoseCovarianceExperimental = CalcCovariance2(mvIterationSets, Tracker::sdCrossCovDur);
-    // Then repeat with significantly more time
-    mm6PoseCovarianceExperimental = CalcCovariance(mvIterationSets, false, "cov_analysis.csv");
-    mm6PoseCovarianceExperimental = CalcCovariance(mvIterationSets, true);
+    
+    //TooN::Matrix<6> m6PoseCovariancePartial= CalcCovariance(mvIterationSets, false, Tracker::sdCrossCovDur, "cov_analysis.csv");
+    //std::cerr<<"Covariance from partial measurements, limited time: "<<std::endl<<m6PoseCovariancePartial<<std::endl;
+    TooN::Matrix<6> m6PoseCovariancePartial= CalcCovariance(mvIterationSets, false, -1, "cov_analysis.csv");
+    std::cerr<<"Covariance from partial measurements, full time: "<<std::endl<<m6PoseCovariancePartial<<std::endl;
+    //double dPartialNorm = TooN::norm_fro(m6PoseCovariancePartial); 
+    //std::cerr<<"Norm: "<<dPartialNorm<<std::endl;
+    //mm6PoseCovarianceExperimental = CalcCovariance(mvIterationSets, true);
+    //std::cerr<<"Covariance from all measurements: "<<std::endl<<mm6PoseCovarianceExperimental<<std::endl;
+    //std::cerr<<"Norm: "<<TooN::norm_fro(mm6PoseCovarianceExperimental)<<std::endl;
+    //mm6PoseCovarianceExperimental = mMapMaker.GetTrackerCov(mpCurrentMKF->mse3BaseFromWorld, mvCurrCamNames, mvIterationSets);
+    //std::cerr<<"Covariance from incremental BA: "<<std::endl<<mm6PoseCovarianceExperimental<<std::endl;
+    mm6PoseCovarianceExperimental = mMapMaker.GetTrackerCovFull(mpCurrentMKF->mse3BaseFromWorld, mvCurrCamNames, mvIterationSets);
+    std::cerr<<"Covariance from full BA: "<<std::endl<<mm6PoseCovarianceExperimental<<std::endl;
+    //double dFullBANorm = TooN::norm_fro(mm6PoseCovarianceExperimental); 
+    //std::cerr<<"Norm: "<<dFullBANorm<<std::endl;
+    
+    //std::cerr<<"Partial scaled to Full BA norm: "<<std::endl<<m6PoseCovariancePartial * (dFullBANorm/dPartialNorm) << std::endl;
+    
     //mPauseClient.call(srv);
   }
   else
   {
-    mm6PoseCovarianceExperimental = CalcCovariance(mvIterationSets, false);
+    //mm6PoseCovarianceExperimental = CalcCovariance(mvIterationSets, false);
+    //std::cerr<<"Covariance from partial measurements: "<<std::endl<<mm6PoseCovarianceExperimental<<std::endl;
   }
   
   //std::cout<<"mm6PoseCovarianceExperimental: "<<std::endl<<mm6PoseCovarianceExperimental<<std::endl;
@@ -1557,7 +1562,7 @@ int Tracker::SearchForPoints(TrackerDataPtrVector& vTD, std::string cameraName, 
   return nFound;
 }
 
-Matrix<6> Tracker::CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationSets, bool bFull, std::string fileName)
+Matrix<6> Tracker::CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationSets, bool bFull, double dDuration, std::string fileName)
 {
   std::unordered_set<MapPoint*> spParticipatingPoints;
   TrackerDataPtrVector vpAllMeas;
@@ -1595,36 +1600,49 @@ Matrix<6> Tracker::CalcCovariance(std::vector<TrackerDataPtrVector>& vIterationS
   {
     // We're doing the full covariance calculation here, don't give duration limit
     // And a zero threshold on the cross cov priority (this means that if two points' covariances
-    // have changed at all, the cross covarince will be recomputed)
+    // have changed at all, the cross covariance will be recomputed)
+    std::cerr<<"Asking to update cross cov of "<<spParticipatingPoints.size()<<" points"<<std::endl;
     mMapMaker.UpdateCrossCovariances(spParticipatingPoints, ros::Duration(-1), 0.0);
+    std::cerr<<"Number of points in dense cov matrix: "<<spParticipatingPoints.size()<<std::endl;
+  
+    //mMapMaker.SavePointCovMatrix("point_cov_g2o.dat", spParticipatingPoints);  // do this one first because it puts g2o's id into the point id
+    //mTrackerCovariance.SavePointCovMatrix("point_cov_extracted.dat", spParticipatingPoints);  // which is used here to put the points into the same order as above
   }
   else
   {
-    mMapMaker.UpdateCrossCovariances(spParticipatingPoints, ros::Duration(Tracker::sdCrossCovDur), Tracker::sdCrossCovPriorityThresh);
+    std::cerr<<"Asking to update cross cov of "<<spParticipatingPoints.size()<<" points"<<std::endl;
+    mMapMaker.UpdateCrossCovariances(spParticipatingPoints, ros::Duration(dDuration), 0); //Tracker::sdCrossCovPriorityThresh);
+    std::cerr<<"Number of points in dense cov matrix: "<<spParticipatingPoints.size()<<std::endl;
   }
   std::cerr<<"Took "<<ros::Time::now() - updateStart<<" seconds to update cross covariances"<<std::endl;
+  
+  int nFullMeasNum = vpAllMeas.size();
+  TrackerDataPtrVector vpDenseMeas;
+  TrackerDataPtrVector vpSparseMeas;
+  //vpDenseMeas.reserve(nFullMeasNum);
+  
+  // Remove all measurements whose points aren't in the (updated) participating points set
+  // Even if we didn't time out on the updating, there still might have been points that were not in the 
+  // saved g2o graph or for some reason the covariance extraction failed
+  for(unsigned i=0; i < vpAllMeas.size(); ++i)
+  {
+    if(spParticipatingPoints.count(&vpAllMeas[i]->mPoint))
+      vpDenseMeas.push_back(vpAllMeas[i]);
+    else
+      vpSparseMeas.push_back(vpAllMeas[i]);
+  }
   
   
   TooN::Matrix<6> m6Cov;
   
   if(bFull)
   {
-    m6Cov = mTrackerCovariance.CalcCovarianceFull(vpAllMeas);
+    m6Cov = mTrackerCovariance.CalcCovarianceFull(vpDenseMeas);
   }
   else
   {
-    int nFullMeasNum = vpAllMeas.size();
-    TrackerDataPtrVector vpTruncMeas;
-    vpTruncMeas.reserve(nFullMeasNum);
-    
-    // Remove all measurements whose points aren't in the (updated) participating points set
-    for(unsigned i=0; i < vpAllMeas.size(); ++i)
-    {
-      if(spParticipatingPoints.count(&vpAllMeas[i]->mPoint))
-        vpTruncMeas.push_back(vpAllMeas[i]);
-    }
-  
-    m6Cov = mTrackerCovariance.CalcCovarianceEstimate(vpTruncMeas, nFullMeasNum, fileName);
+    //m6Cov = mTrackerCovariance.CalcCovarianceEstimate(vpDenseMeas, nFullMeasNum, fileName);
+    m6Cov = mTrackerCovariance.CalcCovarianceEstimate(vpDenseMeas, vpSparseMeas, false, fileName);
   }
   
   return m6Cov;
@@ -1694,8 +1712,8 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
   
   // The TooN WLSCholesky class handles reweighted least squares.
   // It just needs errors and jacobians.
-  //WLS<6> wls; //, wls_noweight;
-  //wls.add_prior(100.0); // Stabilising prior
+  WLS<6> wls; //, wls_noweight;
+  wls.add_prior(100.0); // Stabilising prior
   WLS<6> wls_old; //, wls_noweight;
   wls_old.add_prior(100.0); // Stabilising prior
   mnNumInliers = 0;
@@ -1745,12 +1763,12 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
       }
       
       Matrix<2,6> &m26Jac = td.mm26Jacobian;
-      //Matrix<2,3> &m23Jac = td.mm23Jacobian;
-      //Matrix<2> m2PixelCov = TooN::Identity * (1.0/td.mdSqrtInvNoise);
+      Matrix<2,3> &m23Jac = td.mm23Jacobian;
+      Matrix<2> m2PixelCov = TooN::Identity * (1.0/td.mdSqrtInvNoise);
       
-      //Matrix<3> m3PointCov = td.mPoint.mm3WorldCov == m3Zeros ? TooN::Identity * 1e10 : td.mPoint.mm3WorldCov;
+      Matrix<3> m3PointCov = td.mPoint.mm3WorldCov == m3Zeros ? TooN::Identity * 1e10 : td.mPoint.mm3WorldCov;
     
-      //Matrix<2> m2MeasCov = m23Jac * m3PointCov * m23Jac.T() + m26Jac * mm6PoseCovariance * m26Jac.T() + m2PixelCov;
+      Matrix<2> m2MeasCov = m23Jac * m3PointCov * m23Jac.T() + m2PixelCov;
       /*
       if(j == 0)
       {
@@ -1762,7 +1780,7 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
         std::cerr<<"m2MeasCov: "<<std::endl<<m2MeasCov<<std::endl;
       }
       */
-      //wls.add_mJ_rows(td.mv2Error, m26Jac, opts::M2Inverse(m2MeasCov) * td.mdWeight);
+      wls.add_mJ_rows(td.mv2Error, m26Jac, opts::M2Inverse(m2MeasCov) * td.mdWeight);
       
       nNumAdded++;
       wls_old.add_mJ(td.mv2Error_CovScaled[0], td.mdSqrtInvNoise * m26Jac[0], td.mdWeight); // These two lines are currently
@@ -1771,12 +1789,12 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
     
   }
   
-  //wls.compute();
+  wls.compute();
   wls_old.compute();
   
   if(bMarkOutliers)	
   {
-		//mm6PoseCovariance = TooN::SVD<6>(wls.get_C_inv()).get_pinv();   // from ethzasl_ptam
+		mm6PoseCovariance = TooN::SVD<6>(wls.get_C_inv()).get_pinv();   // from ethzasl_ptam
     mm6PoseCovarianceOld = TooN::SVD<6>(wls_old.get_C_inv()).get_pinv();
     
     //wls_noweight.compute();
@@ -1822,7 +1840,7 @@ void Tracker::ApplyMotionModel()
   UpdateCamsFromWorld();
   
   // Should propagate old pose covariance forward instead of setting it to a large value each time
-  mm6PoseCovariance = TooN::Identity;  
+  //mm6PoseCovariance = TooN::Identity;  
 }
 
 // The motion model is updated after TrackMap has found a new pose

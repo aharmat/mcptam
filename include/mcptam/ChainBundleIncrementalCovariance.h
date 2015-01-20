@@ -203,6 +203,9 @@ public:
   
   bool CovValid(){ return mbCovValid; }
   
+  void SavePointCovMatrix(std::string fileName);
+  void SavePointCovMatrix(std::string fileName, std::vector<int> vPointIDs);
+  
   // Static members
   static int snMaxIterations;   ///< Maximum number of iterations allowed before bailing
   static int snMaxTrialsAfterFailure;  ///< Maximum number of times the solver will 

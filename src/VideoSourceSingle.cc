@@ -72,6 +72,19 @@ VideoSourceSingle::VideoSourceSingle(bool bGetPoseSeparately)
   
   ROS_INFO("VideoSourceSingle: Set up all subscriptions");
   
+  // Acquire an image and get image size from it
+  mbAcquiredImage = false;
+  while(!mbAcquiredImage && ros::ok())
+  {
+    // Trigger ROS callbacks
+    mCallbackQueue.callAvailable();
+  }
+  
+  ROS_INFO("VideoSourceSingle: Got first image, extracting size");
+  mirSize = CVD::ImageRef(mCVPtr->image.cols,mCVPtr->image.rows);
+  mirFullScaleSize = CVD::ImageRef(mirSize.x * mirBinning.x, mirSize.y * mirBinning.y);
+  
+  // Acquire the calibration info
   mbAcquiredInfo = false;
   while(!mbAcquiredInfo && ros::ok())
   {
@@ -83,6 +96,7 @@ VideoSourceSingle::VideoSourceSingle(bool bGetPoseSeparately)
   mInfoSub.shutdown();  
   ROS_INFO("VideoSourceSingle: Got calibration info");
   
+  // Acquire pose info
   if(mbGetPoseSeparately)
   {
     mbAcquiredPose = false;
@@ -95,19 +109,6 @@ VideoSourceSingle::VideoSourceSingle(bool bGetPoseSeparately)
     mPoseSub.shutdown();
     ROS_INFO("VideoSourceSingle: Got pose");
   }
-  
-  mbAcquiredImage = false;
-  while(!mbAcquiredImage && ros::ok())
-  {
-    // Trigger ROS callbacks
-    mCallbackQueue.callAvailable();
-  }
-  
-  ROS_INFO("VideoSourceSingle: Got first image, extracting size");
-
-  mirSize = CVD::ImageRef(mCVPtr->image.cols,mCVPtr->image.rows);
-  mirFullScaleSize = CVD::ImageRef(mirSize.x * mirBinning.x, mirSize.y * mirBinning.y);
-  
 }
 
 VideoSourceSingle::~VideoSourceSingle()
