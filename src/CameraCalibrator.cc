@@ -92,6 +92,7 @@ CameraCalibrator::CameraCalibrator()
   if(mirSize != irFullScaleSize)
   {
     ROS_ERROR("CameraCalibrator: Can't calibrate camera with binning turned on, relaunch camera with binning off");
+    ROS_ERROR_STREAM("CameraCalibrator: Got image size of "<<mirSize.x<<","<<mirSize.y<<"  and full scale size of "<<irFullScaleSize.x<<","<<irFullScaleSize.y);
     ros::shutdown();
     return;
   }
