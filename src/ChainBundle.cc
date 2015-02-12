@@ -436,11 +436,11 @@ class EdgeChainMeas : public g2o::BaseMultiEdge<2, TooN::Vector<2> >
       
       /*
       // Option 1:
-      std::vector<JacobianType, g2o::aligned_allocator<JacobianType> > _jacobianOplusTemp(_vertices.size());
+      std::vector<JacobianType, Eigen::aligned_allocator<JacobianType> > _jacobianOplusTemp(_vertices.size());
       */
       
       // Option 2:
-      std::vector<JacobianType, g2o::aligned_allocator<JacobianType> >& _jacobianOplusTemp = _jacobianOplus;
+      std::vector<JacobianType, Eigen::aligned_allocator<JacobianType> >& _jacobianOplusTemp = _jacobianOplus;
       
       const VertexRelPoint* pPointVertex = dynamic_cast<const VertexRelPoint*>(_vertices.back());
       ROS_ASSERT(pPointVertex);
