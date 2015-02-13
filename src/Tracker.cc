@@ -136,7 +136,7 @@ void Tracker::Reset(bool bSavePose, bool bResetMap)
   mnFrame=0;
   mv6BaseVelocity = Zeros;
   mdMSDScaledVelocityMagnitude = 0;
-  mbJustRecoveredSoUseCoarse = false;
+  mbJustRecoveredSoUseCoarse = true;
   mbInitRequested = false;
   mbPutPlaneAtOrigin = true;
   mbAddNext = false;
@@ -471,7 +471,7 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
          (*gvnAddingMKFs &&
           mOverallTrackingQuality == GOOD &&
           mnLostFrames == 0 &&
-          ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.1) &&
+          ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.5) &&
           //mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, CountMeasurements()))
           mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF)))
       {
@@ -530,12 +530,17 @@ bool Tracker::AttemptRecovery()
   {
     std::string camName = mvAllCamNames[i];
     bool bRelocGood = mRelocaliser.AttemptRecovery(*mpCurrentMKF->mmpKeyFrames[camName]);
+    
+    std::cout<<"Relocalization good: "<<bRelocGood<<std::endl;
+    
     if(!bRelocGood)
       continue;
     
     // The pose returned is for a KeyFrame, so we have to calculate the appropriate base MultiKeyFrame pose from it
     SE3<> se3Best = mRelocaliser.BestPose();
     mse3StartPose = mpCurrentMKF->mse3BaseFromWorld = mpCurrentMKF->mmpKeyFrames[camName]->mse3CamFromBase.inverse() * se3Best;  // CHECK!! GOOD
+    
+    std::cout<<"mse3StartPose: "<<std::endl<<mse3StartPose<<std::endl;
     
     bSuccess = true;
     break;
@@ -637,7 +642,6 @@ void Tracker::TrackForInitialMap()
       CopyMasks(*mMap.mlpMultiKeyFrames.back());
       mnLastMultiKeyFrameDropped = mnFrame;
       mtLastMultiKeyFrameDropped = ros::Time::now();
-
     }
     else
     {
@@ -670,7 +674,7 @@ void Tracker::FindPVS(std::string cameraName, TDVLevels& vPVSLevels)
   std::set<MapPoint*> spNearestPoints;
   CollectNearestPoints(kf, spNearestPoints);
   
-  ROS_DEBUG_STREAM("Found "<<spNearestPoints.size()<<" nearest points");
+  ROS_INFO_STREAM("Found "<<spNearestPoints.size()<<" nearest points");
    
   // For all points we collected
   for(std::set<MapPoint*>::iterator point_it = spNearestPoints.begin(); point_it != spNearestPoints.end(); ++point_it)
@@ -965,12 +969,12 @@ void Tracker::TrackMap()
   
   timingMsg.pvs = (ros::WallTime::now() - startTime).toSec();
   
-  /*
+  
   for(int i=0; i<LEVELS; i++)
   {
     std::cerr<<"PVS["<<i<<"]: "<<anNumPVSPoints[i]<<std::endl;
   }
-  */
+  
   
   
   startTime = ros::WallTime::now();
@@ -1060,15 +1064,17 @@ void Tracker::TrackMap()
   Vector<6> v6LastUpdate;
   v6LastUpdate = Zeros;
   
+  static gvar3<int> gvnUpdatingPoints("UpdatingPoints", 1, HIDDEN|SILENT);
+  
   // Again, ten gauss-newton pose update iterations.
   for(int iter = 0; iter<10 && mvCurrCamNames.size() > 0; iter++)
   {
     // For a bit of time-saving: don't do full nonlinear
     // reprojection at every iteration - it really isn't necessary!
     if(iter == 0 || iter == 4 || iter == 9)
-      v6LastUpdate = PoseUpdateStep(mvIterationSets, iter, 16.0, iter==9);   // Even this is probably overkill, the reason we do many
+      v6LastUpdate = PoseUpdateStep(mvIterationSets, iter, 16.0, iter==9 && *gvnUpdatingPoints);   // Even this is probably overkill, the reason we do many
     else                                                                      // iterations is for M-Estimator convergence rather than 
-      v6LastUpdate = PoseUpdateStepLinear(mvIterationSets, v6LastUpdate, iter, 16.0, iter==9);   // linearisation effects.
+      v6LastUpdate = PoseUpdateStepLinear(mvIterationSets, v6LastUpdate, iter, 16.0, iter==9 && *gvnUpdatingPoints);   // linearisation effects.
       
   }
   
@@ -1518,8 +1524,8 @@ void Tracker::ApplyMotionModel()
   mse3StartPose = mpCurrentMKF->mse3BaseFromWorld;
   
   // Old style motion update with simple velocity  model
-  Vector<6> v6Motion = mv6BaseVelocity * mLastProcessDur.toSec();
-  //Vector<6> v6Motion = Zeros;
+  //Vector<6> v6Motion = mv6BaseVelocity * mLastProcessDur.toSec();
+  Vector<6> v6Motion = Zeros;
   
   if(Tracker::sbUseRotationEstimator)  // estimate the rotation component of the motion from SmallBlurryImage differences
   {

@@ -67,12 +67,18 @@ MapMakerBase::MapMakerBase(Map& map, bool bAdvertise)
 void MapMakerBase::Reset()
 {
   ROS_DEBUG("MapMakerBase: Reset");
+  
+  std::cout<<"Calling map reset"<<std::endl;
   mMap.Reset();
+  std::cout<<"Done calling map reset"<<std::endl;
   
   mbResetDone = true;
   mbResetRequested = false;
   mState = MM_INITIALIZING;
   mdMaxCov = -1;
+  
+  if(mMap.mbGood)  // If map is good after a reset, it means we have a saved map loaded, so switch to running
+    mState = MM_RUNNING;
 }
 
 void MapMakerBase::RequestReset()
@@ -142,7 +148,7 @@ KeyFrame* MapMakerBase::ClosestKeyFrame(KeyFrame &kf, KeyFrameRegion region, boo
   if( !bSameCamName && pClosestKF == NULL )
   {
     // Dump the cameras and map data
-    DumpToFile("fail_map.dat");
+    //DumpToFile("fail_map.dat");
     ROS_ASSERT(pClosestKF != NULL);
   }
   
@@ -357,6 +363,8 @@ void MapMakerBase::PublishMapInfo()
 // Publish map point PCL cloud
 void MapMakerBase::PublishMapPoints()
 {
+  //std::cout<<"In MapMakerBase::PublishMapPoints"<<std::endl;
+  
   if(!mMapPointsPub)
     mMapPointsPub = mNodeHandlePriv.advertise<pcl::PointCloud<pcl::PointXYZRGB> >("map_points", 1,true);
   
@@ -401,6 +409,8 @@ void MapMakerBase::PublishMapPoints()
 // Publish MKFs as a marker array
 void MapMakerBase::PublishMapMKFs()
 {
+  //std::cout<<"In MapMakerBase::PublishMapMKFs"<<std::endl;
+  
   if(!mMapMKFsPub)
     mMapMKFsPub = mNodeHandlePriv.advertise<visualization_msgs::MarkerArray>("map_mkfs_array", 1,true);
   
@@ -468,112 +478,4 @@ void MapMakerBase::PublishMapVisualization()
   ROS_DEBUG(" >>>>>>>>>>>>>>>> PUBLISHING MAP VISUALIZATION <<<<<<<<<<<<<<<<<<<<<<<");
   PublishMapPoints();
   PublishMapMKFs();
-}
-
-// Dumps all map information to a file
-void MapMakerBase::DumpToFile(std::string filename)
-{ 
-  std::ofstream ofs(filename.c_str());
-  
-  if(!ofs.good())
-  {
-    ROS_ERROR_STREAM("Couldn't open "<<filename<<" to write map");
-    return;
-  }
-  
-  // First write CamFromBase for each camera in system
-  ofs<<"% Camera poses in MKF frame, format:"<<std::endl;
-  ofs<<"% Total number of cameras"<<std::endl;
-  ofs<<"% Camera Name, Position (3 vector), Orientation (quaternion, 4 vector)"<<std::endl;
-  
-  MultiKeyFrame* pFirstMKF = *(mMap.mlpMultiKeyFrames.begin());
-  
-  // Total number of cameras
-  ofs<<pFirstMKF->mmpKeyFrames.size()<<std::endl;
-  
-  for(KeyFramePtrMap::iterator kf_it = pFirstMKF->mmpKeyFrames.begin(); kf_it != pFirstMKF->mmpKeyFrames.end(); ++kf_it)
-  {
-    KeyFrame& kf = *(kf_it->second);
-    
-    // Store the conventional way of defining pose (ie inverse of PTAM)
-    geometry_msgs::Pose pose = util::SE3ToPoseMsg(kf.mse3CamFromBase.inverse());
-    
-    ofs<<kf.mCamName;
-    ofs<<", "<<pose.position.x<<", "<<pose.position.y<<", "<<pose.position.z;
-    ofs<<", "<<pose.orientation.x<<", "<<pose.orientation.y<<", "<<pose.orientation.z<<", "<<pose.orientation.w<<std::endl;
-  }
-  
-  // Now write BaseFromWorld for each MKF in system
-  ofs<<"% MKFs in world frame, format:"<<std::endl;
-  ofs<<"% Total number of MKFs"<<std::endl;
-  ofs<<"% MKF number, Position (3 vector), Orientation (quaternion, 4 vector)"<<std::endl;
-  
-  // Total number of MKFs
-  ofs<<mMap.mlpMultiKeyFrames.size()<<std::endl;
-  
-  int i=0;
-  for(MultiKeyFramePtrList::iterator mkf_it = mMap.mlpMultiKeyFrames.begin(); mkf_it != mMap.mlpMultiKeyFrames.end(); ++i, ++mkf_it)
-  {
-    MultiKeyFrame& mkf = *(*mkf_it);
-    mkf.mnID = i;
-    
-    // Store the conventional way of defining pose (ie inverse of PTAM)
-    geometry_msgs::Pose pose = util::SE3ToPoseMsg(mkf.mse3BaseFromWorld.inverse());
-    
-    ofs<<i;
-    ofs<<", "<<pose.position.x<<", "<<pose.position.y<<", "<<pose.position.z;
-    ofs<<", "<<pose.orientation.x<<", "<<pose.orientation.y<<", "<<pose.orientation.z<<", "<<pose.orientation.w<<std::endl;
-  }
-  
-  // Now write map point positions
-  ofs<<"% Points in world frame, format:"<<std::endl;
-  ofs<<"% Total number of points"<<std::endl;
-  ofs<<"% Point number, Position (3 vector), Parent MKF number, Parent camera name"<<std::endl;
-  
-  // Total number of points
-  ofs<<mMap.mlpPoints.size()<<std::endl;
-  
-  int nTotalMeas = 0;
-  i=0;
-  for(MapPointPtrList::iterator point_it = mMap.mlpPoints.begin(); point_it != mMap.mlpPoints.end(); ++i, ++point_it)
-  {
-    MapPoint& point = *(*point_it);
-    point.mnID = i;
-    
-    ofs<<i;
-    ofs<<", "<<point.mv3WorldPos[0]<<", "<<point.mv3WorldPos[1]<<", "<<point.mv3WorldPos[2];
-    ofs<<", "<<point.mpPatchSourceKF->mpParent->mnID<<", "<<point.mpPatchSourceKF->mCamName<<std::endl;
-    
-    nTotalMeas += point.mMMData.spMeasurementKFs.size();
-  }
-  
-  // Now write measurements
-  ofs<<"% Measurements of points from KeyFrames, format: "<<std::endl;
-  ofs<<"% Total number of measurements"<<std::endl;
-  ofs<<"% MKF number, camera name, point number, image position (2 vector) at level 0, measurement noise"<<std::endl;
-  
-  // Total number of measurements
-  ofs<<nTotalMeas<<std::endl;
-  
-  for(MultiKeyFramePtrList::iterator mkf_it = mMap.mlpMultiKeyFrames.begin(); mkf_it != mMap.mlpMultiKeyFrames.end(); ++mkf_it)
-  {
-    MultiKeyFrame& mkf = *(*mkf_it);
-    for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
-    {
-      KeyFrame& kf = *(kf_it->second);
-      for(MeasPtrMap::iterator meas_it = kf.mmpMeasurements.begin(); meas_it != kf.mmpMeasurements.end(); ++meas_it)
-      {
-        MapPoint& point = *(meas_it->first);
-        Measurement& meas = *(meas_it->second);
-        
-        ofs<<mkf.mnID<<", "<<kf.mCamName<<", "<<point.mnID<<", ";
-        ofs<<meas.v2RootPos[0]<<", "<<meas.v2RootPos[1]<<", "<<LevelScale(meas.nLevel) * LevelScale(meas.nLevel)<<std::endl;
-      }
-    }
-  }
-  
-  // Done writing
-  ofs<<"% The end";
-  ofs.close();
-  
 }

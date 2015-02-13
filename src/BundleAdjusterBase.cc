@@ -149,6 +149,7 @@ int BundleAdjusterBase::BundleAdjustAll(std::vector<std::pair<KeyFrame*, MapPoin
   for(MultiKeyFramePtrList::iterator mkf_it = mMap.mlpMultiKeyFrames.begin(); mkf_it != mMap.mlpMultiKeyFrames.end(); ++mkf_it)
   {
     MultiKeyFrame& mkf = *(*mkf_it);
+    ROS_ASSERT(mkf.mnID >= 0);  //debug
     
     if(mkf.mbBad)
       continue;
@@ -213,6 +214,8 @@ int BundleAdjusterBase::BundleAdjustRecent(std::vector<std::pair<KeyFrame*, MapP
   for(std::set<MultiKeyFrame*>::iterator mkf_it = spAdjustSet.begin(); mkf_it != spAdjustSet.end(); ++mkf_it)
   {
     MultiKeyFrame& mkf = *(*mkf_it);
+    ROS_ASSERT(mkf.mnID >= 0);  //debug
+    
     for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
     {
       KeyFrame& kf = *(kf_it->second);
@@ -250,6 +253,14 @@ int BundleAdjusterBase::BundleAdjustRecent(std::vector<std::pair<KeyFrame*, MapP
     
     if(mkf.mbBad)
       continue;
+      
+    // Make sure we're not reaching into the tracker's MKF. When the tracker decides to add an MKF,
+    // it will record the measurements and the point will know about this, but the MKF will not yet
+    // be in the map. This can cause some issues, so just avoid taking this MKF if this is the case
+    if(!mMap.Contains(&mkf))  
+      continue;
+      
+    ROS_ASSERT(mkf.mnID >= 0);  //debug
     
     if(spAdjustSet.count(&mkf) == false)  // parent MKF is not already being adjusted
       spFixedSet.insert(&mkf);            // then add to fixed set

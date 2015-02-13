@@ -105,11 +105,13 @@ protected:
   /// Creates a new VideoSourceMulti object
   VideoSourceMulti* InitVideoSource();
   
-  /// Write the camera parameters to the given file name
-  void DumpCamerasToFile(std::string filename);
-  
   /// Load a map of masks specified by the 'masks' and 'masks_dir' params
   ImageBWMap LoadMasks();
+  
+  void SaveCamerasToFolder(std::string folder);
+  
+  void LoadCamerasFromFolder(std::string folder);
+  
   
   ros::NodeHandle mNodeHandle;      ///< ROS global node handle
   ros::NodeHandle mNodeHandlePriv;  ///< ROS private node handle
@@ -119,9 +121,17 @@ protected:
   
   Map *mpMap;   ///< Pointer to the Map
   
-  TaylorCameraMap mmCameraModels;   ///< The TaylorCamera models
   ImageRefMap mmDrawOffsets;        ///< %Map of drawing offset coordinates
+  TaylorCameraMap mmCameraModelsLive;   ///< The TaylorCamera models loaded from live cameras
+  SE3Map mmPosesLive;                   ///< %Map of fixed relative camera poses loaded from live cameras
+  
+  TaylorCameraMap mmCameraModelsLoaded;   ///< The TaylorCamera models loaded from saved data
+  SE3Map mmPosesLoaded;                   ///< %Map of fixed relative camera poses loaded from saved data
+  
+  TaylorCameraMap mmCameraModels;   ///< The TaylorCamera models
   SE3Map mmPoses;                   ///< %Map of fixed relative camera poses
+  
+  std::string mSaveFolder;
   
   bool mbDone;              ///< Should I quit run loop?
   

@@ -142,7 +142,6 @@ public:
   TooN::Vector<3> mv3Center_NC;             ///< Unit vector in Source-KF coords pointing at the patch center
   TooN::Vector<3> mv3OneDownFromCenter_NC;  ///< Unit vector in Source-KF coords pointing towards one pixel down of the patch center
   TooN::Vector<3> mv3OneRightFromCenter_NC; ///< Unit vector in Source-KF coords pointing towards one pixel right of the patch center
-  TooN::Vector<3> mv3Normal_NC;             ///< Unit vector in Source-KF coords indicating patch normal
   
   TooN::Vector<3> mv3PixelDown_W;           ///< 3-Vector in World coords corresponding to a one-pixel move down the source image
   TooN::Vector<3> mv3PixelRight_W;          ///< 3-Vector in World coords corresponding to a one-pixel move right the source image
@@ -156,7 +155,7 @@ public:
   
   // Random junk (e.g. for visualisation)
   //ros::Time mtCreationTime;   ///< Time of creation
-  int mnID;     ///< Used when dumping map to file
+  int mnID;     ///< Used when saving map to file
   
 };
 

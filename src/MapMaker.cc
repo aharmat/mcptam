@@ -89,13 +89,13 @@ void MapMaker::RequestRescaling(double dScale)
 }
 
 // Request the map parameters be written to the given file name
-void MapMaker::RequestFileDump(std::string filename)
+void MapMaker::RequestMapSave(std::string folder)
 { 
   if(mBundleAdjuster.Running()) 
     mBundleAdjuster.RequestAbort();
     
-  mbFileDump = true; 
-  mDumpFileName = filename;
+  mbMapSave = true; 
+  mSaveFolder = folder;
 }
 
 // Request that the initialization phase is completed early
@@ -114,15 +114,25 @@ void MapMaker::Reset()
   
   MapMakerClientBase::Reset();
   MapMakerServerBase::Reset();
+  
+  std::cout<<"Calling MapMakerBase::Reset()"<<std::endl;
   MapMakerBase::Reset();  // reset the actual map
+  std::cout<<"Done MapMakerBase::Reset()"<<std::endl;
+  
+  /*
+  if(mMap.mbGood)
+  {
+    ApplyGlobalTransformationToMap(CalcPlaneAligner()); 
+  }
+  */
   
   //debug
   mbRescale = false;
   mdScale = 1.0;
   
   //debug
-  mbFileDump = false;
-  mDumpFileName = "map.dat";
+  mbMapSave = false;
+  mSaveFolder = "";
   
   //testing 
   mbStopInit = false;
@@ -160,11 +170,13 @@ void MapMaker::run()
     }
     
     //debug
-    if(mbFileDump)
+    if(mbMapSave)
     {
-      ROS_INFO_STREAM("------------- Dumping file to "<<mDumpFileName);
-      DumpToFile(mDumpFileName);
-      mbFileDump = false;
+      ROS_ASSERT(!mSaveFolder.empty());
+      ROS_INFO_STREAM("------------- Saving map to  "<<mSaveFolder);
+      mMap.SaveToFolder(mSaveFolder);
+      mbMapSave = false;
+      mSaveFolder = "";
     }
     
     if(ResetRequested()) {Reset(); continue;}
@@ -172,7 +184,9 @@ void MapMaker::run()
     
     if(ros::Time::now() - lastPublishTime > publishDur)
     {
+      //std::cout<<"Publishing map info!!"<<std::endl;
       PublishMapInfo();
+      PublishMapVisualization();
       lastPublishTime = ros::Time::now();
     }
     

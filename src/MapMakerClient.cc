@@ -188,6 +188,7 @@ bool MapMakerClient::Init(MultiKeyFrame*& pMKF_Incoming, bool bPutPlaneAtOrigin)
   for(KeyFramePtrMap::iterator it = pMKF->mmpKeyFrames.begin(); it != pMKF->mmpKeyFrames.end(); it++)
     it->second->MakeKeyFrame_Rest();
   
+  pMKF->mnID = mMap.mlpMultiKeyFrames.size();
   mMap.mlpMultiKeyFrames.push_back(pMKF);
   
   while(mMap.mlpPoints.size() == 0 && ros::ok())
@@ -252,6 +253,7 @@ void MapMakerClient::AddMultiKeyFrameFromTopOfQueue()
     }
   }
   
+  pMKF->mnID = mMap.mlpMultiKeyFrames.size();
   mNetworkManager.SendAdd(pMKF);  // Send the new multikeyframe to the server
   mMap.mlpMultiKeyFrames.push_back(pMKF);
   

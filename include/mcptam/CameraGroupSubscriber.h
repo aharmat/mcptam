@@ -105,6 +105,7 @@ public:
   
   // static members
   static bool sbDynamicSync;              ///< Dynamically set the inter message lower bound of the synchronizer based on observed framerate?
+  static double sdMaxSyncWindow;          ///< Maximum time difference between the earliest and latest synchronized images
   static std::string sImageTopic;         ///< The image topic for each camera
   static std::string sInfoTopic;          ///< The info topic for each camera
   static std::string sPoseTopic;          ///< The pose topic for eah camera (only to support old bag files where camera pose was separate topic)

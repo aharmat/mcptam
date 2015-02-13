@@ -184,9 +184,6 @@ protected:
    *  @param [out] marker The resulting visualization message */
   void MKFToMarker(MultiKeyFrame& mkf, visualization_msgs::Marker& marker);
   
-  /// Dumps all map information to a file
-  void DumpToFile(std::string filename);
-  
   Map &mMap;   ///< Reference to the Map
   
   ros::NodeHandle mNodeHandle;   ///< ROS node handle referencing the global namespace

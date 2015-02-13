@@ -125,12 +125,27 @@ public:
    * and removed from the trash. */
   void EmptyTrash();
   
+  void MakeSnapshot();
+
+  void Restore();
+  
+  void SaveToFolder(std::string folder);
+  
+  void LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCameraModels, bool bFix);
+  
+  bool Contains(MultiKeyFrame* pMKF);
+  
   MapPointPtrList mlpPoints;  ///< List of MapPoint pointers that are in the live map
   MapPointPtrList mlpPointsTrash;  ///< List of MapPoint pointers that are in the trash
   MultiKeyFramePtrList mlpMultiKeyFrames;  ///<List of MultiKeyFrame pointers that are in the live map
   MultiKeyFramePtrList mlpMultiKeyFramesTrash;  ///< List of MultiKeyFrame pointers that are in the trash
   boost::mutex mMutex;   ///< To allow multi-threaded operation safely
   bool mbGood;  ///< Is the map initialized and operational?
+  
+  // For making a snapshot
+  MapPointPtrList mlpPointsSnapshot; ///< List of MapPoint pointers that are in the live map
+  MultiKeyFramePtrList mlpMultiKeyFramesSnapshot; ///<List of MultiKeyFrame pointers that are in the live map
+  bool mbGoodSnapshot;
 };
 
 
