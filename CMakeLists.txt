@@ -22,6 +22,8 @@ find_package(GVars3 REQUIRED)
 find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
 
+message(STATUS "OPENGL_glew_LIBRARY = ${OPENGL_glew_LIBRARY}")
+
 include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${SUITESPARSE_INCLUDE_DIRS} ${CVD_INCLUDE_DIR} 
                     ${GVars3_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS})
 
@@ -90,7 +92,12 @@ add_dependencies(pose_calibrator ${PROJECT_NAME}_gencpp)
 target_link_libraries(pose_calibrator ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${OpenCV_LIBS} ${GVars3_LIBRARIES}
                                      ${G2O_STUFF_LIBRARY} ${G2O_CORE_LIBRARY} ${G2O_SOLVER_CHOLMOD} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
                                      
-install(TARGETS mcptam mcptam_client mcptam_server camera_calibrator pose_calibrator
+add_executable(map_editor src/MainMapEditor.cc src/MapEditor.cc src/MapViewer.cc src/GLWindow2.cc src/GLWindowMenu.cc src/TaylorCamera.cc src/KeyFrame.cc src/MapPoint.cc src/Map.cc 
+                          src/SmallBlurryImage.cc src/ShiTomasi.cc src/MiniPatch.cc)
+add_dependencies(map_editor ${PROJECT_NAME}_gencpp)
+target_link_libraries(map_editor ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${OPENGL_glew_LIBRARY} ${OpenCV_LIBS} ${GVars3_LIBRARIES} ${LAPACK_LIBRARIES})
+                                     
+install(TARGETS mcptam mcptam_client mcptam_server camera_calibrator pose_calibrator map_editor
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

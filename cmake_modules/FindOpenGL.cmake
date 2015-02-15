@@ -10,6 +10,7 @@
 # If you want to use just GL you can use these values
 #  OPENGL_gl_LIBRARY   - Path to OpenGL Library
 #  OPENGL_glu_LIBRARY  - Path to GLU Library
+#  OPENGL_glew_LIBRARY  - Path to GLEW Library   <<<--------- not implemented for anything other than linux
 #  
 # On OSX default to using the framework version of opengl
 # People will have to change the cache values of OPENGL_glu_LIBRARY 
@@ -119,7 +120,15 @@ ELSE (WIN32)
             /usr/openwin/lib
             /usr/shlib /usr/X11R6/lib
     )
-
+    
+    FIND_LIBRARY(OPENGL_glew_LIBRARY
+      NAMES GLEW MesaGLEW
+      PATHS ${OPENGL_gl_LIBRARY}
+            /opt/graphics/OpenGL/lib
+            /usr/openwin/lib
+            /usr/shlib /usr/X11R6/lib
+    )
+    
   ENDIF(APPLE)
 ENDIF (WIN32)
 
@@ -139,6 +148,13 @@ IF(OPENGL_gl_LIBRARY)
     ELSE(OPENGL_glu_LIBRARY)
       SET( OPENGL_GLU_FOUND "NO" )
     ENDIF(OPENGL_glu_LIBRARY)
+    
+    IF(OPENGL_glew_LIBRARY)
+      SET( OPENGL_GLEW_FOUND "YES" )
+      SET( OPENGL_LIBRARIES ${OPENGL_glew_LIBRARY} ${OPENGL_LIBRARIES} )
+    ELSE(OPENGL_glew_LIBRARY)
+      SET( OPENGL_GLEW_FOUND "NO" )
+    ENDIF(OPENGL_glew_LIBRARY)
 
     SET( OPENGL_FOUND "YES" )
 
@@ -156,4 +172,5 @@ MARK_AS_ADVANCED(
   OPENGL_xmesa_INCLUDE_DIR
   OPENGL_glu_LIBRARY
   OPENGL_gl_LIBRARY
+  OPENGL_glew_LIBRARY
 )

@@ -48,6 +48,8 @@ GLWindow2::GLWindow2(CVD::ImageRef irSize, std::string sTitle)
   CVD::glSetFont("sans");
   mvMCPoseUpdate=Zeros;
   mvLeftPoseUpdate=Zeros;
+  
+  std::cout<< get_glx_version() <<std::endl;
 };
 
 

@@ -474,23 +474,24 @@ void Map::LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCam
         }
         else
         {
-		  imImage = CVD::img_load(imageFile);
-		  ROS_ASSERT(imImage.totalsize() > 0);
-        
-		  ss.str(std::string());
-		  ss.clear();
-		  imageFile.close();
-		  ss<<folder<<"/mkf"<<pMKF->mnID<<"_"<<camName<<"_mask.jpg";
-		  imageFile.open(ss.str().c_str());
-	      if(!imageFile.is_open())
-		  {
-		    ROS_WARN_STREAM("Couldn't open mask file ["<<ss.str()<<"], assuming no mask exists");
-		  }
-		  else
-		  {
-		    imMask = CVD::img_load(imageFile);
-		  }
-	    }
+          imImage = CVD::img_load(imageFile);
+          ROS_ASSERT(imImage.totalsize() > 0);
+            
+          ss.str(std::string());
+          ss.clear();
+          imageFile.close();
+          ss<<folder<<"/mkf"<<pMKF->mnID<<"_"<<camName<<"_mask.jpg";
+          imageFile.open(ss.str().c_str());
+          
+          if(!imageFile.is_open())
+          {
+            ROS_WARN_STREAM("Couldn't open mask file ["<<ss.str()<<"], assuming no mask exists");
+          }
+          else
+          {
+            imMask = CVD::img_load(imageFile);
+          }
+        }
         
         // Set mask before creating rest of keyframe internals
         if(imMask.totalsize() > 0)
@@ -503,7 +504,7 @@ void Map::LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCam
         {
           pKF->MakeKeyFrame_Lite(imImage, false, false);
           pKF->MakeKeyFrame_Rest();
-	    }
+        }
       }
       
       mlpMultiKeyFrames.push_back(pMKF);

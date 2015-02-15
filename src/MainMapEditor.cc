@@ -29,21 +29,54 @@
 
 /****************************************************************************************
  *
- * \file OpenGL.h
- * \brief OpenGL header files
+ * \file Main.cc
+ * \brief Main entry point for mcptam
  *
- * This code is from the original PTAM, which is
+ * Copyright 2014   Adam Harmat, McGill University (adam.harmat@mail.mcgill.ca)
+ *                  Michael Tribou, University of Waterloo (mjtribou@uwaterloo.ca)
+ *
+ * Parts of this code are from the original PTAM, which are
  * Copyright 2008 Isis Innovation Limited
  *
  ****************************************************************************************/
+ 
+ 
+#include <mcptam/MapEditor.h>
+#include <ros/ros.h>
+#include <ros/console.h>
+#include <log4cxx/logger.h>
 
-#ifndef __OPENGL_INCLUDES_H
-#define __OPENGL_INCLUDES_H
+int main(int argc, char** argv)
+{
+  ros::init(argc, argv, "map_editor");
+  ros::NodeHandle nh;
+  
+  /*
+  ROSCONSOLE_AUTOINIT;
+  log4cxx::LoggerPtr my_logger = log4cxx::Logger::getLogger(ROSCONSOLE_DEFAULT_NAME);
+  // Set the logger for this package to output all statements
+  my_logger->setLevel(ros::console::g_level_lookup[ros::console::levels::Debug]);
+  */
+  
+  try
+  {
+    MapEditor ed;
+    ed.Run();
+  }
+  catch(CVD::Exceptions::All e)
+  {
+    ROS_ERROR("Failed to run map_editor; got exception. ");
+    ROS_ERROR("   Exception was: ");
+    ROS_ERROR_STREAM(e.what);
+  }
+}
 
-#include <GL/glew.h>
-#include <GL/gl.h>
-#include <GL/glext.h>
 
-#include <cvd/gl_helpers.h>
 
-#endif
+
+
+
+
+
+
+

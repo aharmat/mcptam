@@ -1,0 +1,13 @@
+<launch>
+
+<arg name="debug" default="false" />
+<arg name="debug_prefix" value="gdb --args" if="$(arg debug)"/>
+<arg name="debug_prefix" value="" unless="$(arg debug)"/>
+
+<!-- mcptam node -->
+<node name="map_editor" pkg="mcptam" type="map_editor" clear_params="true" output="screen" launch-prefix="$(arg debug_prefix)">
+  <param name="save_folder" type="string" value="$(find mcptam)/saved" />
+</node>
+
+</launch>
+
