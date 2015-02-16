@@ -57,15 +57,17 @@ struct MouseUpdate
   
   void Reset()
   {
-    mv2LeftClick = TooN::Zeros; 
+    //mv2LeftClick = TooN::Zeros; 
     mv2MiddleClick = TooN::Zeros;
-    mv2RightClick = TooN::Zeros;
+    mv2ShiftMiddleClick = TooN::Zeros;
+    //mv2RightClick = TooN::Zeros;
     mdWheel = 0;  
   }
   
-  TooN::Vector<2> mv2LeftClick; 
+  //TooN::Vector<2> mv2LeftClick; 
   TooN::Vector<2> mv2MiddleClick;
-  TooN::Vector<2> mv2RightClick;
+  TooN::Vector<2> mv2ShiftMiddleClick;
+  //TooN::Vector<2> mv2RightClick;
   double mdWheel; // + is up, - is down
 };
 
@@ -119,6 +121,7 @@ protected:
   virtual void on_key_down(GLWindow&, int key);
   virtual void on_mouse_move(GLWindow& win, CVD::ImageRef where, int state);
   virtual void on_mouse_down(GLWindow& win, CVD::ImageRef where, int state, int button);
+  virtual void on_mouse_up(GLWindow& win, CVD::ImageRef where, int state, int button);
   virtual void on_event(GLWindow& win, int event);
   CVD::ImageRef mirLastMousePos;
 

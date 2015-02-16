@@ -210,22 +210,30 @@ void GLWindow2::on_mouse_move(GLWindow& win, CVD::ImageRef where, int state)
   CVD::ImageRef irMotion = where - mirLastMousePos;
   mirLastMousePos = where;
   
-  if(state & BUTTON_LEFT && ! (state & BUTTON_RIGHT))
+  bool bHandled = false;
+  
+  if(state & BUTTON_MIDDLE)
   {
-    mMouseUpdate.mv2LeftClick[0] += irMotion[0];
-    mMouseUpdate.mv2LeftClick[1] += irMotion[1];
-  }
-  else if(!(state & BUTTON_LEFT) && state & BUTTON_RIGHT)
-  {
-    mMouseUpdate.mv2RightClick[0] += irMotion[0];
-    mMouseUpdate.mv2RightClick[1] += irMotion[1];
-  }
-  else if(state & BUTTON_MIDDLE  || (state & BUTTON_LEFT && state & BUTTON_RIGHT))
-  {
-    mMouseUpdate.mv2MiddleClick[0] += irMotion[0];
-    mMouseUpdate.mv2MiddleClick[1] += irMotion[1];
+    bHandled = true;
+    
+    if(state & BUTTON_MOD_SHIFT)
+    {
+      mMouseUpdate.mv2ShiftMiddleClick[0] += irMotion[0];
+      mMouseUpdate.mv2ShiftMiddleClick[1] += irMotion[1];
+    }
+    else
+    {
+      mMouseUpdate.mv2MiddleClick[0] += irMotion[0];
+      mMouseUpdate.mv2MiddleClick[1] += irMotion[1];
+    }
   }
   
+  if(!bHandled) 
+  {
+    std::stringstream ss;
+    ss<<state<<" "<<where.x<<" "<<where.y;
+    GUI.ParseLine("try MouseMove "+ss.str());
+  }
 }
 
 void GLWindow2::on_mouse_down(GLWindow& win, CVD::ImageRef where, int state, int button)
@@ -251,6 +259,13 @@ void GLWindow2::on_mouse_down(GLWindow& win, CVD::ImageRef where, int state, int
     ss<<button<<" "<<state<<" "<<where.x<<" "<<where.y;
     GUI.ParseLine("try MouseDown "+ss.str());
   }
+}
+
+void GLWindow2::on_mouse_up(GLWindow& win, CVD::ImageRef where, int state, int button)
+{
+  std::stringstream ss;
+  ss<<button<<" "<<state<<" "<<where.x<<" "<<where.y;
+  GUI.ParseLine("try MouseUp "+ss.str());
 }
 
 void GLWindow2::on_event(GLWindow& win, int event)
@@ -315,7 +330,9 @@ void GLWindow2::on_key_down(GLWindow&, int k)
     case XK_space:  s="Space"; break;
     case XK_BackSpace:  s="BackSpace"; break;
     case XK_Escape:  s="Escape"; break;
-    default: ;
+    case XK_Delete:  s="Delete"; break;
+    case XK_Undo: s="Undo"; break;
+    default: std::cout<<"Got unkown keysym: "<<std::hex<<k<<std::endl;
   }
 
   if(s!="")

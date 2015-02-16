@@ -6,8 +6,10 @@
 #include <iomanip>
 #include <cvd/gl_helpers.h>
 
-MapViewer::MapViewer(Map &map, GLWindow2 &glw):
-  mMap(map), mGLWindow(glw)
+MapViewer::MapViewer(Map &map, GLWindow2 &glw)
+: mMap(map)
+, mGLWindow(glw)
+, mfAttenuation{0.0f, 0.0f, 0.005f}
 {
   mse3WorldToRotCenter = TooN::SE3<>();
   mse3RotCenterToViewer = TooN::SE3<>::exp(TooN::makeVector(0,0,-5,0,0,0));
@@ -16,11 +18,15 @@ MapViewer::MapViewer(Map &map, GLWindow2 &glw):
   
   mse3ViewerFromWorld = (mse3WorldToRotCenter * mse3RotCenterToViewer).inverse();
   
-  mdPanSensitivity = 0.01;
+  mdPanSensitivity = 0.005;
   mdZoomSensitivity = 0.1;
   mdRotSensitivity = 0.01;
   
   mdZNear = 0.03;
+  
+  mfDefaultPointSize = 1;
+  mfMinPointSize = 2;
+  glGetFloatv( GL_POINT_SIZE_MAX, &mfMaxPointSize);
 }
 
 void MapViewer::DrawMapDots()
@@ -29,17 +35,14 @@ void MapViewer::DrawMapDots()
   SetupModelView();
   
   //glColor3f(0,1,1);
-  glEnable(GL_MULTISAMPLE);
+  //glEnable(GL_MULTISAMPLE);
   
-  float maxSize = 0.0f;
-  glGetFloatv( GL_POINT_SIZE_MAX, &maxSize );
-  
-  glPointParameterf(GL_POINT_SIZE_MIN, 2.0f);
-  glPointParameterf(GL_POINT_SIZE_MAX, maxSize);
+  glPointSize(mfDefaultPointSize);
+  glPointParameterf(GL_POINT_SIZE_MIN, mfMinPointSize);
+  glPointParameterf(GL_POINT_SIZE_MAX, mfMaxPointSize);
   //glPointParameterf(GL_POINT_FADE_THRESHOLD_SIZE, 10.0);
   
-  float vals[3] = {0.0f, 0.0f, 0.005f};
-  glPointParameterfv(GL_POINT_DISTANCE_ATTENUATION, vals);
+  glPointParameterfv(GL_POINT_DISTANCE_ATTENUATION, mfAttenuation);
   
   //glTexEnvf( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE );
   //glEnable( GL_POINT_SPRITE );
@@ -50,21 +53,36 @@ void MapViewer::DrawMapDots()
   {
     MapPoint& point = *(*point_it);
     
+    if(point.mbDeleted)
+      continue;
+    
     TooN::Vector<3> v3Pos = point.mv3WorldPos;
     TooN::Vector<4> v4Color;
+    /*
     v4Color.slice<0,3>() = gavLevelColors[point.mnSourceLevel];
     
     if(point_it == mMap.mlpPoints.begin())
       v4Color[3] = 1;
     else
-      v4Color[3] = 0.1;
-      
+      v4Color[3] = 0.4;
+    */
+    
+    if(point.mnUsing)
+    {
+      v4Color = TooN::makeVector(1,1,0,1);
+    }
+    else
+    {
+      v4Color = TooN::makeVector(1,0,1,1);
+    }
+    
+    
     CVD::glColor(v4Color);
     CVD::glVertex(v3Pos);
   }
   glEnd();
   //glDisable( GL_POINT_SPRITE);
-  glDisable(GL_MULTISAMPLE);
+  //glDisable(GL_MULTISAMPLE);
 }
 
 void MapViewer::DrawGrid()
@@ -157,20 +175,20 @@ void MapViewer::DrawMap()
   
   // Update viewer position according to mouse input:
   MouseUpdate update = mGLWindow.GetMouseUpdate();
-  bool bMoved = update.mv2RightClick != TooN::Zeros || update.mdWheel != 0 || update.mv2MiddleClick != TooN::Zeros;
   
-  // Pan: right mouse
+  // Pan: shift + middle mouse
   // Rotate: middle mouse
   // Zoom: mouse wheel
   
   // Pan moves the rotation center parallel to viewer image
   // First, transform right click vector into world frame
-  TooN::Vector<3> v3RightClick = TooN::Zeros;
-  v3RightClick.slice<0,2>() = update.mv2RightClick;
-  TooN::Vector<3> v3RightClickInWorld = mse3ViewerFromWorld.inverse().get_rotation() * v3RightClick;
+  TooN::Vector<3> v3PanInput = TooN::Zeros;
+  v3PanInput.slice<0,2>() = update.mv2ShiftMiddleClick;
+  TooN::Vector<3> v3PanInputInWorld = mse3ViewerFromWorld.inverse().get_rotation() * v3PanInput;
   // Then apply update
+  double dDistFromRotCenter = TooN::norm(mse3RotCenterToViewer.get_translation());
   TooN::Vector<6> v6RotCenterUpdate = TooN::Zeros;
-  v6RotCenterUpdate.slice<0,3>() = v3RightClickInWorld * mdPanSensitivity * -1;
+  v6RotCenterUpdate.slice<0,3>() = v3PanInputInWorld * dDistFromRotCenter * mdPanSensitivity * -1;
   mse3WorldToRotCenter = TooN::SE3<>::exp(v6RotCenterUpdate) * mse3WorldToRotCenter;
   
   // Zoom moves camera relative to rotation center
@@ -180,9 +198,9 @@ void MapViewer::DrawMap()
   
   // Rotate moves camera relative to rotation center
   // First, compute axis of rotation as the cross between the image normal and the middle click vector
-  TooN::Vector<3> v3MiddleClick = TooN::Zeros;
-  v3MiddleClick.slice<0,2>() = update.mv2MiddleClick;
-  TooN::Vector<3> v3RotAxis = TooN::makeVector(0,0,1) ^ v3MiddleClick;
+  TooN::Vector<3> v3RotInput = TooN::Zeros;
+  v3RotInput.slice<0,2>() = update.mv2MiddleClick;
+  TooN::Vector<3> v3RotAxis = TooN::makeVector(0,0,1) ^ v3RotInput;
   // Now transform rotation vector into world frame
   TooN::Vector<3> v3RotAxisInWorld = mse3ViewerFromWorld.inverse().get_rotation() * v3RotAxis;
   // Then apply update
@@ -220,9 +238,9 @@ void MapViewer::DrawMap()
   glLoadIdentity();
   
   mMessageForUser << "Map: " << mMap.mlpPoints.size() << "P, " << mMap.mlpMultiKeyFrames.size() << "MKF" << std::endl;
-  mMessageForUser << "mse3WorldToRotCenter trans: "<<mse3WorldToRotCenter.get_translation() << std::endl;
-  mMessageForUser << "mse3RotCenterToViewer trans: "<<mse3RotCenterToViewer.get_translation() << std::endl;
-  mMessageForUser << "mse3ViewerFromWorld trans: "<<mse3ViewerFromWorld.get_translation() ;
+  //mMessageForUser << "mse3WorldToRotCenter trans: "<<mse3WorldToRotCenter.get_translation() << std::endl;
+  //mMessageForUser << "mse3RotCenterToViewer trans: "<<mse3RotCenterToViewer.get_translation() << std::endl;
+  //mMessageForUser << "mse3ViewerFromWorld trans: "<<mse3ViewerFromWorld.get_translation() ;
 }
 
 std::string MapViewer::GetMessageForUser()
@@ -318,7 +336,7 @@ void MapViewer::DrawCamera(TooN::SE3<> se3CfromW, bool bSmall)
   
 }
 
-bool MapViewer::ProjectPoint(TooN::Vector<3> v3WorldPos, TooN::Vector<2>& v2Projected)
+bool MapViewer::ProjectPoint(TooN::Vector<3> v3WorldPos, TooN::Vector<2>& v2Projected, double& dDistance, double& dPointRadius)
 {
   TooN::Vector<3> v3CamPos = mse3ViewerFromWorld * v3WorldPos;
   TooN::Vector<4> v4Clip = mm4Projection * TooN::unproject(v3CamPos);
@@ -336,6 +354,18 @@ bool MapViewer::ProjectPoint(TooN::Vector<3> v3WorldPos, TooN::Vector<2>& v2Proj
   v3NDC[1] *= -1;  // flip y coordinate from OpenGL to computer vision convention
   
   v2Projected = mm24WindowConvert * TooN::unproject(v3NDC);
+  
+  float a = mfAttenuation[0];
+  float b = mfAttenuation[1];
+  float c = mfAttenuation[2];
+  float d = TooN::norm(v3CamPos);
+  
+  float fPointWidth = mfDefaultPointSize * sqrt(1/(a + b*d + c*d*d));
+  fPointWidth = std::max(mfMinPointSize, std::min(fPointWidth, mfMaxPointSize));
+  
+  dPointRadius = fPointWidth/2;
+  dDistance = d;
+  
   return true;
 }
 

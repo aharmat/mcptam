@@ -25,7 +25,7 @@ public:
   MapViewer(Map &map, GLWindow2 &glw);
   void DrawMap();
   
-  bool ProjectPoint(TooN::Vector<3> v3WorldPos, TooN::Vector<2>& v2Projected);
+  bool ProjectPoint(TooN::Vector<3> v3WorldPos, TooN::Vector<2>& v2Projected, double& dDistance, double& dPointRadius);
   
   
   std::string GetMessageForUser();
@@ -52,6 +52,11 @@ protected:
   
   TooN::Matrix<4> mm4Projection;
   TooN::Matrix<2,4> mm24WindowConvert;
+  
+  float mfAttenuation[3];
+  float mfMinPointSize;
+  float mfMaxPointSize;
+  float mfDefaultPointSize;
 
   std::ostringstream mMessageForUser;
 };

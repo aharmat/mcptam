@@ -101,6 +101,22 @@ protected:
   
   void LoadCamerasFromFolder(std::string folder);
   
+  void ToggleSelection(CVD::ImageRef irPixel);
+  void SetSelectionInArea(CVD::ImageRef irBegin, CVD::ImageRef irEnd,  bool bSelected);
+  
+  void UnSelectAllPoints();
+  void DeleteSelected();
+  
+  void DrawCrosshairs(CVD::ImageRef irPos, TooN::Vector<4> v4Color, float fLineWidth);
+  void DrawRectangle(CVD::ImageRef irBegin, CVD::ImageRef irEnd, TooN::Vector<4> v4Color, float fLineWidth);
+  
+  CVD::ImageRef NormalizeWindowLoc(CVD::ImageRef irLoc);
+  
+  void InitOrthoDrawing();
+  
+  TooN::SE3<> CalcPlaneAligner();
+  void ApplyGlobalTransformationToMap(TooN::SE3<> se3NewFromOld);
+  
   
   ros::NodeHandle mNodeHandle;      ///< ROS global node handle
   ros::NodeHandle mNodeHandlePriv;  ///< ROS private node handle
@@ -121,7 +137,13 @@ protected:
   
   std::queue<Command> mqCommands;   ///< Queued commands received by GUICommandCallBack
   ros::CallbackQueue mCallbackQueueROS;         ///< Custom callback queue so we can spin just for our own callbacks instead of a node-wide spin
-
+  
+  enum SelectionMode{SINGLE, BOX_SELECT, BOX_UNSELECT} mSelectionMode;
+  enum SelectionStatus{READY, SELECTING} mSelectionStatus;
+  
+  double mdSelectionThresh;
+  CVD::ImageRef mirSelectionBegin;
+  CVD::ImageRef mirSelectionCursor;
 };
 
 #endif
