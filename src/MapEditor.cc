@@ -38,6 +38,7 @@
 //=========================================================================================
 
 #include <mcptam/MapEditor.h>
+#include <mcptam/MapPoint.h>
 #include <mcptam/OpenGL.h>
 #include <mcptam/Map.h>
 #include <mcptam/Utility.h>
@@ -256,9 +257,20 @@ void MapEditor::Run()
     glClearColor(0,0,0,1);
     glClear(GL_COLOR_BUFFER_BIT);
     
+    std::stringstream captionStream;
+    
     mpMapViewer->DrawMap();
+    captionStream << mpMapViewer->GetMessageForUser();
+    
+    TooN::Vector<2> v2Projected;
+    bool bSuccess = mpMapViewer->ProjectPoint((*mpMap->mlpPoints.begin())->mv3WorldPos, v2Projected);
+    
+    if(bSuccess)
+      captionStream << std::endl << "First point projected into viewer: "<<v2Projected;
+    else
+      captionStream << std::endl << "First point does not project into viewer";
    
-    mpGLWindow->DrawCaption(mpMapViewer->GetMessageForUser());
+    mpGLWindow->DrawCaption(captionStream.str());
     mpGLWindow->DrawMenus();
     mpGLWindow->swap_buffers();
     mpGLWindow->HandlePendingEvents();
@@ -281,6 +293,31 @@ void MapEditor::GUICommandHandler(std::string command, std::string params)
     mbDone = true;
     return;
   }
+  
+  /*
+  if(command=="MouseDown")
+  {
+    std::stringstream ss;
+    ss<<params;
+    
+    int button;
+    int state;
+    CVD::ImageRef irClicked;
+    ss>>button>>state>>irClicked.x>>irClicked.y;
+    
+    std::cout<<"button: "<<button<<" state: "<<state<<" clicked: "<<irClicked<<" win size: "<<mpGLWindow->size()<<std::endl;
+    if(button == 1) // left button
+    {
+      double dXScale = mpGLWindow->size().x / (double)(mpGLWindow->GetWindowSize().x);  
+      double dYScale = mpGLWindow->size().y / (double)(mpGLWindow->GetWindowSize().y);
+      mirSelectedPixel = irClicked;
+      mirSelectedPixel.x /= dXScale;
+      mirSelectedPixel.y /= dYScale;
+    }
+    
+    return;
+  }
+  */
   
   ROS_FATAL_STREAM("System: Unhandled command in GUICommandHandler: " << command);
   ros::shutdown();

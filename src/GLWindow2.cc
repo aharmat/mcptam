@@ -46,10 +46,8 @@ GLWindow2::GLWindow2(CVD::ImageRef irSize, std::string sTitle)
   mirVideoSize = irSize;
   GUI.RegisterCommand("GLWindow.AddMenu", GUICommandCallBack, this);
   CVD::glSetFont("sans");
-  mvMCPoseUpdate=Zeros;
-  mvLeftPoseUpdate=Zeros;
   
-  std::cout<< get_glx_version() <<std::endl;
+  //std::cout<< get_glx_version() <<std::endl;
 };
 
 
@@ -212,21 +210,20 @@ void GLWindow2::on_mouse_move(GLWindow& win, CVD::ImageRef where, int state)
   CVD::ImageRef irMotion = where - mirLastMousePos;
   mirLastMousePos = where;
   
-  double dSensitivity = 0.01;
   if(state & BUTTON_LEFT && ! (state & BUTTON_RIGHT))
   {
-    mvMCPoseUpdate[3] -= irMotion[1] * dSensitivity;
-    mvMCPoseUpdate[4] += irMotion[0] * dSensitivity;
+    mMouseUpdate.mv2LeftClick[0] += irMotion[0];
+    mMouseUpdate.mv2LeftClick[1] += irMotion[1];
   }
   else if(!(state & BUTTON_LEFT) && state & BUTTON_RIGHT)
   {
-    mvLeftPoseUpdate[4] -= irMotion[0] * dSensitivity;
-    mvLeftPoseUpdate[3] += irMotion[1] * dSensitivity;
+    mMouseUpdate.mv2RightClick[0] += irMotion[0];
+    mMouseUpdate.mv2RightClick[1] += irMotion[1];
   }
   else if(state & BUTTON_MIDDLE  || (state & BUTTON_LEFT && state & BUTTON_RIGHT))
   {
-    mvLeftPoseUpdate[5] -= irMotion[0] * dSensitivity;
-    mvLeftPoseUpdate[2] += irMotion[1] * dSensitivity;
+    mMouseUpdate.mv2MiddleClick[0] += irMotion[0];
+    mMouseUpdate.mv2MiddleClick[1] += irMotion[1];
   }
   
 }
@@ -236,6 +233,17 @@ void GLWindow2::on_mouse_down(GLWindow& win, CVD::ImageRef where, int state, int
   bool bHandled = false;
   for(unsigned int i=0; !bHandled && i<mvpGLWindowMenus.size(); i++)
     bHandled = mvpGLWindowMenus[i]->HandleClick(button, state, where.x, where.y);
+    
+  if(button & BUTTON_WHEEL_UP)
+  {
+    mMouseUpdate.mdWheel += 1.0;
+    bHandled = true;
+  }
+  else if(button & BUTTON_WHEEL_DOWN)
+  {
+    mMouseUpdate.mdWheel -= 1.0;
+    bHandled = true;
+  }
     
   if(!bHandled)  // button press wasn't over any menu item
   {
@@ -251,12 +259,12 @@ void GLWindow2::on_event(GLWindow& win, int event)
     GUI.ParseLine("quit");
 }
 
-std::pair<Vector<6>, Vector<6> > GLWindow2::GetMousePoseUpdate()
+MouseUpdate GLWindow2::GetMouseUpdate()
 {
-  std::pair<Vector<6>, Vector<6> > result = std::make_pair(mvLeftPoseUpdate, mvMCPoseUpdate);
-  mvLeftPoseUpdate = Zeros;
-  mvMCPoseUpdate = Zeros;
-  return result;
+  MouseUpdate ret = mMouseUpdate;
+  mMouseUpdate.Reset();
+  
+  return ret;
 }
 
 #include <X11/keysym.h>

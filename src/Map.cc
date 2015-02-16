@@ -57,6 +57,7 @@ KeyFrame* translateKF(std::map<MultiKeyFrame*, MultiKeyFrame*>& MKFTranslator, K
 Map::Map()
 {
   mbGoodSnapshot = false;
+  mbGood = false;
 }
 
 Map::~Map()

@@ -9,7 +9,18 @@
 MapViewer::MapViewer(Map &map, GLWindow2 &glw):
   mMap(map), mGLWindow(glw)
 {
-  mse3ViewerFromWorld = TooN::SE3<>();
+  mse3WorldToRotCenter = TooN::SE3<>();
+  mse3RotCenterToViewer = TooN::SE3<>::exp(TooN::makeVector(0,0,-5,0,0,0));
+  
+  std::cout<<"Initial rot center translation: "<<mse3RotCenterToViewer.get_translation()<<std::endl;
+  
+  mse3ViewerFromWorld = (mse3WorldToRotCenter * mse3RotCenterToViewer).inverse();
+  
+  mdPanSensitivity = 0.01;
+  mdZoomSensitivity = 0.1;
+  mdRotSensitivity = 0.01;
+  
+  mdZNear = 0.03;
 }
 
 void MapViewer::DrawMapDots()
@@ -40,7 +51,15 @@ void MapViewer::DrawMapDots()
     MapPoint& point = *(*point_it);
     
     TooN::Vector<3> v3Pos = point.mv3WorldPos;
-    CVD::glColor(gavLevelColors[point.mnSourceLevel]);
+    TooN::Vector<4> v4Color;
+    v4Color.slice<0,3>() = gavLevelColors[point.mnSourceLevel];
+    
+    if(point_it == mMap.mlpPoints.begin())
+      v4Color[3] = 1;
+    else
+      v4Color[3] = 0.1;
+      
+    CVD::glColor(v4Color);
     CVD::glVertex(v3Pos);
   }
   glEnd();
@@ -137,10 +156,42 @@ void MapViewer::DrawMap()
   mMessageForUser.str(""); // Wipe the user message clean
   
   // Update viewer position according to mouse input:
-  std::pair<TooN::Vector<6>, TooN::Vector<6> > pv6 = mGLWindow.GetMousePoseUpdate();
-  TooN::SE3<> se3Temp = mse3ViewerFromWorld.inverse() * TooN::SE3<>::exp(TooN::makeVector(pv6.first[4], -1*pv6.first[3], pv6.first[2],   //translation
-                                                               -1*pv6.second[3], -1*pv6.second[4], pv6.first[5]));  //rotation
-  mse3ViewerFromWorld = se3Temp.inverse();
+  MouseUpdate update = mGLWindow.GetMouseUpdate();
+  bool bMoved = update.mv2RightClick != TooN::Zeros || update.mdWheel != 0 || update.mv2MiddleClick != TooN::Zeros;
+  
+  // Pan: right mouse
+  // Rotate: middle mouse
+  // Zoom: mouse wheel
+  
+  // Pan moves the rotation center parallel to viewer image
+  // First, transform right click vector into world frame
+  TooN::Vector<3> v3RightClick = TooN::Zeros;
+  v3RightClick.slice<0,2>() = update.mv2RightClick;
+  TooN::Vector<3> v3RightClickInWorld = mse3ViewerFromWorld.inverse().get_rotation() * v3RightClick;
+  // Then apply update
+  TooN::Vector<6> v6RotCenterUpdate = TooN::Zeros;
+  v6RotCenterUpdate.slice<0,3>() = v3RightClickInWorld * mdPanSensitivity * -1;
+  mse3WorldToRotCenter = TooN::SE3<>::exp(v6RotCenterUpdate) * mse3WorldToRotCenter;
+  
+  // Zoom moves camera relative to rotation center
+  // Want to move more when distance is already far, and vice versa
+  double dDistChangeFactor = (1 + update.mdWheel*mdZoomSensitivity);
+  mse3RotCenterToViewer.get_translation() *= dDistChangeFactor;
+  
+  // Rotate moves camera relative to rotation center
+  // First, compute axis of rotation as the cross between the image normal and the middle click vector
+  TooN::Vector<3> v3MiddleClick = TooN::Zeros;
+  v3MiddleClick.slice<0,2>() = update.mv2MiddleClick;
+  TooN::Vector<3> v3RotAxis = TooN::makeVector(0,0,1) ^ v3MiddleClick;
+  // Now transform rotation vector into world frame
+  TooN::Vector<3> v3RotAxisInWorld = mse3ViewerFromWorld.inverse().get_rotation() * v3RotAxis;
+  // Then apply update
+  v6RotCenterUpdate = TooN::Zeros;
+  v6RotCenterUpdate.slice<3,3>() = v3RotAxisInWorld * mdRotSensitivity;
+  mse3WorldToRotCenter = TooN::SE3<>::exp(v6RotCenterUpdate) * mse3WorldToRotCenter;
+  
+  // Finally update the the pose we really want
+  mse3ViewerFromWorld = (mse3WorldToRotCenter * mse3RotCenterToViewer).inverse();
 
   mGLWindow.SetupViewport();
   glClearColor(0,0,0,0);
@@ -168,7 +219,10 @@ void MapViewer::DrawMap()
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
   
-  mMessageForUser << " Map: " << mMap.mlpPoints.size() << "P, " << mMap.mlpMultiKeyFrames.size() << "MKF";
+  mMessageForUser << "Map: " << mMap.mlpPoints.size() << "P, " << mMap.mlpMultiKeyFrames.size() << "MKF" << std::endl;
+  mMessageForUser << "mse3WorldToRotCenter trans: "<<mse3WorldToRotCenter.get_translation() << std::endl;
+  mMessageForUser << "mse3RotCenterToViewer trans: "<<mse3RotCenterToViewer.get_translation() << std::endl;
+  mMessageForUser << "mse3ViewerFromWorld trans: "<<mse3ViewerFromWorld.get_translation() ;
 }
 
 std::string MapViewer::GetMessageForUser()
@@ -180,9 +234,39 @@ void MapViewer::SetupFrustum()
 {
   glMatrixMode(GL_PROJECTION);  
   glLoadIdentity();
-  double zNear = 0.03;
-  glFrustum(-zNear, zNear, 0.75*zNear,-0.75*zNear,zNear,50);
+  
+  double dRatio = (double)mGLWindow.size().y / mGLWindow.size().x;
+  
+  double dLeft = -mdZNear;
+  double dRight = mdZNear;
+  double dBottom = dRatio*mdZNear;
+  double dTop = -dRatio*mdZNear;
+  double dNear = mdZNear;
+  double dFar = 50;
+  
+  glFrustum(dLeft, dRight, dBottom, dTop, dNear, dFar);
   glScalef(1,1,-1);
+  
+  mm4Projection = TooN::Zeros;
+  mm4Projection(0,0) = 2*dNear/(dRight-dLeft);
+  mm4Projection(0,2) = (dRight+dLeft)/(dRight-dLeft);
+  mm4Projection(1,1) = 2*dNear/(dTop-dBottom);
+  mm4Projection(1,2) = (dTop+dBottom)/(dTop-dBottom);
+  mm4Projection(2,2) = (dNear+dFar)/(dNear-dFar); 
+  mm4Projection(2,3) = 2*dNear*dFar/(dNear-dFar);
+  mm4Projection(3,2) = -1.0;
+  
+  TooN::Matrix<4> m4Scale = TooN::Identity;
+  m4Scale(2,2) = -1;
+  
+  mm4Projection = mm4Projection * m4Scale;
+  
+  mm24WindowConvert = TooN::Zeros;
+  mm24WindowConvert(0,0) = mGLWindow.size().x * 0.5;
+  mm24WindowConvert(1,1) = mGLWindow.size().y * 0.5;
+  mm24WindowConvert(0,3) = mGLWindow.size().x * 0.5;
+  mm24WindowConvert(1,3) = mGLWindow.size().y * 0.5;
+
   return;
 };
 
@@ -234,4 +318,24 @@ void MapViewer::DrawCamera(TooN::SE3<> se3CfromW, bool bSmall)
   
 }
 
+bool MapViewer::ProjectPoint(TooN::Vector<3> v3WorldPos, TooN::Vector<2>& v2Projected)
+{
+  TooN::Vector<3> v3CamPos = mse3ViewerFromWorld * v3WorldPos;
+  TooN::Vector<4> v4Clip = mm4Projection * TooN::unproject(v3CamPos);
+  
+  if(v4Clip[0] < -v4Clip[3] || v4Clip[0] > v4Clip[3])
+    return false;
+    
+  if(v4Clip[1] < -v4Clip[3] || v4Clip[1] > v4Clip[3])
+    return false;
+    
+  if(v4Clip[2] < -v4Clip[3] || v4Clip[2] > v4Clip[3])
+    return false;
+    
+  TooN::Vector<3> v3NDC = TooN::project(v4Clip);
+  v3NDC[1] *= -1;  // flip y coordinate from OpenGL to computer vision convention
+  
+  v2Projected = mm24WindowConvert * TooN::unproject(v3NDC);
+  return true;
+}
 

@@ -48,6 +48,27 @@
 
 class GLWindowMenu;
 
+struct MouseUpdate
+{
+  MouseUpdate()
+  {
+    Reset();
+  }
+  
+  void Reset()
+  {
+    mv2LeftClick = TooN::Zeros; 
+    mv2MiddleClick = TooN::Zeros;
+    mv2RightClick = TooN::Zeros;
+    mdWheel = 0;  
+  }
+  
+  TooN::Vector<2> mv2LeftClick; 
+  TooN::Vector<2> mv2MiddleClick;
+  TooN::Vector<2> mv2RightClick;
+  double mdWheel; // + is up, - is down
+};
+
 /** @brief Wraps CVD::GLWindow and provides some basic user-interface functionality
  * 
  *  Implements a gvars-driven clickable menu, and a caption line for text display. 
@@ -80,7 +101,7 @@ public:
   CVD::ImageRef GetRealWindowSize();
   
   // Map viewer mouse interface:
-  std::pair<TooN::Vector<6>, TooN::Vector<6> > GetMousePoseUpdate();
+  MouseUpdate GetMouseUpdate();
   
   CVD::ImageRef GetMousePos(){ return mirLastMousePos; }
   
@@ -102,8 +123,11 @@ protected:
   CVD::ImageRef mirLastMousePos;
 
   // Storage for map viewer updates:
-  TooN::Vector<6> mvMCPoseUpdate;
-  TooN::Vector<6> mvLeftPoseUpdate;
+  //TooN::Vector<6> mvMCPoseUpdate;
+  //TooN::Vector<6> mvLeftPoseUpdate;
+  
+  MouseUpdate mMouseUpdate;
+  
 };
 
 

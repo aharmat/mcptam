@@ -24,6 +24,10 @@ class MapViewer
 public:
   MapViewer(Map &map, GLWindow2 &glw);
   void DrawMap();
+  
+  bool ProjectPoint(TooN::Vector<3> v3WorldPos, TooN::Vector<2>& v2Projected);
+  
+  
   std::string GetMessageForUser();
   
 protected:
@@ -37,6 +41,17 @@ protected:
   void SetupModelView(TooN::SE3<> se3WorldFromCurrent = TooN::SE3<>());
   
   TooN::SE3<> mse3ViewerFromWorld;
+  TooN::SE3<> mse3RotCenterToViewer;
+  TooN::SE3<> mse3WorldToRotCenter;
+  
+  double mdPanSensitivity;
+  double mdZoomSensitivity;
+  double mdRotSensitivity;
+  
+  double mdZNear;
+  
+  TooN::Matrix<4> mm4Projection;
+  TooN::Matrix<2,4> mm24WindowConvert;
 
   std::ostringstream mMessageForUser;
 };
