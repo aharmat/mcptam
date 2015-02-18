@@ -50,7 +50,9 @@
 #include <mcptam/Types.h>
 #include <mcptam/GLWindow2.h>
 #include <mcptam/MapViewer.h>
+#include <mcptam/EditAction.h>
 #include <queue>
+#include <stack>
 #include <ros/ros.h>
 #include <ros/callback_queue.h>
 
@@ -104,8 +106,11 @@ protected:
   void ToggleSelection(CVD::ImageRef irPixel);
   void SetSelectionInArea(CVD::ImageRef irBegin, CVD::ImageRef irEnd,  bool bSelected);
   
-  void UnSelectAllPoints();
+  std::vector<MapPoint*> GatherSelected();
+  
+  void ToggleAllPoints();
   void DeleteSelected();
+  void FitGroundPlaneToSelected();
   
   void DrawCrosshairs(CVD::ImageRef irPos, TooN::Vector<4> v4Color, float fLineWidth);
   void DrawRectangle(CVD::ImageRef irBegin, CVD::ImageRef irEnd, TooN::Vector<4> v4Color, float fLineWidth);
@@ -114,8 +119,9 @@ protected:
   
   void InitOrthoDrawing();
   
-  TooN::SE3<> CalcPlaneAligner();
-  void ApplyGlobalTransformationToMap(TooN::SE3<> se3NewFromOld);
+  void DoEditAction(std::shared_ptr<EditAction> pAction);
+  
+  void PutPointsOnLayer(int nLayer, bool bOnlySelected);
   
   
   ros::NodeHandle mNodeHandle;      ///< ROS global node handle
@@ -144,6 +150,12 @@ protected:
   double mdSelectionThresh;
   CVD::ImageRef mirSelectionBegin;
   CVD::ImageRef mirSelectionCursor;
+  
+  bool mbCtrl;
+  
+  std::stack<std::shared_ptr<EditAction> > mspUndoStack;
+  std::stack<std::shared_ptr<EditAction> > mspRedoStack;
+  
 };
 
 #endif

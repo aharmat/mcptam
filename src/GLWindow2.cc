@@ -332,9 +332,25 @@ void GLWindow2::on_key_down(GLWindow&, int k)
     case XK_Escape:  s="Escape"; break;
     case XK_Delete:  s="Delete"; break;
     case XK_Undo: s="Undo"; break;
+    case XK_Control_L: s="Ctrl"; break;
+    case XK_Control_R: s="Ctrl"; break;
     default: std::cout<<"Got unkown keysym: "<<std::hex<<k<<std::endl;
   }
 
   if(s!="")
     GUI.ParseLine("try KeyPress "+s);
+}
+
+void GLWindow2::on_key_up(GLWindow&, int k)
+{
+  std::string s;
+  switch(k)
+  {
+    case XK_Control_L: s="Ctrl"; break;
+    case XK_Control_R: s="Ctrl"; break;
+    default: ;
+  }
+  
+  if(s!="")
+    GUI.ParseLine("try KeyRelease "+s);
 }

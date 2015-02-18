@@ -100,6 +100,7 @@ public:
     mbDeleted = false;
     mnUsing = 0;
     mbOptimized = false;
+    mbSelected = false;
     mnMEstimatorOutlierCount = 0;
     mnMEstimatorInlierCount = 1;
     //mtCreationTime = ros::Time::now();
@@ -129,6 +130,7 @@ public:
   std::atomic<unsigned int> mnUsing;  ///< Atomic counter that indicates the number of TrackerData structures in Tracker currently referencing this point
   bool mbFixed;  ///< Is the point fixed in the world frame?
   bool mbOptimized; ///< This point has been optimized and is in a valid position to track against
+  bool mbSelected;
   
   // What pixels should be used to search for this point?
   KeyFrame* mpPatchSourceKF; ///< The KeyFrame the point was originally made in

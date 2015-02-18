@@ -29,7 +29,7 @@ MapViewer::MapViewer(Map &map, GLWindow2 &glw)
   glGetFloatv( GL_POINT_SIZE_MAX, &mfMaxPointSize);
 }
 
-void MapViewer::DrawMapDots()
+void MapViewer::DrawMapDots(int nPointVis)
 {
   SetupFrustum();
   SetupModelView();
@@ -55,6 +55,9 @@ void MapViewer::DrawMapDots()
     
     if(point.mbDeleted)
       continue;
+      
+    if(!(point.mnUsing & nPointVis))  // bitfield AND to determine point visibility
+      continue;
     
     TooN::Vector<3> v3Pos = point.mv3WorldPos;
     TooN::Vector<4> v4Color;
@@ -67,7 +70,7 @@ void MapViewer::DrawMapDots()
       v4Color[3] = 0.4;
     */
     
-    if(point.mnUsing)
+    if(point.mbSelected)
     {
       v4Color = TooN::makeVector(1,1,0,1);
     }
@@ -169,7 +172,7 @@ void MapViewer::DrawGrid()
 //   mGLWindow.PrintString("z");
 }
 
-void MapViewer::DrawMap()
+void MapViewer::DrawMap(int nPointVis)
 {
   mMessageForUser.str(""); // Wipe the user message clean
   
@@ -225,7 +228,7 @@ void MapViewer::DrawMap()
 
   glEnable(GL_DEPTH_TEST);
   DrawGrid();
-  DrawMapDots();
+  DrawMapDots(nPointVis);
   
   for(MultiKeyFramePtrList::iterator mkf_it = mMap.mlpMultiKeyFrames.begin(); mkf_it != mMap.mlpMultiKeyFrames.end(); ++mkf_it)
   {

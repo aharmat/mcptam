@@ -42,11 +42,12 @@
 #include <mcptam/OpenGL.h>
 #include <mcptam/Map.h>
 #include <mcptam/Utility.h>
+#include <mcptam/DeletePointsAction.h>
+#include <mcptam/FitGroundPlaneAction.h>
 #include <cvd/image_io.h>
 #include <stdlib.h>
 #include <fstream>
 #include <gvars3/instances.h>
-#include <TooN/SymEigen.h>
 
 using namespace GVars3;
 
@@ -62,6 +63,20 @@ MapEditor::MapEditor(std::string windowName)
   GUI.RegisterCommand("MouseUp", GUICommandCallBack, this);
   GUI.RegisterCommand("MouseMove", GUICommandCallBack, this);
   GUI.RegisterCommand("KeyPress", GUICommandCallBack, this);
+  GUI.RegisterCommand("KeyRelease", GUICommandCallBack, this);
+  
+  GUI.ParseLine("Layer1=1");
+  GUI.ParseLine("Layer2=0");
+  GUI.ParseLine("Layer3=0");
+  GUI.ParseLine("Layer4=0");
+  
+  GUI.ParseLine("GLWindow.AddMenu Menu Menu");
+  GUI.ParseLine("Menu.ShowMenu Root");
+  
+  GUI.ParseLine("Menu.AddMenuToggle Root \"Layer 4\" Layer4 Root");
+  GUI.ParseLine("Menu.AddMenuToggle Root \"Layer 3\" Layer3 Root");
+  GUI.ParseLine("Menu.AddMenuToggle Root \"Layer 2\" Layer2 Root");
+  GUI.ParseLine("Menu.AddMenuToggle Root \"Layer 1\" Layer1 Root");
     
   mNodeHandle.setCallbackQueue(&mCallbackQueueROS);
   mNodeHandlePriv.setCallbackQueue(&mCallbackQueueROS);
@@ -74,11 +89,15 @@ MapEditor::MapEditor(std::string windowName)
   mpMap = new Map;  
   mpMap->LoadFromFolder(mSaveFolder, mmPoses, mmCameraModels, false);
   
+  PutPointsOnLayer(1, false);
+  
   mpMapViewer = new MapViewer(*mpMap, *mpGLWindow);
   
   mdSelectionThresh = 1.0;
   mSelectionMode = SINGLE;
   mSelectionStatus = READY;
+  
+  mbCtrl = false;
   
   mbDone = false;
 }
@@ -86,9 +105,13 @@ MapEditor::MapEditor(std::string windowName)
 MapEditor::~MapEditor()
 {
   // This is needed because we're hijacking the mnUsing field of MapPoint to 
-  // indicate selection, and deleting the Map waits for all the
+  // keep track of what layer it's on, and deleting the Map waits for all the
   // mnUsing counts to go to zero before it can delete the map points
-  UnSelectAllPoints();
+  for(MapPointPtrList::iterator point_it = mpMap->mlpPoints.begin(); point_it != mpMap->mlpPoints.end(); ++point_it)
+  {
+    MapPoint& point = *(*point_it);
+    point.mnUsing = 0;
+  }
   
   delete mpGLWindow;
   delete mpMap;
@@ -302,6 +325,10 @@ void MapEditor::DrawRectangle(CVD::ImageRef irBegin, CVD::ImageRef irEnd, TooN::
 
 void MapEditor::Run()
 {
+  static gvar3<int> gvnLayer1("Layer1", 1, HIDDEN|SILENT);
+  static gvar3<int> gvnLayer2("Layer2", 0, HIDDEN|SILENT);
+  static gvar3<int> gvnLayer3("Layer3", 0, HIDDEN|SILENT);
+  static gvar3<int> gvnLayer4("Layer4", 0, HIDDEN|SILENT);
   
   // Loop until instructed to stop
   while(!mbDone && ros::ok())
@@ -317,7 +344,9 @@ void MapEditor::Run()
     
     std::stringstream captionStream;
     
-    mpMapViewer->DrawMap();
+    int nPointVis = (*gvnLayer1 << 0) | (*gvnLayer2 << 1) | (*gvnLayer3 << 2) | (*gvnLayer4 << 3);
+    
+    mpMapViewer->DrawMap(nPointVis);
     captionStream << mpMapViewer->GetMessageForUser();
     captionStream << std::endl << "Selection Mode: ";
     
@@ -350,6 +379,8 @@ void MapEditor::Run()
         DrawRectangle(mirSelectionBegin, mirSelectionCursor, v4Color, 2);
       }
     }
+    
+    captionStream << std::endl <<"Move to Layer [1] [2] [3] [4]";
     
     /*
     TooN::Vector<2> v2Projected;
@@ -387,7 +418,7 @@ void MapEditor::GUICommandHandler(std::string command, std::string params)
   
   if(command=="KeyPress")
   {
-    if(params == "b" || params == "B")
+    if(params == "b")
     {
       if(mSelectionMode == SINGLE || mSelectionMode == BOX_UNSELECT)
       {
@@ -406,22 +437,69 @@ void MapEditor::GUICommandHandler(std::string command, std::string params)
     {
       mSelectionMode = SINGLE;
     }
-    else if(params == "u" || params == "U")
+    else if(params == "a")
     {
-      UnSelectAllPoints();
+      ToggleAllPoints();
     }
     else if(params == "Delete")
     {
       DeleteSelected();
     }
-    else if(params == "g" || params == "G")
+    else if(params == "g")
     {
       // Ground plane align
-      ApplyGlobalTransformationToMap(CalcPlaneAligner()); 
+      FitGroundPlaneToSelected();
     }
-    else if(params == "Undo")
+    else if(params == "Ctrl")
     {
-      std::cout<<"UNDO!"<<std::endl;
+      mbCtrl = true;
+    }
+    else if(params == "z")
+    {
+      if(mbCtrl)
+      {
+        std::cout<<"UNDO"<<std::endl;
+        
+        if(!mspUndoStack.empty())
+        {
+          std::shared_ptr<EditAction> pAction = mspUndoStack.top();
+          pAction->Undo();
+          
+          mspRedoStack.push(pAction);
+          mspUndoStack.pop();
+        }
+      }
+    }
+    else if(params == "y")
+    {
+      if(mbCtrl)
+      {
+        std::cout<<"REDO"<<std::endl;
+        
+        if(!mspRedoStack.empty())
+        {
+          std::shared_ptr<EditAction> pAction = mspRedoStack.top();
+          pAction->Do();
+          
+          mspUndoStack.push(pAction);
+          mspRedoStack.pop();
+        }
+      }
+    }
+    else if(params == "1" || params == "2" || params == "3" || params == "4")
+    {
+      int nTargetLayer = std::stoi(params);
+      PutPointsOnLayer(nTargetLayer, true);
+    }
+    
+    return;
+  }
+  
+  if(command=="KeyRelease")
+  {
+    if(params == "Ctrl")
+    {
+      mbCtrl = false;
     }
     
     return;
@@ -561,7 +639,7 @@ void MapEditor::SetSelectionInArea(CVD::ImageRef irBegin, CVD::ImageRef irEnd, b
       
     if(util::PointInRectangle(v2Projected, v2RectCorner,  v2RectExtents))
     {
-      point.mnUsing = (int)bSelected;
+      point.mbSelected = bSelected;
     }
   }
 }
@@ -595,29 +673,73 @@ void MapEditor::ToggleSelection(CVD::ImageRef irPixel)
   if(!pClosestPoint)
     return;
   
-  // This toggles the mnUsing field between 0 and 1
-  pClosestPoint->mnUsing = 1 - pClosestPoint->mnUsing;
+  pClosestPoint->mbSelected = !pClosestPoint->mbSelected;
 }
 
-void MapEditor::UnSelectAllPoints()
+void MapEditor::ToggleAllPoints()
 {
+  // If any point is currently selected, unselect all
+  // If no point is currently selected, select all
+  
+  bool bAnySelected = false;
+  
   for(MapPointPtrList::iterator point_it = mpMap->mlpPoints.begin(); point_it != mpMap->mlpPoints.end(); ++point_it)
   {
     MapPoint& point = *(*point_it);
-    point.mnUsing = 0;
+    
+    if(point.mbSelected)
+    {
+      bAnySelected = true;
+      break;
+    }
   }
+  
+  for(MapPointPtrList::iterator point_it = mpMap->mlpPoints.begin(); point_it != mpMap->mlpPoints.end(); ++point_it)
+  {
+    MapPoint& point = *(*point_it);
+    point.mbSelected = !bAnySelected;
+  }
+}
+
+std::vector<MapPoint*> MapEditor::GatherSelected()
+{
+  std::vector<MapPoint*> vpPoints;
+  
+  for(MapPointPtrList::iterator point_it = mpMap->mlpPoints.begin(); point_it != mpMap->mlpPoints.end(); ++point_it)
+  {
+    MapPoint& point = *(*point_it);
+    if(point.mbSelected)
+    {
+      vpPoints.push_back(&point);
+    }
+  }
+  
+  return vpPoints;
+}
+
+void MapEditor::FitGroundPlaneToSelected()
+{
+  std::shared_ptr<FitGroundPlaneAction> pAction(new FitGroundPlaneAction( mpMap, GatherSelected() ));
+  DoEditAction(std::dynamic_pointer_cast<EditAction>(pAction));
 }
 
 void MapEditor::DeleteSelected()
 {
-  for(MapPointPtrList::iterator point_it = mpMap->mlpPoints.begin(); point_it != mpMap->mlpPoints.end(); ++point_it)
+  std::shared_ptr<DeletePointsAction> pAction(new DeletePointsAction( GatherSelected() ));
+  DoEditAction(std::dynamic_pointer_cast<EditAction>(pAction));
+}
+
+void MapEditor::DoEditAction(std::shared_ptr<EditAction> pAction)
+{
+  pAction->Do();
+  mspUndoStack.push(pAction);
+  
+  // When we carry out a new action, anything in the redo stack becomes
+  // invalid, so just get rid of it all
+  
+  while(!mspRedoStack.empty())
   {
-    MapPoint& point = *(*point_it);
-    if(point.mnUsing)
-    {
-      point.mbDeleted = true;
-      point.mnUsing = 0;
-    }
+    mspRedoStack.pop();
   }
 }
 
@@ -632,150 +754,17 @@ CVD::ImageRef MapEditor::NormalizeWindowLoc(CVD::ImageRef irLoc)
   return irNormalizedLoc;
 }
 
-// Find a dominant plane in the map, find an SE3<> to put it as the z=0 plane
-TooN::SE3<> MapEditor::CalcPlaneAligner()
+void MapEditor::PutPointsOnLayer(int nLayer, bool bOnlySelected)
 {
-  int nRansacs = 500;
-  TooN::Vector<3> v3BestMean = TooN::Zeros;
-  TooN::Vector<3> v3BestNormal = TooN::Zeros;
-  double dBestDistSquared = 9999999999999999.9;
-  
-  std::vector<MapPoint*> vpPoints;
-  vpPoints.reserve(mpMap->mlpPoints.size());
-  
-  for(MapPointPtrList::iterator it = mpMap->mlpPoints.begin(); it != mpMap->mlpPoints.end(); ++it)
-  {
-    if((*it)->mnUsing)
-      vpPoints.push_back(*it);
-  }
-    
-  unsigned int nPoints = vpPoints.size();
-  if(nPoints < 10)
-  {
-    ROS_INFO("MapEditor: CalcPlane: too few points to calc plane.");
-    return TooN::SE3<>();
-  }
-  
-  for(int i=0; i<nRansacs; i++)
-  {
-    int nA = rand()%nPoints;
-    int nB = nA;
-    int nC = nA;
-    while(nB == nA)
-      nB = rand()%nPoints;
-      
-    while(nC == nA || nC==nB)
-      nC = rand()%nPoints;
-    
-    TooN::Vector<3> v3Mean = 0.33333333 * (vpPoints[nA]->mv3WorldPos + 
-             vpPoints[nB]->mv3WorldPos + 
-             vpPoints[nC]->mv3WorldPos);
-    
-    TooN::Vector<3> v3CA = vpPoints[nC]->mv3WorldPos  - vpPoints[nA]->mv3WorldPos;
-    TooN::Vector<3> v3BA = vpPoints[nB]->mv3WorldPos  - vpPoints[nA]->mv3WorldPos;
-    TooN::Vector<3> v3Normal = v3CA ^ v3BA;
-    
-    if(v3Normal * v3Normal  == 0)
-      continue;
-      
-    TooN::normalize(v3Normal);
-    
-    double dSumError = 0.0;
-    for(unsigned int i=0; i<nPoints; i++)
-    {
-      TooN::Vector<3> v3Diff = vpPoints[i]->mv3WorldPos - v3Mean;
-      double dDistSq = v3Diff * v3Diff;
-      
-      if(dDistSq == 0.0)
-        continue;
-        
-      double dNormDist = fabs(v3Diff * v3Normal);
-      
-      if(dNormDist > 0.05)
-        dNormDist = 0.05;
-        
-      dSumError += dNormDist;
-    }
-    
-    if(dSumError < dBestDistSquared)
-    {
-      dBestDistSquared = dSumError;
-      v3BestMean = v3Mean;
-      v3BestNormal = v3Normal;
-    }
-  }
-  
-  // Done the ransacs, now collect the supposed inlier set
-  std::vector<TooN::Vector<3> > vInliers;
-  for(unsigned int i=0; i<nPoints; i++)
-  {
-    TooN::Vector<3> v3Diff = vpPoints[i]->mv3WorldPos - v3BestMean;
-    double dDistSq = v3Diff * v3Diff;
-    if(dDistSq == 0.0)
-      continue;
-      
-    double dNormDist = fabs(v3Diff * v3BestNormal);
-    if(dNormDist < 0.05)
-      vInliers.push_back(vpPoints[i]->mv3WorldPos);
-  }
-  
-  // With these inliers, calculate mean and cov
-  TooN::Vector<3> v3MeanOfInliers = TooN::Zeros;
-  for(unsigned int i=0; i<vInliers.size(); i++)
-    v3MeanOfInliers+=vInliers[i];
-    
-  v3MeanOfInliers *= (1.0 / vInliers.size());
-  
-  TooN::Matrix<3> m3Cov = TooN::Zeros;
-  for(unsigned int i=0; i<vInliers.size(); i++)
-  {
-    TooN::Vector<3> v3Diff = vInliers[i] - v3MeanOfInliers;
-    m3Cov += v3Diff.as_col() * v3Diff.as_row();
-  }
-  
-  // Find the principal component with the minimal variance: this is the plane normal
-  TooN::SymEigen<3> sym(m3Cov);
-  TooN::Vector<3> v3Normal = sym.get_evectors()[0];
-  
-  // If mean of inliers Z is negative, we want positive plane normal to put camera above plane
-  // If mean of inliers Z is positive, we want negative plane normal to put camera above plane
-  if(v3MeanOfInliers[2] < 0 && v3Normal[2] < 0)
-    v3Normal *= -1.0;
-  else if(v3MeanOfInliers[2] > 0 && v3Normal[2] > 0)
-    v3Normal *= -1.0;
-  
-  TooN::Matrix<3> m3Rot = TooN::Identity;
-  m3Rot[2] = v3Normal;
-  m3Rot[0] = m3Rot[0] - (v3Normal * (m3Rot[0] * v3Normal));
-  TooN::normalize(m3Rot[0]);
-  m3Rot[1] = m3Rot[2] ^ m3Rot[0];
-  
-  TooN::SE3<> se3Aligner;
-  se3Aligner.get_rotation() = m3Rot;
-  TooN::Vector<3> v3RMean = se3Aligner * v3MeanOfInliers;
-  se3Aligner.get_translation() = -v3RMean;
-  
-  return se3Aligner;
-}
-
-// Rotates/translates the whole map and all keyFrames
-void MapEditor::ApplyGlobalTransformationToMap(TooN::SE3<> se3NewFromOld)
-{
-  for(MultiKeyFramePtrList::iterator mkf_it = mpMap->mlpMultiKeyFrames.begin(); mkf_it != mpMap->mlpMultiKeyFrames.end(); ++mkf_it)
-  {
-    MultiKeyFrame& mkf = *(*mkf_it);
-    mkf.mse3BaseFromWorld = mkf.mse3BaseFromWorld * se3NewFromOld.inverse();
-    for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
-    {
-      KeyFrame& kf = *(kf_it->second);      
-      kf.mse3CamFromWorld = kf.mse3CamFromBase * mkf.mse3BaseFromWorld;  // CHECK!! GOOD
-    }
-  }
+  ROS_ASSERT(nLayer >= 1 && nLayer <= 4);
   
   for(MapPointPtrList::iterator point_it = mpMap->mlpPoints.begin(); point_it != mpMap->mlpPoints.end(); ++point_it)
   {
     MapPoint& point = *(*point_it);
-    point.mv3WorldPos = se3NewFromOld * point.mv3WorldPos;
-    point.RefreshPixelVectors();
+    
+    if(bOnlySelected && !point.mbSelected)
+      continue;
+    
+    point.mnUsing = 1 << (nLayer-1);
   }
 }

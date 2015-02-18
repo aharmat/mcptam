@@ -119,6 +119,7 @@ protected:
   
   // Event handling routines:
   virtual void on_key_down(GLWindow&, int key);
+  virtual void on_key_up(GLWindow&, int key);
   virtual void on_mouse_move(GLWindow& win, CVD::ImageRef where, int state);
   virtual void on_mouse_down(GLWindow& win, CVD::ImageRef where, int state, int button);
   virtual void on_mouse_up(GLWindow& win, CVD::ImageRef where, int state, int button);

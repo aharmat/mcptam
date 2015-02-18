@@ -22,8 +22,6 @@ find_package(GVars3 REQUIRED)
 find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
 
-message(STATUS "OPENGL_glew_LIBRARY = ${OPENGL_glew_LIBRARY}")
-
 include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${SUITESPARSE_INCLUDE_DIRS} ${CVD_INCLUDE_DIR} 
                     ${GVars3_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS})
 
@@ -93,7 +91,7 @@ catkin_package(
                                      #~ ${G2O_STUFF_LIBRARY} ${G2O_CORE_LIBRARY} ${G2O_SOLVER_CHOLMOD} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
                                      
 add_executable(map_editor src/MainMapEditor.cc src/MapEditor.cc src/MapViewer.cc src/GLWindow2.cc src/GLWindowMenu.cc src/TaylorCamera.cc src/KeyFrame.cc src/MapPoint.cc src/Map.cc 
-                          src/SmallBlurryImage.cc src/ShiTomasi.cc src/MiniPatch.cc)
+                          src/SmallBlurryImage.cc src/ShiTomasi.cc src/MiniPatch.cc src/DeletePointsAction.cc src/FitGroundPlaneAction.cc)
 add_dependencies(map_editor ${PROJECT_NAME}_gencpp)
 target_link_libraries(map_editor ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${OPENGL_glew_LIBRARY} ${OpenCV_LIBS} ${GVars3_LIBRARIES} ${LAPACK_LIBRARIES})
                                      

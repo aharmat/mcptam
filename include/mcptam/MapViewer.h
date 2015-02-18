@@ -23,7 +23,7 @@ class MapViewer
 {
 public:
   MapViewer(Map &map, GLWindow2 &glw);
-  void DrawMap();
+  void DrawMap(int nPointVis);
   
   bool ProjectPoint(TooN::Vector<3> v3WorldPos, TooN::Vector<2>& v2Projected, double& dDistance, double& dPointRadius);
   
@@ -35,7 +35,7 @@ protected:
   GLWindow2 &mGLWindow;
   
   void DrawGrid();
-  void DrawMapDots();
+  void DrawMapDots(int nPointVis);
   void DrawCamera(TooN::SE3<> se3, bool bSmall=false);
   void SetupFrustum();
   void SetupModelView(TooN::SE3<> se3WorldFromCurrent = TooN::SE3<>());
