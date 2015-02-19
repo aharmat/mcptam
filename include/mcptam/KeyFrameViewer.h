@@ -70,6 +70,18 @@ protected:
   std::vector<KeyFrame*> GatherKeyFrames(std::vector<MapPoint*> vpPoints, bool bSource);
   
   CVD::Image<CVD::byte> ResizeImageToWindow(CVD::Image<CVD::byte> imOrig, double dWidthFrac);
+  
+  void ToggleAllSourcePoints(bool bForceUnselect);
+  void ToggleSourceSelection(CVD::ImageRef irPixel);
+  void SetSourceSelectionInArea(CVD::ImageRef irBegin, CVD::ImageRef irEnd, bool bSelected);
+  
+  CVD::ImageRef ClampLocToSource(CVD::ImageRef irLoc);
+  void DrawCrosshairs(CVD::ImageRef irPos, TooN::Vector<4> v4Color, float fLineWidth);
+  void DrawRectangle(CVD::ImageRef irBegin, CVD::ImageRef irEnd, TooN::Vector<4> v4Color, float fLineWidth);
+  
+  std::vector<MapPoint*> GatherSelected();
+  
+  void InitOrthoDrawing();
 
   Map &mMap;   ///< Reference to the Map
   GLWindow2 &mGLWindow;  ///< Reference to the GL window
@@ -80,6 +92,8 @@ protected:
   int mnPointVis;
   
   int mnSourceIdx;         ///< Current MultiKeyFrame's index, do this instead of keeping iterator because iterators can be invalidated by deletion of MultiKeyFrame
+  int mnTargetIdx;
+  int mnTargetSearchDir;
   
   std::vector<KeyFrame*> mvpTargetKeyFrames;
   std::vector<KeyFrame*> mvpSourceKeyFrames;
@@ -88,6 +102,17 @@ protected:
   
   std::ostringstream mMessageForUser;   ///< Message stream for user
   
+  enum SelectionMode{SINGLE, BOX_SELECT, BOX_UNSELECT} mSelectionMode;
+  enum SelectionStatus{READY, SELECTING} mSelectionStatus;
+  
+  double mdSelectionThresh;
+  CVD::ImageRef mirSelectionBegin;
+  CVD::ImageRef mirSelectionCursor;
+  
+  CVD::Image<CVD::byte> mimSource;
+  CVD::ImageRef mirSourceOffset;
+  
+  double mdPointRadius;
   
 };
 

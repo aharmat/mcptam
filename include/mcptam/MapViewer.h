@@ -24,6 +24,7 @@ class MapViewer
 {
 public:
   MapViewer(Map &map, GLWindow2 &glw);
+  void Init();
   void Draw();
   bool GUICommandHandler(std::string command, std::string params, std::shared_ptr<EditAction>& pAction); 
   std::string GetMessageForUser();

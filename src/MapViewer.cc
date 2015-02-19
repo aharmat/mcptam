@@ -38,10 +38,14 @@ MapViewer::MapViewer(Map &map, GLWindow2 &glw)
   glGetFloatv( GL_POINT_SIZE_MAX, &mfMaxPointSize);
   
   mdSelectionThresh = 1.0;
-  mSelectionMode = SINGLE;
-  mSelectionStatus = READY;
   
   PutPointsOnLayer(1, false);
+}
+
+void MapViewer::Init()
+{
+  mSelectionMode = SINGLE;
+  mSelectionStatus = READY;
 }
 
 void MapViewer::DrawMapDots(int nPointVis)

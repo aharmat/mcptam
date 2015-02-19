@@ -101,6 +101,7 @@ struct Measurement
 {  
   inline Measurement()
   : bTransferred(false)
+  , bDeleted(false)
   { }
   
   int nLevel;                 ///< Which image level?
@@ -108,6 +109,7 @@ struct Measurement
   TooN::Vector<2> v2RootPos;  ///< Position of the measurement at level zero
   enum Src {SRC_TRACKER, SRC_REFIND, SRC_ROOT, SRC_TRAIL, SRC_EPIPOLAR} eSource; ///< Where has this measurement come from?
   bool bTransferred;          ///< Has this measurement been transferred over the network? Meaningless in standalone application
+  bool bDeleted;              ///< Used only during map editing
   
   int nID;  ///< Debugging ID
   

@@ -275,6 +275,7 @@ void MapEditor::LoadCamerasFromFolder(std::string folder)
 
 void MapEditor::Run()
 {
+  mpMapViewer->Init();
   
   // Loop until instructed to stop
   while(!mbDone && ros::ok())
@@ -339,6 +340,7 @@ void MapEditor::GUICommandHandler(std::string command, std::string params)
   if(command=="SwitchToMap")
   {
     mViewerType = MAP;
+    mpMapViewer->Init();
     bHandled = true;
   }
   
