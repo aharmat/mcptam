@@ -63,7 +63,7 @@
 
 class MapMakerServer;
 class BundleAdjusterMulti;
-class KeyFrameViewer;
+class KeyFrameVisualizer;
 
 /** @brief Implements the rest of the objects necssary to run MCTAM_Server */
 class SystemServer : public SystemBase
@@ -102,7 +102,7 @@ protected:
  
   MapMakerServer *mpMapMakerServer;    ///< Pointer to the MapMakerServer
   BundleAdjusterMulti *mpBundleAdjuster;  ///< Pointer to the bundle adjuster that uses MultiBundle
-  KeyFrameViewer *mpKeyFrameViewer;   ///< Pointer to the KeyFrameViewer
+  KeyFrameVisualizer *mpKeyFrameVisualizer;   ///< Pointer to the KeyFrameVisualizer
   
   bool mbDone;   ///< Should I quit run loop?
   

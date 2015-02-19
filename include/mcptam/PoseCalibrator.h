@@ -56,7 +56,7 @@ class MapMakerCalib;
 class BundleAdjusterSingle;
 class TrackerCalib;
 class MultiKeyFrame;
-class KeyFrameViewer;
+class KeyFrameVisualizer;
 
 typedef std::map<std::string, TrackerCalib*> TrackerCalibPtrMap;
 
@@ -121,7 +121,7 @@ private:
   
   BundleAdjusterSingle *mpBundleAdjuster;  ///< Pointer to the bundle adjuster used for map optimization during scene browsing
   MapMakerCalib *mpMapMaker;          ///< Pointer to the MapMakerCalib
-  KeyFrameViewer *mpKeyFrameViewer;       ///< Pointer to the KeyFrameViewer
+  KeyFrameVisualizer *mpKeyFrameVisualizer;       ///< Pointer to the KeyFrameVisualizer
   TrackerCalibPtrMap mmTrackers;      ///< %Map of CalibratorTrackers
   
   SE3Map mmFinalPoses;   ///< %Map of camera names to relative poses

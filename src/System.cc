@@ -43,7 +43,7 @@
  ****************************************************************************************/
 
 #include <mcptam/System.h>
-#include <mcptam/KeyFrameViewer.h>
+#include <mcptam/KeyFrameVisualizer.h>
 #include <mcptam/OpenGL.h>
 #include <mcptam/MapMaker.h>
 #include <mcptam/Tracker.h>
@@ -185,7 +185,7 @@ System::System()
   std::cout<<"Creating Tracker"<<std::endl;
   mpTracker = new Tracker(*mpMap, *mpMapMaker, mmCameraModels, mmPosesLive, mmDrawOffsets, mpGLWindow);
    std::cout<<"Creating keyframe viewer"<<std::endl;
-  mpKeyFrameViewer = new KeyFrameViewer(*mpMap, *mpGLWindow, mmDrawOffsets, mpVideoSourceMulti->GetSizes());
+  mpKeyFrameVisualizer = new KeyFrameVisualizer(*mpMap, *mpGLWindow, mmDrawOffsets, mpVideoSourceMulti->GetSizes());
   
   ImageBWMap masksMap = LoadMasks(); 
   mpTracker->SetMasks(masksMap);
@@ -195,7 +195,7 @@ System::System()
 
 System::~System()
 {
-  delete mpKeyFrameViewer;
+  delete mpKeyFrameVisualizer;
   delete mpTracker;
   delete mpMapMaker;
   delete mpBundleAdjuster;
@@ -283,7 +283,7 @@ void System::Run()
       glClearColor(0,0,0,0);
       glClear(GL_COLOR_BUFFER_BIT);
         
-      mpKeyFrameViewer->Draw();
+      mpKeyFrameVisualizer->Draw();
     }
     else
     {
@@ -293,7 +293,7 @@ void System::Run()
     // Update the GUI with the caption info
     std::stringstream captionStream;
     if(bDrawKeyFrames)
-      captionStream << mpKeyFrameViewer->GetMessageForUser();
+      captionStream << mpKeyFrameVisualizer->GetMessageForUser();
     else
       captionStream << mpTracker->GetMessageForUser();
       
@@ -328,13 +328,13 @@ void System::GUICommandHandler(std::string command, std::string params)
   
   if(command=="ShowNextKeyFrame")
   {
-    mpKeyFrameViewer->Next();
+    mpKeyFrameVisualizer->Next();
     return;
   }
   
   if(command=="ShowPrevKeyFrame")
   {
-    mpKeyFrameViewer->Prev();
+    mpKeyFrameVisualizer->Prev();
     return;
   }
   

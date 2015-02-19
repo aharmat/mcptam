@@ -42,8 +42,6 @@
 #include <mcptam/OpenGL.h>
 #include <mcptam/Map.h>
 #include <mcptam/Utility.h>
-#include <mcptam/DeletePointsAction.h>
-#include <mcptam/FitGroundPlaneAction.h>
 #include <cvd/image_io.h>
 #include <stdlib.h>
 #include <fstream>
@@ -65,19 +63,18 @@ MapEditor::MapEditor(std::string windowName)
   GUI.RegisterCommand("KeyPress", GUICommandCallBack, this);
   GUI.RegisterCommand("KeyRelease", GUICommandCallBack, this);
   
+  GUI.RegisterCommand("SwitchToKF", GUICommandCallBack, this);
+  GUI.RegisterCommand("SwitchToMap", GUICommandCallBack, this);
+  
   GUI.ParseLine("Layer1=1");
   GUI.ParseLine("Layer2=0");
   GUI.ParseLine("Layer3=0");
   GUI.ParseLine("Layer4=0");
   
-  GUI.ParseLine("GLWindow.AddMenu Menu Menu");
-  GUI.ParseLine("Menu.ShowMenu Root");
+  GUI.ParseLine("GLWindow.AddMenu Menu");
+  GUI.ParseLine("Menu.AddMenuButton MapViewer \"To KF View\" SwitchToKF");
+  GUI.ParseLine("Menu.AddMenuButton KeyFrameViewer \"To Map View\" SwitchToMap");
   
-  GUI.ParseLine("Menu.AddMenuToggle Root \"Layer 4\" Layer4 Root");
-  GUI.ParseLine("Menu.AddMenuToggle Root \"Layer 3\" Layer3 Root");
-  GUI.ParseLine("Menu.AddMenuToggle Root \"Layer 2\" Layer2 Root");
-  GUI.ParseLine("Menu.AddMenuToggle Root \"Layer 1\" Layer1 Root");
-    
   mNodeHandle.setCallbackQueue(&mCallbackQueueROS);
   mNodeHandlePriv.setCallbackQueue(&mCallbackQueueROS);
   
@@ -89,14 +86,10 @@ MapEditor::MapEditor(std::string windowName)
   mpMap = new Map;  
   mpMap->LoadFromFolder(mSaveFolder, mmPoses, mmCameraModels, false);
   
-  PutPointsOnLayer(1, false);
-  
   mpMapViewer = new MapViewer(*mpMap, *mpGLWindow);
+  mpKeyFrameViewer = new KeyFrameViewer(*mpMap, *mpGLWindow);
   
-  mdSelectionThresh = 1.0;
-  mSelectionMode = SINGLE;
-  mSelectionStatus = READY;
-  
+  mViewerType = MAP;
   mbCtrl = false;
   
   mbDone = false;
@@ -116,6 +109,7 @@ MapEditor::~MapEditor()
   delete mpGLWindow;
   delete mpMap;
   delete mpMapViewer;
+  delete mpKeyFrameViewer;
 }
 
 // This can be used with GUI.RegisterCommand to capture user input
@@ -279,64 +273,18 @@ void MapEditor::LoadCamerasFromFolder(std::string folder)
   std::cout<<"Got "<<mmPoses.size()<<" poses"<<std::endl;
 }
 
-void MapEditor::InitOrthoDrawing()
-{
-  glDisable(GL_STENCIL_TEST);
-  glDisable(GL_DEPTH_TEST);
-  glDisable(GL_TEXTURE_2D);
-  glDisable(GL_TEXTURE_RECTANGLE_ARB);
-  glDisable(GL_LINE_SMOOTH);
-  glDisable(GL_POLYGON_SMOOTH);
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glColorMask(1,1,1,1);
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity();
-  mpGLWindow->SetupWindowOrtho();
-}
-
-void MapEditor::DrawCrosshairs(CVD::ImageRef irPos, TooN::Vector<4> v4Color, float fLineWidth)
-{
-  int nWidth = mpGLWindow->size().x;
-  int nHeight = mpGLWindow->size().y;
-  
-  InitOrthoDrawing();
-  
-  glLineWidth(fLineWidth);
-  CVD::glColor(v4Color);
-  CVD::glLine(CVD::ImageRef(0,irPos.y), CVD::ImageRef(nWidth, irPos.y));
-  CVD::glLine(CVD::ImageRef(irPos.x,0), CVD::ImageRef(irPos.x, nHeight));
-}
-
-void MapEditor::DrawRectangle(CVD::ImageRef irBegin, CVD::ImageRef irEnd, TooN::Vector<4> v4Color, float fLineWidth)
-{
-  InitOrthoDrawing();
-  
-  glLineWidth(fLineWidth);
-  CVD::glColor(v4Color);
-  
-  glBegin(GL_LINE_LOOP);
-  glVertex(irBegin);
-  glVertex(CVD::ImageRef(irEnd.x, irBegin.y));
-  glVertex(irEnd);
-  glVertex(CVD::ImageRef(irBegin.x, irEnd.y));
-  glEnd();
-}
-
 void MapEditor::Run()
 {
-  static gvar3<int> gvnLayer1("Layer1", 1, HIDDEN|SILENT);
-  static gvar3<int> gvnLayer2("Layer2", 0, HIDDEN|SILENT);
-  static gvar3<int> gvnLayer3("Layer3", 0, HIDDEN|SILENT);
-  static gvar3<int> gvnLayer4("Layer4", 0, HIDDEN|SILENT);
   
   // Loop until instructed to stop
   while(!mbDone && ros::ok())
   {
     // Required before drawing
-    mpGLWindow->SetupViewport();  
-    mpGLWindow->SetupVideoOrtho();
-    mpGLWindow->SetupVideoRasterPosAndZoom();
+    mpGLWindow->SetupViewport(); 
+    mpGLWindow->SetupWindowOrtho(); 
+    mpGLWindow->SetupWindowRasterPos();
+    //mpGLWindow->SetupVideoOrtho();
+    //mpGLWindow->SetupVideoRasterPosAndZoom();
     
     // Clear screen with black
     glClearColor(0,0,0,1);
@@ -344,53 +292,16 @@ void MapEditor::Run()
     
     std::stringstream captionStream;
     
-    int nPointVis = (*gvnLayer1 << 0) | (*gvnLayer2 << 1) | (*gvnLayer3 << 2) | (*gvnLayer4 << 3);
-    
-    mpMapViewer->DrawMap(nPointVis);
-    captionStream << mpMapViewer->GetMessageForUser();
-    captionStream << std::endl << "Selection Mode: ";
-    
-    if(mSelectionMode == SINGLE)
+    if(mViewerType == MAP)
     {
-      captionStream << "SINGLE";
+      mpMapViewer->Draw();
+      captionStream << mpMapViewer->GetMessageForUser();
     }
-    else if(mSelectionMode == BOX_SELECT || mSelectionMode == BOX_UNSELECT)
+    else if(mViewerType == KF)
     {
-      TooN::Vector<4> v4Color;
-      captionStream << "BOX ";
-      
-      if(mSelectionMode == BOX_SELECT)
-      {
-        captionStream << "SELECT";
-        v4Color = TooN::makeVector(0.5, 1, 0.5, 0.8);  // greenish
-      }
-      else
-      {
-        captionStream << "UN-SELECT";
-        v4Color = TooN::makeVector(1, 0.5, 0.5, 0.8);  // reddish
-      }
-      
-      if(mSelectionStatus == READY)
-      {
-        DrawCrosshairs(mirSelectionCursor, v4Color, 2);
-      }
-      else if(mSelectionStatus == SELECTING)
-      {
-        DrawRectangle(mirSelectionBegin, mirSelectionCursor, v4Color, 2);
-      }
+      mpKeyFrameViewer->Draw();
+      captionStream << mpKeyFrameViewer->GetMessageForUser();
     }
-    
-    captionStream << std::endl <<"Move to Layer [1] [2] [3] [4]";
-    
-    /*
-    TooN::Vector<2> v2Projected;
-    bool bSuccess = mpMapViewer->ProjectPoint((*mpMap->mlpPoints.begin())->mv3WorldPos, v2Projected);
-    
-    if(bSuccess)
-      captionStream << std::endl << "First point projected into viewer: "<<v2Projected;
-    else
-      captionStream << std::endl << "First point does not project into viewer";
-    */
     
     mpGLWindow->DrawCaption(captionStream.str());
     mpGLWindow->DrawMenus();
@@ -410,47 +321,30 @@ void MapEditor::Run()
 
 void MapEditor::GUICommandHandler(std::string command, std::string params)  
 {
+  bool bHandled = false;
+  
   if(command=="quit" || command == "exit")
   {
     mbDone = true;
-    return;
+    bHandled = true;
+  }
+  
+  if(command=="SwitchToKF")
+  {
+    mViewerType = KF;
+    mpKeyFrameViewer->Init();
+    bHandled = true;
+  }
+  
+  if(command=="SwitchToMap")
+  {
+    mViewerType = MAP;
+    bHandled = true;
   }
   
   if(command=="KeyPress")
   {
-    if(params == "b")
-    {
-      if(mSelectionMode == SINGLE || mSelectionMode == BOX_UNSELECT)
-      {
-        mSelectionMode = BOX_SELECT;
-      }
-      else if(mSelectionMode == BOX_SELECT)
-      {
-        std::cout<<"Just set BOX_UNSELECT"<<std::endl;
-        mSelectionMode = BOX_UNSELECT;
-      }
-      
-      mSelectionStatus = READY;
-      mirSelectionCursor = mpGLWindow->cursor_position();
-    }
-    else if(params == "Escape")
-    {
-      mSelectionMode = SINGLE;
-    }
-    else if(params == "a")
-    {
-      ToggleAllPoints();
-    }
-    else if(params == "Delete")
-    {
-      DeleteSelected();
-    }
-    else if(params == "g")
-    {
-      // Ground plane align
-      FitGroundPlaneToSelected();
-    }
-    else if(params == "Ctrl")
+    if(params == "Ctrl")
     {
       mbCtrl = true;
     }
@@ -486,13 +380,8 @@ void MapEditor::GUICommandHandler(std::string command, std::string params)
         }
       }
     }
-    else if(params == "1" || params == "2" || params == "3" || params == "4")
-    {
-      int nTargetLayer = std::stoi(params);
-      PutPointsOnLayer(nTargetLayer, true);
-    }
     
-    return;
+    bHandled = true;
   }
   
   if(command=="KeyRelease")
@@ -502,235 +391,37 @@ void MapEditor::GUICommandHandler(std::string command, std::string params)
       mbCtrl = false;
     }
     
-    return;
+    bHandled = true;
   }
   
-  if(command=="MouseDown")
+  if(mViewerType == MAP)
   {
-    std::stringstream ss;
-    ss<<params;
+    std::shared_ptr<EditAction> pAction;
+    bHandled |= mpMapViewer->GUICommandHandler(command, params, pAction);
     
-    int button;
-    int state;
-    CVD::ImageRef irClicked;
-    ss>>button>>state>>irClicked.x>>irClicked.y;
-    
-    CVD::ImageRef irClickedNorm = NormalizeWindowLoc(irClicked);
-    
-    std::cout<<"irClicked: "<<irClicked<<std::endl;
-    std::cout<<"irClickedNorm: "<<irClickedNorm<<std::endl;
-    
-    //std::cout<<"button: "<<button<<" state: "<<state<<" clicked: "<<irClicked<<" win size: "<<mpGLWindow->size()<<std::endl;
-    if(button == CVD::GLWindow::BUTTON_LEFT)
-    {
-      if(mSelectionMode == SINGLE)
-      {
-        ToggleSelection(irClicked);
-      }
-      else if(mSelectionMode == BOX_SELECT || mSelectionMode == BOX_UNSELECT)
-      {
-        mSelectionStatus = SELECTING;
-        mirSelectionBegin = irClicked;
-        mirSelectionCursor = irClicked;
-      }
-    }
-    
-    return;
+    if(pAction)
+      DoEditAction(pAction);
   }
-  
-  if(command=="MouseUp")
+  else if(mViewerType == KF)
   {
-    std::stringstream ss;
-    ss<<params;
+    std::shared_ptr<EditAction> pAction;
+    bHandled |= mpKeyFrameViewer->GUICommandHandler(command, params, pAction);
     
-    int button;
-    int state;
-    CVD::ImageRef irClicked;
-    ss>>button>>state>>irClicked.x>>irClicked.y;
-    
-    //CVD::ImageRef irClickedNorm = NormalizeWindowLoc(irClicked);
-    
-    //std::cout<<"button: "<<button<<" state: "<<state<<" clicked: "<<irClicked<<" win size: "<<mpGLWindow->size()<<std::endl;
-    if(button == CVD::GLWindow::BUTTON_LEFT)
-    {
-      if(mSelectionMode == BOX_SELECT || mSelectionMode == BOX_UNSELECT)
-      {
-        SetSelectionInArea(mirSelectionBegin, irClicked, mSelectionMode == BOX_SELECT);
-        
-        mSelectionMode = SINGLE;
-        mSelectionStatus = READY;
-      }
-    }
-    
-    return;
+    if(pAction)
+      DoEditAction(pAction);
   }
   
-  if(command=="MouseMove")
+  if(!bHandled)
   {
-    std::stringstream ss;
-    ss<<params;
-    
-    int state;
-    CVD::ImageRef irWhere;
-    ss>>state>>irWhere.x>>irWhere.y;
-    
-    if(mSelectionMode == BOX_SELECT || mSelectionMode == BOX_UNSELECT)
-    {
-      mirSelectionCursor = irWhere;
-    }
-    
-    return;
+    ROS_DEBUG_STREAM("System: Unhandled command in GUICommandHandler: " << command);
+    //ros::shutdown();
   }
-  
-  ROS_FATAL_STREAM("System: Unhandled command in GUICommandHandler: " << command);
-  ros::shutdown();
-}
-
-void MapEditor::SetSelectionInArea(CVD::ImageRef irBegin, CVD::ImageRef irEnd, bool bSelected)
-{
-  // Figure out top left and bottom right corners
-  CVD::ImageRef irTopLeft, irBottomRight;
-  
-  if(irBegin.x < irEnd.x && irBegin.y < irEnd.y)  // drew from top left to bottom right
-  {
-    irTopLeft = irBegin;
-    irBottomRight = irEnd;
-  }
-  else if(irBegin.x > irEnd.x && irBegin.y < irEnd.y)  // drew from top right to bottom left
-  {
-    irTopLeft.x = irEnd.x;
-    irTopLeft.y = irBegin.y;
-    
-    irBottomRight.x = irBegin.x;
-    irBottomRight.y = irEnd.y;
-  }
-  else if(irBegin.x > irEnd.x && irBegin.y > irEnd.y)  // drew from bottom right to top left
-  {
-    irTopLeft = irEnd;
-    irBottomRight = irBegin;
-  }
-  else if(irBegin.x < irEnd.x && irBegin.y > irEnd.y)  // drew from bottom left to top right
-  {
-    irTopLeft.x = irBegin.x;
-    irTopLeft.y = irEnd.y;
-    
-    irBottomRight.x = irEnd.x;
-    irBottomRight.y = irBegin.y;
-  }
-  else  // Some rectangle with at least one side zero width, don't do anything
-  {
-    return;
-  }
-  
-  TooN::Vector<2> v2RectCorner = CVD::vec(irTopLeft);
-  TooN::Vector<2> v2RectExtents = CVD::vec(irBottomRight - irTopLeft);
-  
-  for(MapPointPtrList::iterator point_it = mpMap->mlpPoints.begin(); point_it != mpMap->mlpPoints.end(); ++point_it)
-  {
-    MapPoint& point = *(*point_it);
-    
-    TooN::Vector<2> v2Projected;
-    double dDistance;
-    double dRadius;
-    bool bSuccess = mpMapViewer->ProjectPoint(point.mv3WorldPos, v2Projected, dDistance, dRadius);
-    
-    if(!bSuccess)
-      continue;
-      
-    if(util::PointInRectangle(v2Projected, v2RectCorner,  v2RectExtents))
-    {
-      point.mbSelected = bSelected;
-    }
-  }
-}
-
-void MapEditor::ToggleSelection(CVD::ImageRef irPixel)
-{
-  MapPoint* pClosestPoint = NULL;
-  double dClosestDist = 1e10;
-  TooN::Vector<2> v2Selected = CVD::vec(irPixel);
-  
-  for(MapPointPtrList::iterator point_it = mpMap->mlpPoints.begin(); point_it != mpMap->mlpPoints.end(); ++point_it)
-  {
-    MapPoint& point = *(*point_it);
-    
-    TooN::Vector<2> v2Projected;
-    double dDistance;
-    double dRadius;
-    bool bSuccess = mpMapViewer->ProjectPoint(point.mv3WorldPos, v2Projected, dDistance, dRadius);
-    
-    if(!bSuccess)
-      continue;
-      
-    double dDiff = TooN::norm(v2Selected - v2Projected);
-    if(dDistance < dClosestDist && dDiff < (dRadius + mdSelectionThresh))
-    {
-      dClosestDist = dDistance;
-      pClosestPoint = &point;
-    }
-  }
-  
-  if(!pClosestPoint)
-    return;
-  
-  pClosestPoint->mbSelected = !pClosestPoint->mbSelected;
-}
-
-void MapEditor::ToggleAllPoints()
-{
-  // If any point is currently selected, unselect all
-  // If no point is currently selected, select all
-  
-  bool bAnySelected = false;
-  
-  for(MapPointPtrList::iterator point_it = mpMap->mlpPoints.begin(); point_it != mpMap->mlpPoints.end(); ++point_it)
-  {
-    MapPoint& point = *(*point_it);
-    
-    if(point.mbSelected)
-    {
-      bAnySelected = true;
-      break;
-    }
-  }
-  
-  for(MapPointPtrList::iterator point_it = mpMap->mlpPoints.begin(); point_it != mpMap->mlpPoints.end(); ++point_it)
-  {
-    MapPoint& point = *(*point_it);
-    point.mbSelected = !bAnySelected;
-  }
-}
-
-std::vector<MapPoint*> MapEditor::GatherSelected()
-{
-  std::vector<MapPoint*> vpPoints;
-  
-  for(MapPointPtrList::iterator point_it = mpMap->mlpPoints.begin(); point_it != mpMap->mlpPoints.end(); ++point_it)
-  {
-    MapPoint& point = *(*point_it);
-    if(point.mbSelected)
-    {
-      vpPoints.push_back(&point);
-    }
-  }
-  
-  return vpPoints;
-}
-
-void MapEditor::FitGroundPlaneToSelected()
-{
-  std::shared_ptr<FitGroundPlaneAction> pAction(new FitGroundPlaneAction( mpMap, GatherSelected() ));
-  DoEditAction(std::dynamic_pointer_cast<EditAction>(pAction));
-}
-
-void MapEditor::DeleteSelected()
-{
-  std::shared_ptr<DeletePointsAction> pAction(new DeletePointsAction( GatherSelected() ));
-  DoEditAction(std::dynamic_pointer_cast<EditAction>(pAction));
 }
 
 void MapEditor::DoEditAction(std::shared_ptr<EditAction> pAction)
 {
+  ROS_ASSERT(pAction);
+  
   pAction->Do();
   mspUndoStack.push(pAction);
   
@@ -752,19 +443,4 @@ CVD::ImageRef MapEditor::NormalizeWindowLoc(CVD::ImageRef irLoc)
   irNormalizedLoc.y /= dYScale;
   
   return irNormalizedLoc;
-}
-
-void MapEditor::PutPointsOnLayer(int nLayer, bool bOnlySelected)
-{
-  ROS_ASSERT(nLayer >= 1 && nLayer <= 4);
-  
-  for(MapPointPtrList::iterator point_it = mpMap->mlpPoints.begin(); point_it != mpMap->mlpPoints.end(); ++point_it)
-  {
-    MapPoint& point = *(*point_it);
-    
-    if(bOnlySelected && !point.mbSelected)
-      continue;
-    
-    point.mnUsing = 1 << (nLayer-1);
-  }
 }

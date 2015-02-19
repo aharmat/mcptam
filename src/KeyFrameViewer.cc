@@ -37,6 +37,7 @@
 #include <mcptam/KeyFrameViewer.h>
 #include <mcptam/Map.h>
 #include <mcptam/KeyFrame.h>
+#include <mcptam/MapPoint.h>
 #include <mcptam/GLWindow2.h>
 #include <mcptam/OpenGL.h>
 #include <mcptam/LevelHelpers.h>
@@ -45,20 +46,175 @@
 
 using namespace GVars3;
 
-KeyFrameViewer::KeyFrameViewer(Map &map, GLWindow2 &glw, ImageRefMap mDrawOffsets, ImageRefMap mSizes)
+KeyFrameViewer::KeyFrameViewer(Map &map, GLWindow2 &glw)
 : mMap(map)
 , mGLWindow(glw)
-, mmDrawOffsets(mDrawOffsets)
-, mmSizes(mSizes)
 {
-  nCurrentIdx = 0;
+  mnSourceIdx = 0;
+  mnVerticalDrawOffset = 100;
+  mdPointSizeFrac = 1.0/300.0;
+}
+
+std::vector<MapPoint*> KeyFrameViewer::GatherVisiblePoints(int nPointVis)
+{
+  std::vector<MapPoint*> vpPoints;
+  
+  for(MapPointPtrList::iterator point_it = mMap.mlpPoints.begin(); point_it != mMap.mlpPoints.end(); ++point_it)
+  {
+    MapPoint& point = *(*point_it);
+    
+    if(point.mnUsing & nPointVis)  // bitfield AND to determine point visibility
+    { 
+      vpPoints.push_back(&point);
+    }
+  }
+  
+  return vpPoints;
+}
+
+std::vector<KeyFrame*> KeyFrameViewer::GatherKeyFrames(std::vector<MapPoint*> vpPoints, bool bSource)
+{
+  std::set<KeyFrame*> spKeyFrames;
+  
+  for(unsigned i=0; i < vpPoints.size(); ++i)
+  {
+    if(bSource)
+    {
+      spKeyFrames.insert(vpPoints[i]->mpPatchSourceKF);
+    }
+    else
+    {
+      std::set<KeyFrame*>& spMeasKeyFrames = vpPoints[i]->mMMData.spMeasurementKFs;
+      spKeyFrames.insert(spMeasKeyFrames.begin(), spMeasKeyFrames.end());
+    }
+  }
+  
+  std::vector<std::pair<int, KeyFrame*> > vScoresAndKeyFrames;
+  
+  for(std::set<KeyFrame*>::iterator kf_it = spKeyFrames.begin(); kf_it != spKeyFrames.end(); ++kf_it)
+  {
+    KeyFrame* pKF = *kf_it;
+    int nScore = 0;
+    
+    for(unsigned i=0; i < vpPoints.size(); ++i)
+    {
+      nScore += pKF->mmpMeasurements.count(vpPoints[i]);
+    }
+  
+    vScoresAndKeyFrames.push_back(std::make_pair(nScore, pKF));
+  }
+  
+  std::sort(vScoresAndKeyFrames.begin(), vScoresAndKeyFrames.end(), std::greater<std::pair<int, KeyFrame*> >());
+  
+  std::vector<KeyFrame*> vpKeyFrames;
+  vpKeyFrames.reserve(vScoresAndKeyFrames.size());
+  
+  for(unsigned i=0; i < vScoresAndKeyFrames.size(); ++i)
+  {
+    vpKeyFrames.push_back(vScoresAndKeyFrames[i].second);
+  }
+  
+  return vpKeyFrames;
+}
+
+void KeyFrameViewer::Init()
+{
+  static gvar3<int> gvnLayer1("Layer1", 1, HIDDEN|SILENT);
+  static gvar3<int> gvnLayer2("Layer2", 0, HIDDEN|SILENT);
+  static gvar3<int> gvnLayer3("Layer3", 0, HIDDEN|SILENT);
+  static gvar3<int> gvnLayer4("Layer4", 0, HIDDEN|SILENT);
+  
+  mnPointVis = (*gvnLayer1 << 0) | (*gvnLayer2 << 1) | (*gvnLayer3 << 2) | (*gvnLayer4 << 3);
+  
+  std::vector<MapPoint*> vpPoints = GatherVisiblePoints(mnPointVis);
+  mvpSourceKeyFrames = GatherKeyFrames(vpPoints, true);
+  mvpTargetKeyFrames = GatherKeyFrames(vpPoints, false);
+  
+  //std::cout<<"Visible point measuring keyframes: "<<mvpSourceKeyFrames.size()<<std::endl;
+  
+  mnSourceIdx = mvpSourceKeyFrames.size() > 0 ? 0 : -1;
+  
+  //std::cout<<"mnSourceIdx: "<<mnSourceIdx<<std::endl;
+  
+  // Unselect all points
+  for(MapPointPtrList::iterator point_it = mMap.mlpPoints.begin(); point_it != mMap.mlpPoints.end(); ++point_it)
+  {
+    MapPoint& point = *(*point_it);
+    point.mbSelected = false;
+  }
+}
+
+CVD::Image<CVD::byte> KeyFrameViewer::ResizeImageToWindow(CVD::Image<CVD::byte> imOrig, double dWidthFrac)
+{
+  CVD::ImageRef irWindowSize = mGLWindow.size(); // mGLWindow.GetWindowSize();
+  double dNewWidth = irWindowSize.x * dWidthFrac;
+  double dResizeRatio = dNewWidth / imOrig.size().x;
+  
+  mm2Scale = TooN::Identity;
+  mm2Scale *= dResizeRatio;
+  
+  /*
+  std::cout<<"Window width: "<< irWindowSize.x<<std::endl;
+  std::cout<<"Width Frac: "<<dWidthFrac<<std::endl;
+  std::cout<<"Orig image width: "<<imOrig.size().x<<std::endl;
+  std::cout<<"New width: "<<dNewWidth<<std::endl;
+  std::cout<<"Resize ratio: "<<dResizeRatio<<std::endl;
+  */
+  
+  CVD::Image<CVD::byte> imResized(CVD::ImageRef(dNewWidth, imOrig.size().y * dResizeRatio));
+  
+  cv::Mat imOrigWrapped(imOrig.size().y, imOrig.size().x, CV_8U, imOrig.data(), imOrig.row_stride());
+  cv::Mat imResizedWrapped(imResized.size().y, imResized.size().x, CV_8U, imResized.data(), imResized.row_stride());
+  cv::resize(imOrigWrapped, imResizedWrapped, imResizedWrapped.size(), 0, 0, cv::INTER_CUBIC);
+  
+  return imResized;
 }
 
 // Draw the current MultiKeyFrame
 void KeyFrameViewer::Draw()
 {
+  GUI.ParseLine("Menu.ShowMenu KeyFrameViewer");
+  
   mMessageForUser.str(""); // Wipe the user message clean
   
+  if(mnSourceIdx == -1)
+    return;
+  
+  KeyFrame* pKFSource = mvpSourceKeyFrames[mnSourceIdx];
+  CVD::Image<CVD::byte> imSource= ResizeImageToWindow(pKFSource->maLevels[0].image, 0.5);
+  CVD::ImageRef irSourceOffset = CVD::ImageRef(0,mnVerticalDrawOffset);
+  
+  glRasterPos(irSourceOffset);
+  glDrawPixels(imSource);
+  
+  mMessageForUser << "Viewing Source KF: " << mnSourceIdx + 1 << " / " << mvpSourceKeyFrames.size();
+  
+  double dPointSize = mGLWindow.size().x * mdPointSizeFrac;
+  std::cout<<"Point size: "<< dPointSize<<std::endl;
+  
+  glPointSize(dPointSize); 
+  glBegin(GL_POINTS);
+  
+  for(MeasPtrMap::iterator meas_it = pKFSource->mmpMeasurements.begin(); meas_it != pKFSource->mmpMeasurements.end(); ++meas_it)
+  {
+    MapPoint& point = *(meas_it->first);
+    Measurement& meas = *(meas_it->second);
+    
+    if(point.mpPatchSourceKF != pKFSource)
+      continue;
+      
+    if(!(point.mnUsing & mnPointVis))
+      continue;
+    
+    CVD::glColor(gavLevelColors[meas.nLevel]);
+    CVD::glVertex(mm2Scale*meas.v2RootPos + CVD::vec(irSourceOffset));
+  }
+  
+  glEnd();
+  
+  
+  
+  /*
   // Lock the map while we draw to make sure nobody deletes anything from under our nose
   // This won't affect the Tracker since the KeyFrameViewer is called in the same thread,
   // after the Tracker's done its thing
@@ -70,12 +226,12 @@ void KeyFrameViewer::Draw()
     return;
   }
   
-  // Check if nCurrentIdx is still valid, map could have shrunk with removal of MKFs
-  if(nCurrentIdx >= (int)mMap.mlpMultiKeyFrames.size())
-    nCurrentIdx = 0;
+  // Check if mnSourceIdx is still valid, map could have shrunk with removal of MKFs
+  if(mnSourceIdx >= (int)mMap.mlpMultiKeyFrames.size())
+    mnSourceIdx = 0;
   
   // Get corresponding iterator dereference
-  MultiKeyFrame& mkf = *(*std::next(mMap.mlpMultiKeyFrames.begin(), nCurrentIdx));  
+  MultiKeyFrame& mkf = *(*std::next(mMap.mlpMultiKeyFrames.begin(), mnSourceIdx));  
   
   static gvar3<int> gvnDrawLevel("DrawLevel", 0, HIDDEN|SILENT);
   static gvar3<int> gvnDrawCandidates("DrawCandidates", 0, HIDDEN|SILENT);
@@ -127,36 +283,48 @@ void KeyFrameViewer::Draw()
     
     glEnd();
   }
-  
-  mMessageForUser << "MKF : "<<nCurrentIdx+1<<" / "<<mMap.mlpMultiKeyFrames.size();
-  
-}
 
-// Select the next MultiKeyFrame in the Map
-void KeyFrameViewer::Next()
-{
-  nCurrentIdx++;
-  boost::mutex::scoped_lock lock(mMap.mMutex); 
+  */
   
-  if(nCurrentIdx >= (int)mMap.mlpMultiKeyFrames.size())
-  {
-    nCurrentIdx = 0;
-  }
-}
-
-// Select the previous MultiKeyFrame in the Map
-void KeyFrameViewer::Prev()
-{
-  nCurrentIdx--;
   
-  if(nCurrentIdx < 0)
-  {
-    boost::mutex::scoped_lock lock(mMap.mMutex); 
-    nCurrentIdx = mMap.mlpMultiKeyFrames.size() - 1;
-  }
+  
 }
 
 std::string KeyFrameViewer::GetMessageForUser()
 {
   return mMessageForUser.str();
+}
+
+bool KeyFrameViewer::GUICommandHandler(std::string command, std::string params, std::shared_ptr<EditAction>& pAction)
+{
+  bool bHandled = false;
+  
+  if(command=="KeyPress")
+  {
+    if(params == "a")
+    {
+      // Make sure index is valid before changing it
+      if(mnSourceIdx != -1)
+      {
+        mnSourceIdx--;
+        if(mnSourceIdx < 0)
+          mnSourceIdx = (int)mvpSourceKeyFrames.size()-1;
+      }
+    }
+    
+    if(params == "d")
+    {
+      // Make sure index is valid before changing it
+      if(mnSourceIdx != -1)
+      {
+        mnSourceIdx++;
+        if(mnSourceIdx == (int)mvpSourceKeyFrames.size())
+          mnSourceIdx = 0;
+      }
+    }
+    
+    bHandled = true;
+  }
+  
+  return bHandled;
 }

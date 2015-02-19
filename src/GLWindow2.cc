@@ -143,6 +143,11 @@ void GLWindow2::SetupVideoRasterPosAndZoom()
   glPixelZoom(adZoom[0], -adZoom[1]);
 }
 
+void GLWindow2::SetupWindowRasterPos()
+{
+  glRasterPos2d(-0.5,-0.5);
+}
+
 void GLWindow2::SetupViewport()
 {
   glViewport(0, 0, size()[0], size()[1]);

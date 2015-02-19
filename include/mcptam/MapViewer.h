@@ -13,6 +13,7 @@
 
 #include <mcptam/GLWindow2.h>
 #include <mcptam/Map.h>
+#include <mcptam/EditAction.h>
 #include <TooN/TooN.h>
 #include <TooN/se3.h>
 #include <sstream>
@@ -23,22 +24,35 @@ class MapViewer
 {
 public:
   MapViewer(Map &map, GLWindow2 &glw);
-  void DrawMap(int nPointVis);
-  
-  bool ProjectPoint(TooN::Vector<3> v3WorldPos, TooN::Vector<2>& v2Projected, double& dDistance, double& dPointRadius);
-  
-  
+  void Draw();
+  bool GUICommandHandler(std::string command, std::string params, std::shared_ptr<EditAction>& pAction); 
   std::string GetMessageForUser();
   
 protected:
-  Map &mMap;
-  GLWindow2 &mGLWindow;
   
   void DrawGrid();
   void DrawMapDots(int nPointVis);
   void DrawCamera(TooN::SE3<> se3, bool bSmall=false);
   void SetupFrustum();
   void SetupModelView(TooN::SE3<> se3WorldFromCurrent = TooN::SE3<>());
+  bool ProjectPoint(TooN::Vector<3> v3WorldPos, TooN::Vector<2>& v2Projected, double& dDistance, double& dPointRadius);
+  
+  void ToggleSelection(CVD::ImageRef irPixel);
+  void SetSelectionInArea(CVD::ImageRef irBegin, CVD::ImageRef irEnd,  bool bSelected);
+  
+  std::vector<MapPoint*> GatherSelected();
+  
+  void ToggleAllPoints(int nPointVis);
+  
+  void DrawCrosshairs(CVD::ImageRef irPos, TooN::Vector<4> v4Color, float fLineWidth);
+  void DrawRectangle(CVD::ImageRef irBegin, CVD::ImageRef irEnd, TooN::Vector<4> v4Color, float fLineWidth);
+  
+  void InitOrthoDrawing();
+  
+  void PutPointsOnLayer(int nLayer, bool bOnlySelected);
+  
+  Map &mMap;
+  GLWindow2 &mGLWindow;
   
   TooN::SE3<> mse3ViewerFromWorld;
   TooN::SE3<> mse3RotCenterToViewer;
@@ -54,11 +68,19 @@ protected:
   TooN::Matrix<2,4> mm24WindowConvert;
   
   float mfAttenuation[3];
+  float mfOldAttenuation[3];
   float mfMinPointSize;
   float mfMaxPointSize;
   float mfDefaultPointSize;
 
   std::ostringstream mMessageForUser;
+  
+  enum SelectionMode{SINGLE, BOX_SELECT, BOX_UNSELECT} mSelectionMode;
+  enum SelectionStatus{READY, SELECTING} mSelectionStatus;
+  
+  double mdSelectionThresh;
+  CVD::ImageRef mirSelectionBegin;
+  CVD::ImageRef mirSelectionCursor;
 };
 
 #endif

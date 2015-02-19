@@ -29,22 +29,21 @@
 
 /****************************************************************************************
  *
- * \file KeyFrameViewer.h
- * \brief Declaration of KeyFrameViewer class
+ * \file KeyFrameVisualizer.h
+ * \brief Declaration of KeyFrameVisualizer class
  *
  * Copyright 2014   Adam Harmat, McGill University (adam.harmat@mail.mcgill.ca)
  *                  Michael Tribou, University of Waterloo (mjtribou@uwaterloo.ca)
  *
- * Defines KeyFrameViewer, a class that allows the viewing of the images making up
+ * Defines KeyFrameVisualizer, a class that allows the viewing of the images making up
  * KeyFrames in the Map.
  *
  ****************************************************************************************/
 
-#ifndef __KEYFRAME_VIEWER_H
-#define __KEYFRAME_VIEWER_H
+#ifndef __KEYFRAME_VISUALIZER_H
+#define __KEYFRAME_VISUALIZER_H
 
 #include <mcptam/Types.h>
-#include <mcptam/EditAction.h>
 #include <sstream>
 
 class Map;
@@ -54,41 +53,39 @@ class GLWindow2;
  * 
  *  Draws all KeyFrames in one MultiKeyFrame together, along with the detected corners. Scrolling through
  *  MultiKeyFrames is accomplished with the Next and Prev functions. */
-class KeyFrameViewer
+class KeyFrameVisualizer
 {
 public:
 
-  KeyFrameViewer(Map &map, GLWindow2 &glw);
-  void Init();
+  /** @brief Only parameterized constructor to ensure a valid object
+   *  @param map The Map being used
+   *  @param glw The GL window object to draw to
+   *  @param mDrawOffsets The draw offsets for each camera, determines where in the window each KeyFrame is drawn */
+  KeyFrameVisualizer(Map &map, GLWindow2 &glw, ImageRefMap mDrawOffsets, ImageRefMap mSizes);
+  
+  /// Draw the current MultiKeyFrame
   void Draw();
-  bool GUICommandHandler(std::string command, std::string params, std::shared_ptr<EditAction>& pAction);
+  
+  /// Select the next MultiKeyFrame in the Map
+  void Next();
+  
+  /// Select the previous MultiKeyFrame in the Map
+  void Prev();
+  
+  /// Contains information that should be displayed to the user
+  /** @return The message string */
   std::string GetMessageForUser();
   
 protected:
 
-  std::vector<MapPoint*> GatherVisiblePoints(int nPointVis);
-  std::vector<KeyFrame*> GatherKeyFrames(std::vector<MapPoint*> vpPoints, bool bSource);
-  
-  CVD::Image<CVD::byte> ResizeImageToWindow(CVD::Image<CVD::byte> imOrig, double dWidthFrac);
-
   Map &mMap;   ///< Reference to the Map
   GLWindow2 &mGLWindow;  ///< Reference to the GL window
+  ImageRefMap mmDrawOffsets;  ///< The drawing offsets
+  ImageRefMap mmSizes;  ///< The image offsets
   
-  int mnVerticalDrawOffset;
-  double mdPointSizeFrac;
-  
-  int mnPointVis;
-  
-  int mnSourceIdx;         ///< Current MultiKeyFrame's index, do this instead of keeping iterator because iterators can be invalidated by deletion of MultiKeyFrame
-  
-  std::vector<KeyFrame*> mvpTargetKeyFrames;
-  std::vector<KeyFrame*> mvpSourceKeyFrames;
+  int nCurrentIdx;         ///< Current MultiKeyFrame's index, do this instead of keeping iterator because iterators can be invalidated by deletion of MultiKeyFrame
 
-  TooN::Matrix<2> mm2Scale;
-  
   std::ostringstream mMessageForUser;   ///< Message stream for user
-  
-  
 };
 
 #endif

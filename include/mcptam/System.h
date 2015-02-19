@@ -53,7 +53,7 @@
 
 class MapMaker;
 class BundleAdjusterMulti;
-class KeyFrameViewer;
+class KeyFrameVisualizer;
 
 /** @brief Implements the rest of the objects necessary to run MCTAM */
 class System : public SystemFrontendBase
@@ -80,7 +80,7 @@ protected:
 
   MapMaker* mpMapMaker;                   ///< Pointer to the standalone version of MapMaker
   BundleAdjusterMulti* mpBundleAdjuster;  ///< Pointer to the BundleAdjuster
-  KeyFrameViewer *mpKeyFrameViewer;       ///< Pointer to the KeyFrameViewer
+  KeyFrameVisualizer *mpKeyFrameVisualizer;       ///< Pointer to the KeyFrameVisualizer
   
 };
 

@@ -93,6 +93,7 @@ public:
   void SetupUnitOrtho();
   void SetupWindowOrtho();
   void SetupVideoRasterPosAndZoom();
+  void SetupWindowRasterPos();
 
   // Text display functions:
   //void PrintString(CVD::ImageRef irPos, std::string s);

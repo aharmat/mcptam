@@ -39,7 +39,7 @@
 
 #include <mcptam/SystemServer.h>
 #include <mcptam/VideoSourceMulti.h>
-#include <mcptam/KeyFrameViewer.h>
+#include <mcptam/KeyFrameVisualizer.h>
 #include <mcptam/OpenGL.h>
 #include <mcptam/MapMakerServer.h>
 #include <mcptam/BundleAdjusterMulti.h>
@@ -125,7 +125,7 @@ SystemServer::SystemServer()
   
   mpBundleAdjuster = new BundleAdjusterMulti(*mpMap, mmCameraModels);
   mpMapMakerServer = new MapMakerServer(*mpMap, mmCameraModels, *mpBundleAdjuster);
-  mpKeyFrameViewer = new KeyFrameViewer(*mpMap, *mpGLWindow, mmDrawOffsets, mpVideoSourceMulti->GetSizes());
+  mpKeyFrameVisualizer = new KeyFrameVisualizer(*mpMap, *mpGLWindow, mmDrawOffsets, mpVideoSourceMulti->GetSizes());
   
   // VideoSourceMulti was only needed to build mmCameraModels, delete it so that
   // subscribers shut down
@@ -145,7 +145,7 @@ SystemServer::SystemServer()
 
 SystemServer::~SystemServer()
 {
-  delete mpKeyFrameViewer;
+  delete mpKeyFrameVisualizer;
   delete mpMapMakerServer;
   delete mpBundleAdjuster;
 }
@@ -218,8 +218,8 @@ void SystemServer::Run()
     }
     else
     {
-      mpKeyFrameViewer->Draw();
-      captionStream << mpKeyFrameViewer->GetMessageForUser();
+      mpKeyFrameVisualizer->Draw();
+      captionStream << mpKeyFrameVisualizer->GetMessageForUser();
       captionStream << std::endl;
     }
     
@@ -292,13 +292,13 @@ void SystemServer::GUICommandHandler(std::string command, std::string params)
   
   if(command=="ShowNextKeyFrame")
   {
-    mpKeyFrameViewer->Next();
+    mpKeyFrameVisualizer->Next();
     return;
   }
   
   if(command=="ShowPrevKeyFrame")
   {
-    mpKeyFrameViewer->Prev();
+    mpKeyFrameVisualizer->Prev();
     return;
   }
   
