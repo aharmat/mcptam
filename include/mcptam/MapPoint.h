@@ -68,10 +68,17 @@
 #include <atomic>
 
 class TrackerData;
+class MapPoint;
 
 /// Stores information on keyframe status relative to owner MapPoint
 struct MapMakerData
 {
+public:
+
+  MapMakerData(MapPoint* pPoint)
+  : mPoint(*pPoint)
+  { }
+  
   std::set<KeyFrame*> spMeasurementKFs;   ///< Which keyFrames has this map point got measurements in?
   std::set<KeyFrame*> spNeverRetryKFs;    ///< Which keyFrames have measurements failed enough so I should never retry?
   
@@ -81,10 +88,24 @@ struct MapMakerData
   {  
     int nGoodCount = 0;
     for(std::set<KeyFrame*>::iterator kf_it = spMeasurementKFs.begin(); kf_it != spMeasurementKFs.end(); ++kf_it)
-      nGoodCount += (int)!((*kf_it)->mpParent->mbBad);
+    {
+      KeyFrame* pKF = *kf_it;
+      
+      if(pKF->mmpMeasurements[&mPoint]->bDeleted) 
+        continue;
+        
+      if(pKF->mpParent->mbBad)
+        continue;
+      
+      nGoodCount += 1;
+    }
     
     return nGoodCount; 
   }
+  
+private:
+  MapPoint& mPoint;
+  
 };
 
 
@@ -94,6 +115,7 @@ class MapPoint
 public:
   /// Constructor inserts sensible defaults and zeros pointers.
   MapPoint()
+  : mMMData(this)
   {
     mbFixed = false;
     mbBad = false;

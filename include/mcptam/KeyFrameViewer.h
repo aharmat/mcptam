@@ -45,6 +45,7 @@
 
 #include <mcptam/Types.h>
 #include <mcptam/EditAction.h>
+#include <mcptam/KeyFrame.h>
 #include <sstream>
 
 class Map;
@@ -66,12 +67,12 @@ public:
   
 protected:
 
-  std::vector<MapPoint*> GatherVisiblePoints(int nPointVis);
+  std::vector<MapPoint*> GatherVisiblePoints();
   std::vector<KeyFrame*> GatherKeyFrames(std::vector<MapPoint*> vpPoints, bool bSource);
   
-  CVD::Image<CVD::byte> ResizeImageToWindow(CVD::Image<CVD::byte> imOrig, double dWidthFrac);
+  CVD::Image<CVD::byte> ResizeImageToWindow(CVD::Image<CVD::byte> imOrig, double dWidthFrac, TooN::Matrix<2>& m2Scale);
   
-  void ToggleAllSourcePoints(bool bForceUnselect);
+  void UnSelectAllPoints();
   void ToggleSourceSelection(CVD::ImageRef irPixel);
   void SetSourceSelectionInArea(CVD::ImageRef irBegin, CVD::ImageRef irEnd, bool bSelected);
   
@@ -79,7 +80,8 @@ protected:
   void DrawCrosshairs(CVD::ImageRef irPos, TooN::Vector<4> v4Color, float fLineWidth);
   void DrawRectangle(CVD::ImageRef irBegin, CVD::ImageRef irEnd, TooN::Vector<4> v4Color, float fLineWidth);
   
-  std::vector<MapPoint*> GatherSelected();
+  std::vector<MapPoint*> GatherSourcePoints(bool bOnlySelected);
+  MeasPtrMap GatherSelectedTargetMeasurements();
   
   void InitOrthoDrawing();
 
@@ -98,7 +100,8 @@ protected:
   std::vector<KeyFrame*> mvpTargetKeyFrames;
   std::vector<KeyFrame*> mvpSourceKeyFrames;
 
-  TooN::Matrix<2> mm2Scale;
+  TooN::Matrix<2> mm2SourceScale;
+  TooN::Matrix<2> mm2TargetScale;
   
   std::ostringstream mMessageForUser;   ///< Message stream for user
   
@@ -113,6 +116,9 @@ protected:
   CVD::ImageRef mirSourceOffset;
   
   double mdPointRadius;
+  
+  KeyFrame* mpKFSource;
+  KeyFrame* mpKFTarget;
   
 };
 

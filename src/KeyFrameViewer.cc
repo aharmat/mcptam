@@ -43,6 +43,7 @@
 #include <mcptam/LevelHelpers.h>
 #include <mcptam/Utility.h>
 #include <mcptam/DeletePointsAction.h>
+#include <mcptam/DeleteMeasurementsAction.h>
 #include <gvars3/instances.h>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <cvd/draw.h>
@@ -61,9 +62,12 @@ KeyFrameViewer::KeyFrameViewer(Map &map, GLWindow2 &glw)
   
   mdSelectionThresh = 1.0;
   mirSourceOffset = CVD::ImageRef(0,mnVerticalDrawOffset);
+  
+  mpKFSource = NULL;
+  mpKFTarget = NULL;
 }
 
-std::vector<MapPoint*> KeyFrameViewer::GatherVisiblePoints(int nPointVis)
+std::vector<MapPoint*> KeyFrameViewer::GatherVisiblePoints()
 {
   std::vector<MapPoint*> vpPoints;
   
@@ -71,7 +75,7 @@ std::vector<MapPoint*> KeyFrameViewer::GatherVisiblePoints(int nPointVis)
   {
     MapPoint& point = *(*point_it);
     
-    if(point.mnUsing & nPointVis)  // bitfield AND to determine point visibility
+    if(point.mnUsing & mnPointVis)  // bitfield AND to determine point visibility
     { 
       vpPoints.push_back(&point);
     }
@@ -86,40 +90,83 @@ std::vector<KeyFrame*> KeyFrameViewer::GatherKeyFrames(std::vector<MapPoint*> vp
   
   for(unsigned i=0; i < vpPoints.size(); ++i)
   {
+    MapPoint* pPoint = vpPoints[i];
+    
     if(bSource)
     {
-      spKeyFrames.insert(vpPoints[i]->mpPatchSourceKF);
+      spKeyFrames.insert(pPoint->mpPatchSourceKF);
     }
     else
     {
-      std::set<KeyFrame*>& spMeasKeyFrames = vpPoints[i]->mMMData.spMeasurementKFs;
+      std::set<KeyFrame*> spMeasKeyFrames = pPoint->mMMData.spMeasurementKFs;
+      spMeasKeyFrames.erase(pPoint->mpPatchSourceKF);  // Remove the source keyframe from the set
       spKeyFrames.insert(spMeasKeyFrames.begin(), spMeasKeyFrames.end());
     }
   }
   
-  std::vector<std::pair<int, KeyFrame*> > vScoresAndKeyFrames;
-  
-  for(std::set<KeyFrame*>::iterator kf_it = spKeyFrames.begin(); kf_it != spKeyFrames.end(); ++kf_it)
-  {
-    KeyFrame* pKF = *kf_it;
-    int nScore = 0;
-    
-    for(unsigned i=0; i < vpPoints.size(); ++i)
-    {
-      nScore += pKF->mmpMeasurements.count(vpPoints[i]);
-    }
-  
-    vScoresAndKeyFrames.push_back(std::make_pair(nScore, pKF));
-  }
-  
-  std::sort(vScoresAndKeyFrames.begin(), vScoresAndKeyFrames.end(), std::greater<std::pair<int, KeyFrame*> >());
-  
   std::vector<KeyFrame*> vpKeyFrames;
-  vpKeyFrames.reserve(vScoresAndKeyFrames.size());
   
-  for(unsigned i=0; i < vScoresAndKeyFrames.size(); ++i)
+  if(bSource)
   {
-    vpKeyFrames.push_back(vScoresAndKeyFrames[i].second);
+    int nNumPoints = (int)vpPoints.size();
+    std::vector<std::pair<int, KeyFrame*> > vScoresAndKeyFrames;
+    
+    for(std::set<KeyFrame*>::iterator kf_it = spKeyFrames.begin(); kf_it != spKeyFrames.end(); ++kf_it)
+    {
+      KeyFrame* pKF = *kf_it;
+      int nScore = 0;
+      
+      for(int i=0; i < nNumPoints; ++i)
+      {
+        MapPoint* pPoint = vpPoints[i];
+        
+        if(pPoint->mpPatchSourceKF != pKF)
+          continue;
+        
+        MeasPtrMap::iterator meas_it = pKF->mmpMeasurements.find(pPoint);
+        
+        if(meas_it == pKF->mmpMeasurements.end())
+          continue;
+          
+        Measurement* pMeas = meas_it->second;
+        
+        if(pMeas->bDeleted)
+          continue;
+        
+        // We have a good measurement of this point, add one to KF's score
+        nScore += 1;
+        
+        // If the point is selected, want to push this KF high in the rankings
+        // so add nNumPoints to the score, which guarantees that this KF will 
+        // rank higher than any that don't have any selected point measurements
+        if(pPoint->mbSelected)
+          nScore += nNumPoints;
+      }
+      
+      // hijack mdSceneDepthMean for debugging
+      pKF->mdSceneDepthMean = nScore;
+    
+      vScoresAndKeyFrames.push_back(std::make_pair(nScore, pKF));
+    }
+    
+    std::sort(vScoresAndKeyFrames.begin(), vScoresAndKeyFrames.end(), std::greater<std::pair<int, KeyFrame*> >());
+    
+    
+    vpKeyFrames.reserve(vScoresAndKeyFrames.size());
+    
+    for(unsigned i=0; i < vScoresAndKeyFrames.size(); ++i)
+    {
+      vpKeyFrames.push_back(vScoresAndKeyFrames[i].second);
+    }
+  }
+  else
+  {
+    vpKeyFrames.reserve(spKeyFrames.size());
+    for(std::set<KeyFrame*>::iterator kf_it = spKeyFrames.begin(); kf_it != spKeyFrames.end(); ++kf_it)
+    {
+      KeyFrame* pKF = *kf_it;
+      vpKeyFrames.push_back(pKF);
+    }
   }
   
   return vpKeyFrames;
@@ -134,37 +181,30 @@ void KeyFrameViewer::Init()
   
   mnPointVis = (*gvnLayer1 << 0) | (*gvnLayer2 << 1) | (*gvnLayer3 << 2) | (*gvnLayer4 << 3);
   
-  std::vector<MapPoint*> vpPoints = GatherVisiblePoints(mnPointVis);
+  std::vector<MapPoint*> vpPoints = GatherVisiblePoints();
   mvpSourceKeyFrames = GatherKeyFrames(vpPoints, true);
-  mvpTargetKeyFrames = GatherKeyFrames(vpPoints, false);
   
   //std::cout<<"Visible point measuring keyframes: "<<mvpSourceKeyFrames.size()<<std::endl;
   
   mnSourceIdx = mvpSourceKeyFrames.size() > 0 ? 0 : -1;
   mnTargetIdx = -1;
-  mnTargetSearchDir = 1;
   
   //std::cout<<"mnSourceIdx: "<<mnSourceIdx<<std::endl;
   
-  // Unselect all points
-  for(MapPointPtrList::iterator point_it = mMap.mlpPoints.begin(); point_it != mMap.mlpPoints.end(); ++point_it)
-  {
-    MapPoint& point = *(*point_it);
-    point.mbSelected = false;
-  }
+  //UnSelectAllPoints();
   
   mSelectionMode = SINGLE;
   mSelectionStatus = READY;
 }
 
-CVD::Image<CVD::byte> KeyFrameViewer::ResizeImageToWindow(CVD::Image<CVD::byte> imOrig, double dWidthFrac)
+CVD::Image<CVD::byte> KeyFrameViewer::ResizeImageToWindow(CVD::Image<CVD::byte> imOrig, double dWidthFrac, TooN::Matrix<2>& m2Scale)
 {
   CVD::ImageRef irWindowSize = mGLWindow.size(); // mGLWindow.GetWindowSize();
   double dNewWidth = irWindowSize.x * dWidthFrac;
   double dResizeRatio = dNewWidth / imOrig.size().x;
   
-  mm2Scale = TooN::Identity;
-  mm2Scale *= dResizeRatio;
+  m2Scale = TooN::Identity;
+  m2Scale *= dResizeRatio;
   
   /*
   std::cout<<"Window width: "<< irWindowSize.x<<std::endl;
@@ -186,7 +226,7 @@ CVD::Image<CVD::byte> KeyFrameViewer::ResizeImageToWindow(CVD::Image<CVD::byte> 
 // Draw the current MultiKeyFrame
 void KeyFrameViewer::Draw()
 {
-  GUI.ParseLine("Menu.ShowMenu KeyFrameViewer");
+  GUI.ParseLine("Menu.ShowMenu KFViewer");
   
   mMessageForUser.str(""); // Wipe the user message clean
   
@@ -196,78 +236,153 @@ void KeyFrameViewer::Draw()
     return;
   }
   
-  KeyFrame* pKFSource = mvpSourceKeyFrames[mnSourceIdx];
-  mimSource= ResizeImageToWindow(pKFSource->maLevels[0].image, 0.5);
+  mpKFSource = mvpSourceKeyFrames[mnSourceIdx];
+  mimSource= ResizeImageToWindow(mpKFSource->maLevels[0].image, 0.5, mm2SourceScale);
+  
+  CVD::ImageRef irTargetOffset = mirSourceOffset + CVD::ImageRef(mimSource.size().x,0);
+  CVD::ImageRef irTitleTextOffset = CVD::ImageRef(mimSource.size().x*0.5 - 135,-20);
   
   glRasterPos(mirSourceOffset);
   glDrawPixels(mimSource);
   
-  mMessageForUser << "Viewing Source KF: " << mnSourceIdx + 1 << " / " << mvpSourceKeyFrames.size();
+  std::stringstream titleStream;
+  titleStream << "Source KeyFrame " << mnSourceIdx + 1 << " / " << mvpSourceKeyFrames.size();
   
-  MeasPtrMap mSelectedSourcePoints;
-  
-  mdPointRadius = (mGLWindow.size().x * mdPointSizeFrac) * 0.5;
-  //std::cout<<"Point size: "<< dPointSize<<std::endl;
-  
-  // First draw all the points
-  glPointSize(2*mdPointRadius); 
-  glBegin(GL_POINTS);
-  
-  for(MeasPtrMap::iterator meas_it = pKFSource->mmpMeasurements.begin(); meas_it != pKFSource->mmpMeasurements.end(); ++meas_it)
-  {
-    MapPoint& point = *(meas_it->first);
-    Measurement& meas = *(meas_it->second);
+  glColor3f(0.9,0.9,0);      
+  mGLWindow.PrintString(mirSourceOffset + irTitleTextOffset, titleStream.str(), 15);
     
-    if(point.mpPatchSourceKF != pKFSource)
-      continue;
-      
-    if(!(point.mnUsing & mnPointVis))
-      continue;
-      
-    if(point.mbDeleted)
-      continue;
-    
-    TooN::Vector<3> v3Color = gavLevelColors[meas.nLevel];
-    TooN::Vector<2> v2Point = mm2Scale*meas.v2RootPos + CVD::vec(mirSourceOffset);
-    
-    CVD::glColor(v3Color);
-    CVD::glVertex(v2Point);
-    
-    if(point.mbSelected)
-    {
-      mSelectedSourcePoints[&point] = &meas;
-    }
-  }
-  
-  glEnd();
-  
-  // Now draw a circle around the ones that are selected
-  std::vector<CVD::ImageRef> vCirclePoints = CVD::getCircle(mdPointRadius + 2);
-        
+  // For circle drawing
   glEnable(GL_LINE_SMOOTH);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glLineWidth(mdPointRadius*0.3);
   
-  for(MeasPtrMap::iterator meas_it = mSelectedSourcePoints.begin(); meas_it != mSelectedSourcePoints.end(); ++meas_it)
+  // First draw all the points
+  mdPointRadius = (mGLWindow.size().x * mdPointSizeFrac) * 0.5;
+  std::vector<CVD::ImageRef> vCirclePoints = CVD::getCircle(mdPointRadius + 2);
+  
+  std::vector<MapPoint*> vpSourcePoints = GatherSourcePoints(false);
+  
+  for(unsigned i=0; i < vpSourcePoints.size(); ++i)
   {
-    //MapPoint& point = *(meas_it->first);
-    Measurement& meas = *(meas_it->second);
-    
-    TooN::Vector<3> v3Color = gavLevelColors[meas.nLevel];
-    TooN::Vector<2> v2Point = mm2Scale*meas.v2RootPos + CVD::vec(mirSourceOffset);
+    MapPoint* pPoint = vpSourcePoints[i];
+    Measurement* pMeas = mpKFSource->mmpMeasurements[pPoint];
+
+    TooN::Vector<3> v3Color = gavLevelColors[pMeas->nLevel];
+    TooN::Vector<2> v2Point = mm2SourceScale*pMeas->v2RootPos + CVD::vec(mirSourceOffset);
     
     CVD::glColor(v3Color);
     
-    glBegin(GL_LINE_LOOP);
-    for(unsigned i=0; i < vCirclePoints.size(); ++i)
-    {
-      CVD::glVertex(v2Point + CVD::vec(vCirclePoints[i]));
-    }
+    glPointSize(2*mdPointRadius); 
+    glBegin(GL_POINTS);
+    CVD::glVertex(v2Point);
     glEnd();
+    
+    // Now draw a circle around the ones that are selected
+    if(pPoint->mbSelected)
+    {
+      glLineWidth(mdPointRadius*0.3);
+      glBegin(GL_LINE_LOOP);
+      for(unsigned i=0; i < vCirclePoints.size(); ++i)
+      {
+        CVD::glVertex(v2Point + CVD::vec(vCirclePoints[i]));
+      }
+      glEnd();
+    }
+  }
+  
+  std::vector<MapPoint*> vpSelectedPoints = GatherSourcePoints(true);
+  mvpTargetKeyFrames = GatherKeyFrames(vpSelectedPoints, false);
+  
+  // If there's some selected points, need to draw a target KF
+  if(mvpTargetKeyFrames.size() > 0)
+  {
+    // If we didn't have a valid target before, start at 0
+    if(mnTargetIdx == -1)
+    {
+      mnTargetIdx = 0;
+      mpKFTarget = mvpTargetKeyFrames[mnTargetIdx];
+    }
+    else
+    {
+      ROS_ASSERT(mpKFTarget != NULL);
+      
+      // See if mpKFTarget is still in vector of targets
+      std::vector<KeyFrame*>::iterator kf_it = std::find(mvpTargetKeyFrames.begin(), mvpTargetKeyFrames.end(), mpKFTarget);
+        
+      if(kf_it == mvpTargetKeyFrames.end()) // target kf not in vector anymore, switch to a new target 
+      {
+        mnTargetIdx = 0;
+        mpKFTarget = mvpTargetKeyFrames[mnTargetIdx];
+      }
+      else
+      {
+        mnTargetIdx = std::distance(mvpTargetKeyFrames.begin(), kf_it);
+      }
+    }
+  }
+  else
+  {
+    mnTargetIdx = -1;
+    mpKFTarget = NULL;
   }
   
   
+  titleStream.str("");
+  titleStream << "Target KeyFrame " << (mnTargetIdx == -1 ? 0 : mnTargetIdx + 1) << " / " << mvpTargetKeyFrames.size();
+  
+  glColor3f(0.9,0.9,0);      
+  mGLWindow.PrintString(irTargetOffset + irTitleTextOffset, titleStream.str(), 15);
+  
+  
+  // Now actually draw target KF
+  if(mnTargetIdx != -1)
+  {
+    CVD::Image<CVD::byte> imTarget = ResizeImageToWindow(mpKFTarget->maLevels[0].image, 0.5, mm2TargetScale);
+    
+    glRasterPos(irTargetOffset);
+    glDrawPixels(imTarget);
+    
+    // Now draw the selected points in the target
+    glEnable(GL_LINE_SMOOTH);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    for(unsigned i=0; i < vpSelectedPoints.size(); ++i)
+    {
+      MapPoint* pPoint = vpSelectedPoints[i];
+      
+      MeasPtrMap::iterator meas_it = mpKFTarget->mmpMeasurements.find(pPoint);
+      
+      if(meas_it == mpKFTarget->mmpMeasurements.end())
+        continue;
+        
+      Measurement* pMeas = meas_it->second;;
+      
+      if(pMeas->bDeleted)
+        continue;
+      
+      TooN::Vector<3> v3Color = gavLevelColors[pMeas->nLevel];
+      TooN::Vector<2> v2Point = mm2TargetScale*pMeas->v2RootPos + CVD::vec(irTargetOffset);
+      
+      CVD::glColor(v3Color);
+      
+      glPointSize(2*mdPointRadius); 
+      glBegin(GL_POINTS);
+      CVD::glVertex(v2Point);
+      glEnd();
+      
+      // Draw circles around points
+      glLineWidth(mdPointRadius*0.3);
+      glBegin(GL_LINE_LOOP);
+      for(unsigned i=0; i < vCirclePoints.size(); ++i)
+      {
+        CVD::glVertex(v2Point + CVD::vec(vCirclePoints[i]));
+      }
+      glEnd();
+    }
+  }
+  
+  mMessageForUser << "Source Points: " << vpSourcePoints.size();
   mMessageForUser << std::endl << "Selection Mode: ";
     
   if(mSelectionMode == SINGLE)
@@ -300,185 +415,18 @@ void KeyFrameViewer::Draw()
     }
   }
   
-  if(mSelectedSourcePoints.size() > 0)
-  {
-    // If we didn't have a valid target before, start searching at 0, otherwise start
-    // at wherever we left off
-    if(mnTargetIdx == -1)
-      mnTargetIdx = 0;
-      
-     bool bFound = false;
-      
-    // Figure out which target KF to draw
-    for(unsigned i=0; i < mvpTargetKeyFrames.size(); ++i, mnTargetIdx += mnTargetSearchDir)
-    {
-      if(mnTargetIdx >= (int)mvpTargetKeyFrames.size())
-        mnTargetIdx = 0;
-      if(mnTargetIdx < 0)
-        mnTargetIdx = (int)mvpTargetKeyFrames.size() - 1;
-        
-      KeyFrame* pKFTarget = mvpTargetKeyFrames[mnTargetIdx];
-      
-      if(pKFTarget == pKFSource)
-        continue;
-        
-      for(MeasPtrMap::iterator meas_it = mSelectedSourcePoints.begin(); meas_it != mSelectedSourcePoints.end(); ++meas_it)
-      {
-        MapPoint& point = *(meas_it->first);
-        
-        if(pKFTarget->mmpMeasurements.count(&point))
-        {
-          bFound = true;
-          break;
-        }
-      }
-      
-      if(bFound)
-        break;
-    }
-    
-    // The target keyframes MUST contain a keyframe that measures a selected point, 
-    // since every point has at least two measuring keyframes
-    ROS_ASSERT(bFound);
-  }
-  else
-  {
-    mnTargetIdx = -1;
-  }
-  
-  // Now actually draw target KF
-  if(mnTargetIdx != -1)
-  {
-    KeyFrame* pKFTarget = mvpTargetKeyFrames[mnTargetIdx];
-    CVD::Image<CVD::byte> imTarget = ResizeImageToWindow(pKFTarget->maLevels[0].image, 0.5);
-    CVD::ImageRef irTargetOffset = mirSourceOffset + CVD::ImageRef(mimSource.size().x,0);
-    
-    glRasterPos(irTargetOffset);
-    glDrawPixels(imTarget);
-    
-    mMessageForUser << std::endl << "Viewing Target KF: " << mnTargetIdx + 1 << " / " << mvpTargetKeyFrames.size();
-    
-    // Now draw the selected points in the target
-    glPointSize(2*mdPointRadius); 
-    glBegin(GL_POINTS);
-    
-    for(MeasPtrMap::iterator meas_it = pKFTarget->mmpMeasurements.begin(); meas_it != pKFTarget->mmpMeasurements.end(); ++meas_it)
-    {
-      MapPoint& point = *(meas_it->first);
-      Measurement& meas = *(meas_it->second);
-      
-      if(!mSelectedSourcePoints.count(&point))
-        continue;
-      
-      TooN::Vector<3> v3Color = gavLevelColors[meas.nLevel];
-      TooN::Vector<2> v2Point = mm2Scale*meas.v2RootPos + CVD::vec(irTargetOffset);
-      
-      CVD::glColor(v3Color);
-      CVD::glVertex(v2Point);
-    }
-    
-    glEnd();
-    
-    // Draw circles around points
-    glEnable(GL_LINE_SMOOTH);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glLineWidth(mdPointRadius*0.3);
-    
-    for(MeasPtrMap::iterator meas_it = pKFTarget->mmpMeasurements.begin(); meas_it != pKFTarget->mmpMeasurements.end(); ++meas_it)
-    {
-      MapPoint& point = *(meas_it->first);
-      Measurement& meas = *(meas_it->second);
-      
-      if(!mSelectedSourcePoints.count(&point))
-        continue;
-      
-      TooN::Vector<3> v3Color = gavLevelColors[meas.nLevel];
-      TooN::Vector<2> v2Point = mm2Scale*meas.v2RootPos + CVD::vec(irTargetOffset);
-      
-      CVD::glColor(v3Color);
-      
-      glBegin(GL_LINE_LOOP);
-      for(unsigned i=0; i < vCirclePoints.size(); ++i)
-      {
-        CVD::glVertex(v2Point + CVD::vec(vCirclePoints[i]));
-      }
-      glEnd();
-    }
-  }
-  
-  
-  /*
-  // Lock the map while we draw to make sure nobody deletes anything from under our nose
-  // This won't affect the Tracker since the KeyFrameViewer is called in the same thread,
-  // after the Tracker's done its thing
-  boost::mutex::scoped_lock lock(mMap.mMutex); 
-  
-  if(mMap.mlpMultiKeyFrames.empty())
-  {
-    mMessageForUser << "MAP IS EMPTY! NO MKFs TO DRAW!";
-    return;
-  }
-  
-  // Check if mnSourceIdx is still valid, map could have shrunk with removal of MKFs
-  if(mnSourceIdx >= (int)mMap.mlpMultiKeyFrames.size())
-    mnSourceIdx = 0;
-  
-  // Get corresponding iterator dereference
-  MultiKeyFrame& mkf = *(*std::next(mMap.mlpMultiKeyFrames.begin(), mnSourceIdx));  
-  
-  static gvar3<int> gvnDrawLevel("DrawLevel", 0, HIDDEN|SILENT);
-  static gvar3<int> gvnDrawCandidates("DrawCandidates", 0, HIDDEN|SILENT);
-  
-  for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); kf_it++)
-  {
-    std::string camName = kf_it->first;
-    CVD::ImageRef irOffset = mmDrawOffsets[camName];
-    CVD::ImageRef irSize = mmSizes[camName];
-    
-    KeyFrame& kf = *(kf_it->second);
-    CVD::Image<CVD::byte> imDraw = kf.maLevels[*gvnDrawLevel].image;
-    
-    if(imDraw.size() != irSize)  // only do resizing if necessary
-    {
-      CVD::Image<CVD::byte> imDrawResized(irSize);
-      cv::Mat imDrawWrapped(imDraw.size().y, imDraw.size().x, CV_8U, imDraw.data(), imDraw.row_stride());
-      cv::Mat imDrawResizedWrapped(imDrawResized.size().y, imDrawResized.size().x, CV_8U, imDrawResized.data(), imDrawResized.row_stride());
-      cv::resize(imDrawWrapped, imDrawResizedWrapped, imDrawResizedWrapped.size(), 0, 0, cv::INTER_CUBIC);
-      imDraw = imDrawResized;
-    }
-    
-    glRasterPos(irOffset);
-    glDrawPixels(imDraw);
-    
-    CVD::glColor(gavLevelColors[*gvnDrawLevel]);
-    glPointSize(3*LevelScale(*gvnDrawLevel)); 
-    glBegin(GL_POINTS);
-    
-    if(!*gvnDrawCandidates)   // Draw measurements from this KF
-    {
-      for(MeasPtrMap::iterator meas_it = kf.mmpMeasurements.begin(); meas_it != kf.mmpMeasurements.end(); ++meas_it)
-      {
-        Measurement& meas = *(meas_it->second);
-        if(meas.eSource == Measurement::SRC_ROOT && meas.nLevel == *gvnDrawLevel)
-        {
-          CVD::glVertex(meas.v2RootPos + CVD::vec(irOffset));
-        }
-      }
-    }
-    else  // otherwise draw candidates from this KF
-    {
-      for(unsigned int j=0; j < kf.maLevels[*gvnDrawLevel].vCandidates.size(); ++j) 
-      {
-        CVD::ImageRef irLevelZero = CVD::ir_rounded(LevelZeroPos(kf.maLevels[*gvnDrawLevel].vCandidates[j].irLevelPos, *gvnDrawLevel));
-        CVD::glVertex(irLevelZero + irOffset);
-      }
-    }
-    
-    glEnd();
-  }
-
-  */
+  mMessageForUser << std::endl << "Selected Points: " << vpSelectedPoints.size();
+  mMessageForUser << std::endl;
+  mMessageForUser << std::endl << "NAVIGATION";
+  mMessageForUser << std::endl << "A/D: Prev/Next source KeyFrame";
+  mMessageForUser << std::endl << "W/S: Prev/Next target KeyFrame";
+  mMessageForUser << std::endl;
+  mMessageForUser << std::endl << "COMMANDS";
+  mMessageForUser << std::endl << "        U: Un-select all points";
+  mMessageForUser << std::endl << "        B: Enter box select mode / Switch to box un-select mode";
+  mMessageForUser << std::endl << "      ESC: Exit box select mode";
+  mMessageForUser << std::endl << "      DEL: Delete selected points (careful about selected points on other source KeyFrames)";
+  mMessageForUser << std::endl << "BackSpace: Delete target KeyFrame's measurements of selected points. If a point has <2 measurements, it is also deleted.";
   
 }
 
@@ -496,38 +444,46 @@ bool KeyFrameViewer::GUICommandHandler(std::string command, std::string params, 
   
   if(command=="KeyPress")
   {
-    if(params == "s")
+    if(params == "a")
     {
       mnSourceIdx--;
       if(mnSourceIdx < 0)
         mnSourceIdx = (int)mvpSourceKeyFrames.size()-1;
         
-      ToggleAllSourcePoints(true);
+      //UnSelectAllPoints();
     }
     
-    if(params == "f")
+    if(params == "d")
     {
       mnSourceIdx++;
       if(mnSourceIdx == (int)mvpSourceKeyFrames.size())
         mnSourceIdx = 0;
       
-      ToggleAllSourcePoints(true);
+      //UnSelectAllPoints();
     }
     
-    if(params == "e")
+    if(params == "w")
     {
-      mnTargetSearchDir = -1;
-      mnTargetIdx--;
-      if(mnTargetIdx < 0)
-        mnTargetIdx = (int)mvpTargetKeyFrames.size()-1;
+      if(mnTargetIdx != -1)
+      {
+        mnTargetIdx--;
+        if(mnTargetIdx < 0)
+          mnTargetIdx = (int)mvpTargetKeyFrames.size()-1;
+          
+        mpKFTarget = mvpTargetKeyFrames[mnTargetIdx];
+      }
     }
     
-    if(params == "d")
+    if(params == "s")
     {
-      mnTargetSearchDir = 1;
-      mnTargetIdx++;
-      if(mnTargetIdx == (int)mvpTargetKeyFrames.size())
-        mnTargetIdx = 0;
+      if(mnTargetIdx != -1)
+      {
+        mnTargetIdx++;
+        if(mnTargetIdx == (int)mvpTargetKeyFrames.size())
+          mnTargetIdx = 0;
+          
+        mpKFTarget = mvpTargetKeyFrames[mnTargetIdx];
+      }
     }
     
     if(params == "b")
@@ -548,13 +504,18 @@ bool KeyFrameViewer::GUICommandHandler(std::string command, std::string params, 
     {
       mSelectionMode = SINGLE;
     }
-    else if(params == "a")
+    else if(params == "u")
     {
-      ToggleAllSourcePoints(false);
+      UnSelectAllPoints();
     }
     else if(params == "Delete")
     {
-      std::shared_ptr<DeletePointsAction> pDeleteAction(new DeletePointsAction( GatherSelected() ));
+      std::shared_ptr<DeletePointsAction> pDeleteAction(new DeletePointsAction( GatherSourcePoints(true) ));
+      pAction = std::dynamic_pointer_cast<EditAction>(pDeleteAction);
+    }
+    else if(params == "BackSpace")
+    {
+      std::shared_ptr<DeleteMeasurementsAction> pDeleteAction(new DeleteMeasurementsAction( GatherSelectedTargetMeasurements() ));
       pAction = std::dynamic_pointer_cast<EditAction>(pDeleteAction);
     }
     
@@ -637,35 +598,27 @@ void KeyFrameViewer::ToggleSourceSelection(CVD::ImageRef irPixel)
   if(!util::PointInRectangle(irPixel, mirSourceOffset, mimSource.size()))
     return;
   
-  KeyFrame* pKFSource = mvpSourceKeyFrames[mnSourceIdx];
   irPixel -= mirSourceOffset;
   
-  MapPoint* pClosestPoint = NULL;
-  double dSmallestDiff = 1e10;
+  //MapPoint* pClosestPoint = NULL;
+  //double dSmallestDiff = 1e10;
   TooN::Vector<2> v2Selected = CVD::vec(irPixel);
   
-  for(MeasPtrMap::iterator meas_it = pKFSource->mmpMeasurements.begin(); meas_it != pKFSource->mmpMeasurements.end(); ++meas_it)
+  std::vector<MapPoint*> vpSourcePoints = GatherSourcePoints(false);
+  
+  for(unsigned i=0; i < vpSourcePoints.size(); ++i)
   {
-    MapPoint& point = *(meas_it->first);
-    Measurement& meas = *(meas_it->second);
-    
-    if(point.mpPatchSourceKF != pKFSource)
-      continue;
+    MapPoint* pPoint = vpSourcePoints[i];
+    Measurement* pMeas = mpKFSource->mmpMeasurements[pPoint];
       
-    if(!(point.mnUsing & mnPointVis))
-      continue;
-      
-    if(point.mbDeleted)
-      continue;
-      
-    TooN::Vector<2> v2Point = mm2Scale*meas.v2RootPos;
+    TooN::Vector<2> v2Point = mm2SourceScale*pMeas->v2RootPos;
     
     double dDiff = TooN::norm(v2Selected - v2Point);
     if(dDiff < (mdPointRadius + mdSelectionThresh)) // && dDiff < dSmallestDiff)
     {
       //dSmallestDiff = dDiff;
       //pClosestPoint = &point;
-      point.mbSelected = !point.mbSelected;
+      pPoint->mbSelected = !pPoint->mbSelected;
     }
   }
   
@@ -677,58 +630,12 @@ void KeyFrameViewer::ToggleSourceSelection(CVD::ImageRef irPixel)
   */
 }
 
-void KeyFrameViewer::ToggleAllSourcePoints(bool bForceUnselect)
+void KeyFrameViewer::UnSelectAllPoints()
 {
-  KeyFrame* pKFSource = mvpSourceKeyFrames[mnSourceIdx];
-  
-  // If any point is currently selected, unselect all
-  // If no point is currently selected, select all
-  
-  bool bAnySelected = false;
-  
-  if(bForceUnselect)
+  for(MapPointPtrList::iterator point_it = mMap.mlpPoints.begin(); point_it != mMap.mlpPoints.end(); ++point_it)
   {
-    bAnySelected = bForceUnselect;
-  }
-  else
-  {
-    for(MeasPtrMap::iterator meas_it = pKFSource->mmpMeasurements.begin(); meas_it != pKFSource->mmpMeasurements.end(); ++meas_it)
-    {
-      MapPoint& point = *(meas_it->first);
-      //Measurement& meas = *(meas_it->second);
-      
-      if(point.mpPatchSourceKF != pKFSource)
-        continue;
-        
-      if(!(point.mnUsing & mnPointVis))
-        continue;
-        
-      if(point.mbDeleted)
-        continue;
-        
-      if(point.mbSelected)
-      {
-        bAnySelected = true;
-        break;
-      }
-    }
-  }
-  
-  for(MeasPtrMap::iterator meas_it = pKFSource->mmpMeasurements.begin(); meas_it != pKFSource->mmpMeasurements.end(); ++meas_it)
-  {
-    MapPoint& point = *(meas_it->first);
-    //Measurement& meas = *(meas_it->second);
-    
-    if(point.mpPatchSourceKF != pKFSource)
-      continue;
-      
-    if(!(point.mnUsing & mnPointVis))
-      continue;
-      
-    if(point.mbDeleted)
-      continue;
-      
-    point.mbSelected = !bAnySelected;
+    MapPoint& point = *(*point_it);
+    point.mbSelected = false;
   }
 }
 
@@ -793,27 +700,18 @@ void KeyFrameViewer::SetSourceSelectionInArea(CVD::ImageRef irBegin, CVD::ImageR
   TooN::Vector<2> v2RectCorner = CVD::vec(irTopLeft);
   TooN::Vector<2> v2RectExtents = CVD::vec(irBottomRight - irTopLeft);
   
-  KeyFrame* pKFSource = mvpSourceKeyFrames[mnSourceIdx];
+  std::vector<MapPoint*> vpSourcePoints = GatherSourcePoints(false);
   
-  for(MeasPtrMap::iterator meas_it = pKFSource->mmpMeasurements.begin(); meas_it != pKFSource->mmpMeasurements.end(); ++meas_it)
+  for(unsigned i=0; i < vpSourcePoints.size(); ++i)
   {
-    MapPoint& point = *(meas_it->first);
-    Measurement& meas = *(meas_it->second);
+    MapPoint* pPoint = vpSourcePoints[i];
+    Measurement* pMeas = mpKFSource->mmpMeasurements[pPoint];
     
-    if(point.mpPatchSourceKF != pKFSource)
-      continue;
-      
-    if(!(point.mnUsing & mnPointVis))
-      continue;
-      
-    if(point.mbDeleted)
-      continue;
-      
-    TooN::Vector<2> v2Point = mm2Scale*meas.v2RootPos + CVD::vec(mirSourceOffset);
+    TooN::Vector<2> v2Point = mm2SourceScale*pMeas->v2RootPos + CVD::vec(mirSourceOffset);
     
     if(util::PointInRectangle(v2Point, v2RectCorner,  v2RectExtents))
     {
-      point.mbSelected = bSelected;
+      pPoint->mbSelected = bSelected;
     }
   }
 }
@@ -867,27 +765,49 @@ void KeyFrameViewer::InitOrthoDrawing()
   mGLWindow.SetupWindowOrtho();
 }
 
-std::vector<MapPoint*> KeyFrameViewer::GatherSelected()
+MeasPtrMap KeyFrameViewer::GatherSelectedTargetMeasurements()
+{
+  MeasPtrMap mpMeas;
+  
+  for(MeasPtrMap::iterator meas_it = mpKFTarget->mmpMeasurements.begin(); meas_it != mpKFTarget->mmpMeasurements.end(); ++meas_it)
+  {
+    MapPoint& point = *(meas_it->first);
+    Measurement& meas = *(meas_it->second);
+    
+    if(meas.bDeleted)
+      continue;
+      
+    if(!point.mbSelected)
+      continue;
+  
+    mpMeas[&point] = &meas;
+  }
+  
+  return mpMeas;
+}
+
+std::vector<MapPoint*> KeyFrameViewer::GatherSourcePoints(bool bOnlySelected)
 {
   std::vector<MapPoint*> vpPoints;
-
-  KeyFrame* pKFSource = mvpSourceKeyFrames[mnSourceIdx];
   
-  for(MeasPtrMap::iterator meas_it = pKFSource->mmpMeasurements.begin(); meas_it != pKFSource->mmpMeasurements.end(); ++meas_it)
+  for(MeasPtrMap::iterator meas_it = mpKFSource->mmpMeasurements.begin(); meas_it != mpKFSource->mmpMeasurements.end(); ++meas_it)
   {
     MapPoint& point = *(meas_it->first);
     //Measurement& meas = *(meas_it->second);
     
-    if(point.mpPatchSourceKF != pKFSource)
+    if(point.mbDeleted)
+      continue;
+      
+    if(point.mbBad)
       continue;
       
     if(!(point.mnUsing & mnPointVis))
       continue;
-      
-    if(point.mbDeleted)
+    
+    if(point.mpPatchSourceKF != mpKFSource)
       continue;
       
-    if(point.mbSelected)
+    if(!bOnlySelected || point.mbSelected)
     {
       vpPoints.push_back(&point);
     }

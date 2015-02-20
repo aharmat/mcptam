@@ -103,7 +103,7 @@ void GLWindow2::DrawMenus()
   SetupWindowOrtho();
   glLineWidth(1);
   
-  int nTop = 30;
+  int nTop = 5;
   int nHeight = 30;
   for(std::vector<GLWindowMenu*>::iterator i = mvpGLWindowMenus.begin(); i!= mvpGLWindowMenus.end(); i++)
   {
@@ -163,7 +163,7 @@ void GLWindow2::PrintString(CVD::ImageRef irPos, std::string s, double scale, do
   glPopMatrix();
 }
 
-void GLWindow2::DrawCaption(std::string s)
+void GLWindow2::DrawCaption(std::string s, TooN::Vector<3> v3TextColor, TooN::Vector<4> v4BackgroundColor)
 {
   if(s.length() == 0)
     return;
@@ -186,10 +186,11 @@ void GLWindow2::DrawCaption(std::string s)
     }
   }
   
-  int nTopOfBox = size().y - nLines * 16;
+  int nTopOfBox = size().y - nLines * 14;
   
   // Draw a grey background box for the text
-  glColor4f(0,0,0,0.4);
+  //glColor4f(0,0,0,0.4);
+  CVD::glColor(v4BackgroundColor);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glBegin(GL_QUADS);
@@ -200,7 +201,8 @@ void GLWindow2::DrawCaption(std::string s)
   glEnd();
   
   // Draw the caption text in yellow
-  glColor3f(1,1,0);      
+  //glColor3f(1,1,0);  
+  CVD::glColor(v3TextColor);    
   PrintString(CVD::ImageRef(10,nTopOfBox + 13), s);
 }
 
@@ -288,10 +290,10 @@ MouseUpdate GLWindow2::GetMouseUpdate()
 }
 
 #include <X11/keysym.h>
-void GLWindow2::on_key_down(GLWindow&, int k)
+std::string GLWindow2::ConvertKey (int key)
 {
   std::string s;
-  switch(k)
+  switch(key)
   {
     case XK_a:   case XK_A:  s="a"; break;
     case XK_b:   case XK_B:  s="b"; break;
@@ -339,23 +341,24 @@ void GLWindow2::on_key_down(GLWindow&, int k)
     case XK_Undo: s="Undo"; break;
     case XK_Control_L: s="Ctrl"; break;
     case XK_Control_R: s="Ctrl"; break;
-    default: std::cout<<"Got unkown keysym: "<<std::hex<<k<<std::endl;
+    default: std::cout << "Got unkown keysym: " << std::hex << key << std::dec << std::endl;
   }
 
+  return s;
+}
+
+void GLWindow2::on_key_down(GLWindow&, int k)
+{
+  std::string s = ConvertKey(k);
+  
   if(s!="")
-    GUI.ParseLine("try KeyPress "+s);
+    GUI.ParseLine("try KeyPress " + s);
 }
 
 void GLWindow2::on_key_up(GLWindow&, int k)
 {
-  std::string s;
-  switch(k)
-  {
-    case XK_Control_L: s="Ctrl"; break;
-    case XK_Control_R: s="Ctrl"; break;
-    default: ;
-  }
+  std::string s = ConvertKey(k);
   
   if(s!="")
-    GUI.ParseLine("try KeyRelease "+s);
+    GUI.ParseLine("try KeyRelease " + s);
 }

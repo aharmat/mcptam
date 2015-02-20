@@ -82,6 +82,8 @@ protected:
   double mdSelectionThresh;
   CVD::ImageRef mirSelectionBegin;
   CVD::ImageRef mirSelectionCursor;
+  
+  bool mbMKey;
 };
 
 #endif

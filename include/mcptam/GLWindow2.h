@@ -98,7 +98,7 @@ public:
   // Text display functions:
   //void PrintString(CVD::ImageRef irPos, std::string s);
   void PrintString(CVD::ImageRef irPos, std::string s, double scale=8, double spacing=1.6, double kerning=0.1);
-  void DrawCaption(std::string s);
+  void DrawCaption(std::string s, TooN::Vector<3> v3TextColor = TooN::makeVector(1,1,0), TooN::Vector<4> v4BackgroundColor = TooN::makeVector(0,0,0,0.4));
   
   CVD::ImageRef GetWindowSize(){ return mirVideoSize; }
   CVD::ImageRef GetRealWindowSize();
@@ -132,6 +132,8 @@ protected:
   //TooN::Vector<6> mvLeftPoseUpdate;
   
   MouseUpdate mMouseUpdate;
+  
+  std::string ConvertKey (int key);
   
 };
 

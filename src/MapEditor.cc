@@ -73,7 +73,7 @@ MapEditor::MapEditor(std::string windowName)
   
   GUI.ParseLine("GLWindow.AddMenu Menu");
   GUI.ParseLine("Menu.AddMenuButton MapViewer \"To KF View\" SwitchToKF");
-  GUI.ParseLine("Menu.AddMenuButton KeyFrameViewer \"To Map View\" SwitchToMap");
+  GUI.ParseLine("Menu.AddMenuButton KFViewer \"To Map View\" SwitchToMap");
   
   mNodeHandle.setCallbackQueue(&mCallbackQueueROS);
   mNodeHandlePriv.setCallbackQueue(&mCallbackQueueROS);
@@ -304,7 +304,7 @@ void MapEditor::Run()
       captionStream << mpKeyFrameViewer->GetMessageForUser();
     }
     
-    mpGLWindow->DrawCaption(captionStream.str());
+    mpGLWindow->DrawCaption(captionStream.str(), TooN::makeVector(0.9, 0.9, 0), TooN::makeVector(0, 0, 0, 0));
     mpGLWindow->DrawMenus();
     mpGLWindow->swap_buffers();
     mpGLWindow->HandlePendingEvents();

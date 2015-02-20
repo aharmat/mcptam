@@ -46,6 +46,8 @@ void MapViewer::Init()
 {
   mSelectionMode = SINGLE;
   mSelectionStatus = READY;
+  
+  mbMKey = false;
 }
 
 void MapViewer::DrawMapDots(int nPointVis)
@@ -74,6 +76,9 @@ void MapViewer::DrawMapDots(int nPointVis)
     MapPoint& point = *(*point_it);
     
     if(point.mbDeleted)
+      continue;
+      
+    if(point.mbBad)
       continue;
       
     if(!(point.mnUsing & nPointVis))  // bitfield AND to determine point visibility
@@ -304,7 +309,37 @@ void MapViewer::Draw()
     }
   }
   
-  mMessageForUser << std::endl <<"Move to Layer [1] [2] [3] [4]";
+  // Get number of selected points to display to user
+  int nNumPointsSelected = 0;
+  for(MapPointPtrList::iterator point_it = mMap.mlpPoints.begin(); point_it != mMap.mlpPoints.end(); ++point_it)
+  {
+    MapPoint& point = *(*point_it);
+    
+    if(point.mbDeleted)
+      continue;
+      
+    if(point.mbBad)
+      continue;
+      
+    if(point.mbSelected)
+      nNumPointsSelected += 1;
+      
+  }
+  
+  mMessageForUser << std::endl << "Selected Points: " << nNumPointsSelected;
+  mMessageForUser << std::endl;
+  mMessageForUser << std::endl << "NAVIGATION";
+  mMessageForUser << std::endl << "Rotation: Middle mouse";
+  mMessageForUser << std::endl << "Zoom: Mouse wheel";
+  mMessageForUser << std::endl << "Pan: SHIFT + Middle mouse";
+  mMessageForUser << std::endl;
+  mMessageForUser << std::endl << "COMMANDS";
+  mMessageForUser << std::endl << "  A: Toggle selecting all points";
+  mMessageForUser << std::endl << "  B: Enter box select mode / Switch to box un-select mode";
+  mMessageForUser << std::endl << "ESC: Exit box select mode";
+  mMessageForUser << std::endl << "  #: Numbers 1-4, not the # key. Toggle layer visibility.";
+  mMessageForUser << std::endl << "M+#: Put selected points on layer # (1-4)";
+  mMessageForUser << std::endl << "DEL: Delete selected points (careful about selected points on hidden layers)";
 }
 
 std::string MapViewer::GetMessageForUser()
@@ -526,7 +561,43 @@ bool MapViewer::GUICommandHandler(std::string command, std::string params, std::
     else if(params == "1" || params == "2" || params == "3" || params == "4")
     {
       int nTargetLayer = std::stoi(params);
-      PutPointsOnLayer(nTargetLayer, true);
+      
+      if(mbMKey)
+      {
+        PutPointsOnLayer(nTargetLayer, true);
+      }
+      else
+      {
+        switch(nTargetLayer)
+        {
+          case 1:
+            *gvnLayer1 = 1 - *gvnLayer1;
+            break;
+          case 2:
+            *gvnLayer2 = 1 - *gvnLayer2;
+            break;
+          case 3: 
+            *gvnLayer3 = 1 - *gvnLayer3;
+            break;
+          case 4:
+            *gvnLayer4 = 1 - *gvnLayer4;
+            break;
+        }
+      }
+    }
+    else if(params == "m")
+    {
+      mbMKey = true;
+    }
+    
+    bHandled = true;
+  }
+  
+  if(command=="KeyRelease")
+  {
+    if(params == "m")
+    {
+      mbMKey = false;
     }
     
     bHandled = true;
