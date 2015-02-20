@@ -84,6 +84,8 @@ protected:
   CVD::ImageRef mirSelectionCursor;
   
   bool mbMKey;
+  
+  double mdLastMaxViewerZ;
 };
 
 #endif

@@ -151,14 +151,14 @@ PoseCalibrator::PoseCalibrator()
   mpMapMaker = new MapMakerCalib(*mpMap, mmCameraModels, *mpBundleAdjuster);
   mpKeyFrameVisualizer = new KeyFrameVisualizer(*mpMap, *mpGLWindow, mmDrawOffsets, mpVideoSourceMulti->GetSizes());
   
-  ImageBWMap masksMap = LoadMasks(); 
+  LoadLiveMasks(); 
   
   // Create the CalibratorTrackers, one for each camera
   for(TaylorCameraMap::iterator it = mmCameraModels.begin(); it != mmCameraModels.end(); it++)
   {
     std::string camName = it->first;
     mmTrackers[camName] = new TrackerCalib(*mpMap, *mpMapMaker, mmCameraModels, camName, mmDrawOffsets[camName], mirPatternSize, mdSquareSize, mpGLWindow);
-    mmTrackers[camName]->SetMasks(masksMap);
+    mmTrackers[camName]->SetMasks(mmMasksLive);
   }
   
   mnLastNumInit = 0;

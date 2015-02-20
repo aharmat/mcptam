@@ -135,6 +135,7 @@ System::System()
     // If we loaded a map, disable adding MKFs and updating points by default
     if(mpMap->mbGood)
     {
+      std::cout<<"Map is GOOD, disabling adding and updating"<<std::endl;
       *gvnAddingMKFs = 0;
       *gvnUpdatingPoints = 0;
     }
@@ -187,8 +188,8 @@ System::System()
    std::cout<<"Creating keyframe viewer"<<std::endl;
   mpKeyFrameVisualizer = new KeyFrameVisualizer(*mpMap, *mpGLWindow, mmDrawOffsets, mpVideoSourceMulti->GetSizes());
   
-  ImageBWMap masksMap = LoadMasks(); 
-  mpTracker->SetMasks(masksMap);
+  LoadLiveMasks(); 
+  mpTracker->SetMasks(mmMasksLive);
     
   mbDone = false;
 }
@@ -353,23 +354,9 @@ void System::GUICommandHandler(std::string command, std::string params)
   if(command=="SaveMap")
   {
     ROS_ASSERT(!mSaveFolder.empty());
-    
-    ROS_INFO_STREAM("> Requesting save to "<<mSaveFolder);
-    
-    std::string execString = "exec rm -r " + mSaveFolder + "/*"; 
-    int nRet = std::system(execString.c_str());
-    
-    if(nRet < 0)
-    {
-      ROS_ERROR("=======================================================================");
-      ROS_ERROR("COULD NOT ERASE EXISTING CONTENTS OF SAVE FOLDER, NOT WRITING MAP DATA!");
-      ROS_ERROR("=======================================================================");
-    }
-    else
-    {
-      mpMapMaker->RequestMapSave(mSaveFolder);
-      SaveCamerasToFolder(mSaveFolder);
-    }
+  
+    mpMapMaker->RequestMapSave(mSaveFolder);
+    SaveCamerasToFolder(mSaveFolder);
     
     return;
   }

@@ -457,7 +457,6 @@ void MapMakerServerBase::AddStereoMapPoints(MultiKeyFrame& mkfSrc, int nLevel, i
   {
     KeyFrame &kfSrc = *(it->second);
     Level &level = kfSrc.maLevels[nLevel];
-    ThinCandidates(kfSrc, nLevel);
     
     double dDistThreshUsed = dDistThresh;
     if(dDistThreshUsed < 0) // means we need to compute the thresh on a per-KF basis here
@@ -476,6 +475,10 @@ void MapMakerServerBase::AddStereoMapPoints(MultiKeyFrame& mkfSrc, int nLevel, i
       KeyFrame& kfTarget = *vpTargets[j];
       if(kfTarget.mpParent->mbBad)
         continue;
+        
+      // Thin candidates before processing each target KF, since a point could have been made
+      // for a given candidate with the last target KF
+      ThinCandidates(kfSrc, nLevel);
         
       ROS_DEBUG_STREAM("Target: "<<kfTarget.mCamName<<"  source candidate points: "<<level.vCandidates.size());
       for(unsigned int i = 0; i<level.vCandidates.size(); ++i)

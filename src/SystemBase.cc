@@ -43,6 +43,7 @@
 #include <mcptam/VideoSourceMulti.h>
 #include <mcptam/Utility.h>
 #include <cvd/image_io.h>
+#include <opencv2/imgproc/imgproc.hpp>
 #include <stdlib.h>
 #include <fstream>
 
@@ -229,40 +230,7 @@ VideoSourceMulti* SystemBase::InitVideoSource()
   return new VideoSourceMulti(bGetPoseSeparately);
 }
 
-// Load in the masks for the camera images to block certain portions from being searched for point features
-ImageBWMap SystemBase::LoadMasks()
-{
-  ImageBWMap masksMap;
-  XmlRpc::XmlRpcValue masks;
-  if(mNodeHandlePriv.getParam ("masks", masks))
-  {
-    if(masks.getType() != XmlRpc::XmlRpcValue::TypeStruct)
-    {
-      ROS_FATAL("SystemBase: masks parameter should be a dictionary with camera names as keys and mask file names as values");
-      ros::shutdown();
-    }
-    
-    std::string masks_dir;
-    if(!mNodeHandlePriv.getParam ("masks_dir", masks_dir))
-    {
-      ROS_FATAL("System: need a masks_dir parameter if using masks specifying directory where mask images are found");
-      ros::shutdown();
-    }
-    
-    XmlRpc::XmlRpcValue::ValueStruct::iterator it;
-    for (it= masks.begin(); it != masks.end(); ++it)
-    {
-      std::stringstream ss;
-      ss<<masks_dir<<"/"<<std::string(it->second);
-      ROS_INFO_STREAM("Loading "<<ss.str());
-      masksMap[it->first] = CVD::img_load(ss.str());
-    }
-  }
-  
-  return masksMap;
-}
-
-// Saves all map information to a file
+// Saves all map information to a folder
 void SystemBase::SaveCamerasToFolder(std::string folder)
 { 
   std::string calibrationsFile = folder + "/calibrations.dat";
@@ -499,3 +467,55 @@ void SystemBase::LoadCamerasFromFolder(std::string folder)
   
 }
 
+// Load in the masks for the camera images to block certain portions from being searched for point features
+void SystemBase::LoadLiveMasks()
+{
+  mmMasksLive.clear();
+  
+  XmlRpc::XmlRpcValue masks;
+  if(mNodeHandlePriv.getParam ("masks", masks))
+  {
+    if(masks.getType() != XmlRpc::XmlRpcValue::TypeStruct)
+    {
+      ROS_FATAL("SystemBase: masks parameter should be a dictionary with camera names as keys and mask file names as values");
+      ros::shutdown();
+    }
+    
+    std::string masks_dir;
+    if(!mNodeHandlePriv.getParam ("masks_dir", masks_dir))
+    {
+      ROS_FATAL("System: need a masks_dir parameter if using masks specifying directory where mask images are found");
+      ros::shutdown();
+    }
+    
+    XmlRpc::XmlRpcValue::ValueStruct::iterator it;
+    for (it= masks.begin(); it != masks.end(); ++it)
+    {
+      std::string camName = it->first;
+      std::stringstream ss;
+      ss<<masks_dir<<"/"<<std::string(it->second);
+      ROS_INFO_STREAM("Loading "<<ss.str());
+      
+      CVD::Image<CVD::byte> imMask = CVD::img_load(ss.str());  // not deep copy
+      
+      if(imMask.totalsize() == 0)
+      {
+        ROS_WARN_STREAM("Tried to load " << camName <<" mask from " << ss.str() <<" but it failed!");
+        continue;
+      }
+      
+      CVD::ImageRef irDesiredSize = mmCameraModels[camName].GetImageSize();
+      
+      if(imMask.size() != irDesiredSize) // needs resizing first
+      {
+        CVD::Image<CVD::byte> imMaskResized(irDesiredSize);
+        cv::Mat maskWrapped(imMask.size().y, imMask.size().x, CV_8U, imMask.data(), imMask.row_stride());
+        cv::Mat maskResizedWrapped(imMaskResized.size().y, imMaskResized.size().x, CV_8U, imMaskResized.data(), imMaskResized.row_stride());
+        cv::resize(maskWrapped, maskResizedWrapped, maskResizedWrapped.size(), 0, 0, cv::INTER_CUBIC);
+        imMask = imMaskResized;  // not deep copy
+      }
+    
+      mmMasksLive[camName] = imMask;
+    }
+  }
+}

@@ -38,6 +38,7 @@ MapViewer::MapViewer(Map &map, GLWindow2 &glw)
   glGetFloatv( GL_POINT_SIZE_MAX, &mfMaxPointSize);
   
   mdSelectionThresh = 1.0;
+  mdLastMaxViewerZ = 50;
   
   PutPointsOnLayer(1, false);
 }
@@ -68,6 +69,8 @@ void MapViewer::DrawMapDots(int nPointVis)
   
   //glTexEnvf( GL_POINT_SPRITE, GL_COORD_REPLACE, GL_TRUE );
   //glEnable( GL_POINT_SPRITE );
+  
+  double dMaxViewerZ = 0;
   
   glBegin(GL_POINTS);
   
@@ -104,15 +107,22 @@ void MapViewer::DrawMapDots(int nPointVis)
       v4Color = TooN::makeVector(1,0,1,1);
     }
     
-    
     CVD::glColor(v4Color);
     CVD::glVertex(v3Pos);
+    
+    TooN::Vector<3> v3PointInViewer = mse3ViewerFromWorld * point.mv3WorldPos;
+    if(v3PointInViewer[2] > dMaxViewerZ)
+    {
+      dMaxViewerZ = v3PointInViewer[2];
+    }
   }
   glEnd();
   //glDisable( GL_POINT_SPRITE);
   //glDisable(GL_MULTISAMPLE);
   
   glPointParameterfv(GL_POINT_DISTANCE_ATTENUATION, mfOldAttenuation);
+  
+  mdLastMaxViewerZ = dMaxViewerZ;
 }
 
 void MapViewer::DrawGrid()
@@ -359,7 +369,7 @@ void MapViewer::SetupFrustum()
   double dBottom = dRatio*mdZNear;
   double dTop = -dRatio*mdZNear;
   double dNear = mdZNear;
-  double dFar = 50;
+  double dFar = mdLastMaxViewerZ;
   
   glFrustum(dLeft, dRight, dBottom, dTop, dNear, dFar);
   glScalef(1,1,-1);

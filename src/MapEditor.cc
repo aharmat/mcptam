@@ -65,6 +65,7 @@ MapEditor::MapEditor(std::string windowName)
   
   GUI.RegisterCommand("SwitchToKF", GUICommandCallBack, this);
   GUI.RegisterCommand("SwitchToMap", GUICommandCallBack, this);
+  GUI.RegisterCommand("Save", GUICommandCallBack, this);
   
   GUI.ParseLine("Layer1=1");
   GUI.ParseLine("Layer2=0");
@@ -73,7 +74,9 @@ MapEditor::MapEditor(std::string windowName)
   
   GUI.ParseLine("GLWindow.AddMenu Menu");
   GUI.ParseLine("Menu.AddMenuButton MapViewer \"To KF View\" SwitchToKF");
+  GUI.ParseLine("Menu.AddMenuButton MapViewer \"Save\" Save");
   GUI.ParseLine("Menu.AddMenuButton KFViewer \"To Map View\" SwitchToMap");
+  GUI.ParseLine("Menu.AddMenuButton KFViewer \"Save\" Save");
   
   mNodeHandle.setCallbackQueue(&mCallbackQueueROS);
   mNodeHandlePriv.setCallbackQueue(&mCallbackQueueROS);
@@ -344,6 +347,12 @@ void MapEditor::GUICommandHandler(std::string command, std::string params)
     bHandled = true;
   }
   
+  if(command=="Save")
+  {
+    mpMap->SaveToFolder(mSaveFolder);
+    ROS_INFO_STREAM("Saved map to "<<mSaveFolder);
+  }
+  
   if(command=="KeyPress")
   {
     if(params == "Ctrl")
@@ -380,6 +389,15 @@ void MapEditor::GUICommandHandler(std::string command, std::string params)
           mspUndoStack.push(pAction);
           mspRedoStack.pop();
         }
+      }
+    }
+    else if(params == "s")
+    {
+      if(mbCtrl)
+      {
+        // Save map
+        mpMap->SaveToFolder(mSaveFolder);
+        ROS_INFO_STREAM("Saved map to "<<mSaveFolder);
       }
     }
     

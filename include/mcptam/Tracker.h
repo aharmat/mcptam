@@ -136,7 +136,7 @@ public:
   void TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw);
   
   /// Set the feature extraction masks for the camera images
-  void SetMasks(ImageBWMap& imMasks);
+  void SetMasks(ImageBWMap& mMasks);
   
   /// Get the current poses of the cameras
   SE3Map GetCurrentCameraPoses();

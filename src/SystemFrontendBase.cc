@@ -361,4 +361,3 @@ bool SystemFrontendBase::ResetSystemCallback(mcptam::Reset::Request &request, mc
   
   return true;
 }
-

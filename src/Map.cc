@@ -243,7 +243,75 @@ void Map::EmptyTrash()
 // Saves all map information to a file
 void Map::SaveToFolder(std::string folder)
 { 
+  // Erase existing images in folder
+  std::string execString = "exec rm -r " + folder + "/*.jpg"; 
+  int nRet = std::system(execString.c_str());
+  
+  if(nRet < 0)
+  {
+    ROS_ERROR("=======================================================================");
+    ROS_ERROR(" COULD NOT ERASE EXISTING IMAGES IN SAVE FOLDER, NOT WRITING MAP DATA!");
+    ROS_ERROR("=======================================================================");
+    return;
+  }
+  
+  // Count the number of good MKFs, MapPoints, and Measurements
+  // Need to do this because we won't include bad and deleted entities in the save,
+  // but they might be in the map, either because they haven't been removed yet by
+  // the appropriate handling functions, or because the map editor is calling
+  // this function and it uses the mbBad and mbDeleted flags to mark things without
+  // actually removing them in order to provide undo capability
+  int nGoodMKFs = 0;
+  int nGoodPoints = 0;
+  int nGoodMeas = 0;
+  
+  // Count good MKFs and good meas here
+  for(MultiKeyFramePtrList::iterator mkf_it = mlpMultiKeyFrames.begin(); mkf_it != mlpMultiKeyFrames.end(); ++mkf_it)
+  {
+    MultiKeyFrame& mkf = *(*mkf_it);
+    
+    if(mkf.mbBad || mkf.mbDeleted)
+      continue;
+      
+    nGoodMKFs += 1;
+    
+    for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
+    {
+      KeyFrame& kf = *(kf_it->second);
+      for(MeasPtrMap::iterator meas_it = kf.mmpMeasurements.begin(); meas_it != kf.mmpMeasurements.end(); ++meas_it)
+      {
+        MapPoint& point = *(meas_it->first);
+        Measurement& meas = *(meas_it->second);
+        
+        if(point.mbBad || point.mbDeleted)
+          continue;
+        
+        if(meas.bDeleted)
+          continue;
+          
+        nGoodMeas += 1;
+      }
+    }
+  }
+  
+  // Count good points here
+  for(MapPointPtrList::iterator point_it = mlpPoints.begin(); point_it != mlpPoints.end(); ++point_it)
+  {
+    MapPoint& point = *(*point_it);
+    
+    if(point.mbBad || point.mbDeleted)
+      continue;
+      
+    nGoodPoints += 1;
+  }
+  
+  
+
+  // Don't need to erase existing map.dat file, since it will be overwritten
   std::string mapFile = folder + "/map.dat";
+  
+  std::map<std::string, CVD::Parameter<> > imgParams;
+  imgParams["jpeg.quality"] = CVD::Parameter<int>(90);
   
   std::ofstream ofs(mapFile.c_str());
   
@@ -264,7 +332,7 @@ void Map::SaveToFolder(std::string folder)
   ofs<<"% MKF number, Position (3 vector), Orientation (quaternion, 4 vector)"<<std::endl;
   
   // Total number of MKFs
-  ofs<<mlpMultiKeyFrames.size()<<std::endl;
+  ofs << nGoodMKFs <<std::endl;
   
   int i=0;
   for(MultiKeyFramePtrList::iterator mkf_it = mlpMultiKeyFrames.begin(); mkf_it != mlpMultiKeyFrames.end(); ++i, ++mkf_it)
@@ -272,75 +340,18 @@ void Map::SaveToFolder(std::string folder)
     MultiKeyFrame& mkf = *(*mkf_it);
     mkf.mnID = i;
     
+    // If the save was requested before these were cleaned up, don't include them
+    if(mkf.mbBad || mkf.mbDeleted)
+      continue;
+    
     // Store the conventional way of defining pose (ie inverse of PTAM)
     geometry_msgs::Pose pose = util::SE3ToPoseMsg(mkf.mse3BaseFromWorld.inverse());
     
     ofs<<i;
     ofs<<", "<<pose.position.x<<", "<<pose.position.y<<", "<<pose.position.z;
     ofs<<", "<<pose.orientation.x<<", "<<pose.orientation.y<<", "<<pose.orientation.z<<", "<<pose.orientation.w<<std::endl;
-  }
-  
-  // Now write map point positions
-  ofs<<"% Points in world frame, format:"<<std::endl;
-  ofs<<"% Total number of points"<<std::endl;
-  ofs<<"% Point number, Position (3 vector), Parent MKF number, Parent camera name, Fixed, Optimized"<<std::endl;
-  
-  // Total number of points
-  ofs<<mlpPoints.size()<<std::endl;
-  
-  int nTotalMeas = 0;
-  i=0;
-  for(MapPointPtrList::iterator point_it = mlpPoints.begin(); point_it != mlpPoints.end(); ++i, ++point_it)
-  {
-    MapPoint& point = *(*point_it);
-    point.mnID = i;
     
-    ofs<<i;
-    ofs<<", "<<point.mv3WorldPos[0]<<", "<<point.mv3WorldPos[1]<<", "<<point.mv3WorldPos[2];
-    ofs<<", "<<point.mpPatchSourceKF->mpParent->mnID<<", "<<point.mpPatchSourceKF->mCamName;
-    ofs<<", "<<point.mbFixed<<", "<<point.mbOptimized<<std::endl;
-    
-    nTotalMeas += point.mMMData.spMeasurementKFs.size();
-  }
-  
-  // Now write measurements
-  ofs<<"% Measurements of points from KeyFrames, format: "<<std::endl;
-  ofs<<"% Total number of measurements"<<std::endl;
-  ofs<<"% MKF number, camera name, point number, image position (2 vector) at level 0, level, subpix, source"<<std::endl;
-  
-  // Total number of measurements
-  ofs<<nTotalMeas<<std::endl;
-  
-  for(MultiKeyFramePtrList::iterator mkf_it = mlpMultiKeyFrames.begin(); mkf_it != mlpMultiKeyFrames.end(); ++mkf_it)
-  {
-    MultiKeyFrame& mkf = *(*mkf_it);
-    for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
-    {
-      KeyFrame& kf = *(kf_it->second);
-      for(MeasPtrMap::iterator meas_it = kf.mmpMeasurements.begin(); meas_it != kf.mmpMeasurements.end(); ++meas_it)
-      {
-        MapPoint& point = *(meas_it->first);
-        Measurement& meas = *(meas_it->second);
-        
-        ofs<<mkf.mnID<<", "<<kf.mCamName<<", "<<point.mnID<<", ";
-        ofs<<meas.v2RootPos[0]<<", "<<meas.v2RootPos[1]<<", "<<meas.nLevel<<", "<<meas.bSubPix<<", "<<meas.eSource<<std::endl;
-      }
-    }
-  }
-  
-  // Done writing
-  ofs<<"% The end";
-  ofs.close();
-  
-  
-  // Now write the images
-  
-  std::map<std::string, CVD::Parameter<> > param;
-  param["jpeg.quality"] = CVD::Parameter<int>(90);
-  
-  for(MultiKeyFramePtrList::iterator mkf_it = mlpMultiKeyFrames.begin(); mkf_it != mlpMultiKeyFrames.end(); ++i, ++mkf_it)
-  {
-    MultiKeyFrame& mkf = *(*mkf_it);
+    // Save the keyframe images
     for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
     {
       std::string camName = kf_it->first;
@@ -360,11 +371,11 @@ void Map::SaveToFolder(std::string folder)
           return;
         }
         
-        CVD::img_save<CVD::byte>(kf.maLevels[0].image, imageStream, CVD::ImageType::JPEG, param);
+        CVD::img_save<CVD::byte>(kf.maLevels[0].image, imageStream, CVD::ImageType::JPEG, imgParams);
         
         imageStream.close();
         
-        if(kf.maLevels[0].mask.totalsize() > 0)
+        if(kf.maLevels[0].lastMask.totalsize() > 0)
         {
           ss.str(std::string());
           ss.clear();
@@ -378,11 +389,71 @@ void Map::SaveToFolder(std::string folder)
             return;
           }
           
-          CVD::img_save<CVD::byte>(kf.maLevels[0].mask, imageStream, CVD::ImageType::JPEG, param);
+          CVD::img_save<CVD::byte>(kf.maLevels[0].lastMask, imageStream, CVD::ImageType::JPEG, imgParams);
         }
       }
     }
   }
+  
+  // Now write map point positions
+  ofs<<"% Points in world frame, format:"<<std::endl;
+  ofs<<"% Total number of points"<<std::endl;
+  ofs<<"% Point number, Position (3 vector), Parent MKF number, Parent camera name, Fixed, Optimized"<<std::endl;
+  
+  // Total number of points
+  ofs << nGoodPoints << std::endl;
+  
+  i=0;
+  for(MapPointPtrList::iterator point_it = mlpPoints.begin(); point_it != mlpPoints.end(); ++i, ++point_it)
+  {
+    MapPoint& point = *(*point_it);
+    point.mnID = i;
+    
+    // If the save was requested before these were cleaned up, don't include them
+    if(point.mbBad || point.mbDeleted)
+      continue;
+    
+    ofs<<i;
+    ofs<<", "<<point.mv3WorldPos[0]<<", "<<point.mv3WorldPos[1]<<", "<<point.mv3WorldPos[2];
+    ofs<<", "<<point.mpPatchSourceKF->mpParent->mnID<<", "<<point.mpPatchSourceKF->mCamName;
+    ofs<<", "<<point.mbFixed<<", "<<point.mbOptimized<<std::endl;
+  }
+  
+  // Now write measurements
+  ofs<<"% Measurements of points from KeyFrames, format: "<<std::endl;
+  ofs<<"% Total number of measurements"<<std::endl;
+  ofs<<"% MKF number, camera name, point number, image position (2 vector) at level 0, level, subpix, source"<<std::endl;
+  
+  // Total number of measurements
+  ofs << nGoodMeas << std::endl;
+  
+  for(MultiKeyFramePtrList::iterator mkf_it = mlpMultiKeyFrames.begin(); mkf_it != mlpMultiKeyFrames.end(); ++mkf_it)
+  {
+    MultiKeyFrame& mkf = *(*mkf_it);
+    for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
+    {
+      KeyFrame& kf = *(kf_it->second);
+      for(MeasPtrMap::iterator meas_it = kf.mmpMeasurements.begin(); meas_it != kf.mmpMeasurements.end(); ++meas_it)
+      {
+        MapPoint& point = *(meas_it->first);
+        Measurement& meas = *(meas_it->second);
+        
+        if(point.mbBad || point.mbDeleted)
+          continue;
+        
+        // A measurement can be marked deleted by the map editor, don't include in save
+        if(meas.bDeleted)
+          continue;
+        
+        ofs<<mkf.mnID<<", "<<kf.mCamName<<", "<<point.mnID<<", ";
+        ofs<<meas.v2RootPos[0]<<", "<<meas.v2RootPos[1]<<", "<<meas.nLevel<<", "<<meas.bSubPix<<", "<<meas.eSource<<std::endl;
+      }
+    }
+  }
+  
+  // Done writing
+  ofs<<"% The end";
+  ofs.close();
   
 }
 
@@ -486,7 +557,7 @@ void Map::LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCam
           
           if(!imageFile.is_open())
           {
-            ROS_WARN_STREAM("Couldn't open mask file ["<<ss.str()<<"], assuming no mask exists");
+            ROS_DEBUG_STREAM("Couldn't open mask file ["<<ss.str()<<"], assuming no mask exists");
           }
           else
           {
@@ -499,8 +570,8 @@ void Map::LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCam
           pKF->SetMask(imMask);
     
         // Don't do deep copy of image since we just created it and nobody else will use it
-        // The handling of the mask is not right at the moment, since glare masking is decided 
-        // on the tracker side and not saved into the KF, so just don't do it for now....
+        // The loaded mask already includes any optional glare masking that was originally
+        // in the keyframe, so don't do it again 
         if(imImage.totalsize() > 0)
         {
           pKF->MakeKeyFrame_Lite(imImage, false, false);

@@ -218,25 +218,16 @@ void Tracker::InitCurrentMKF(const SE3<>& pose)
 }
 
 // Set the feature extraction masks for the camera images
-void Tracker::SetMasks(ImageBWMap& imMasks)
+void Tracker::SetMasks(ImageBWMap& mMasks)
 {
-  mmMasks = imMasks;  
+  mmMasks = mMasks;  
   
   for(KeyFramePtrMap::iterator kf_it = mpCurrentMKF->mmpKeyFrames.begin(); kf_it != mpCurrentMKF->mmpKeyFrames.end(); ++kf_it)
   {
     if(mmMasks.count(kf_it->first)) // we've got a mask for this keyframe
     {
       CVD::Image<CVD::byte> imMask = mmMasks[kf_it->first];  // not deep copy
-      
-      if(imMask.size() != mmSizes[kf_it->first]) // needs resizing first
-      {
-        CVD::Image<CVD::byte> imMaskResized(mmSizes[kf_it->first]);
-        cv::Mat maskWrapped(imMask.size().y, imMask.size().x, CV_8U, imMask.data(), imMask.row_stride());
-        cv::Mat maskResizedWrapped(imMaskResized.size().y, imMaskResized.size().x, CV_8U, imMaskResized.data(), imMaskResized.row_stride());
-        cv::resize(maskWrapped, maskResizedWrapped, maskResizedWrapped.size(), 0, 0, cv::INTER_CUBIC);
-        imMask = imMaskResized;  // not deep copy
-      }
-      
+      ROS_ASSERT(imMask.size() == mmSizes[kf_it->first]); // the LoadMask function should have resized the masks
       kf_it->second->SetMask(imMask);
     }
   }
@@ -853,9 +844,9 @@ void Tracker::SetupFineTracking(TDVLevels& vPVSLevels, TrackerDataPtrVector& vIt
   // Now do the fine tracking stage. This needs many more points!
   
   // should be 10
-  int nFineRange = 10;  // Pixel search range for the fine stage. 
+  int nFineRange = 20;  // Pixel search range for the fine stage. 
   if(bDidCoarse)       // Can use a tighter search if the coarse stage was already done.
-    nFineRange = 5;
+    nFineRange = 10;
     
   // What patches shall we use this time? The high-level ones are quite important,
   // so do all of these, with sub-pixel refinement.
@@ -943,10 +934,10 @@ void Tracker::TrackMap()
   vPVSLevels.resize(mvCurrCamNames.size());
   
   int anNumPVSPoints[LEVELS];
-  anNumPVSPoints[0] = 0;
-  anNumPVSPoints[1] = 0;
-  anNumPVSPoints[2] = 0;
-  anNumPVSPoints[3] = 0;
+  for(int i=0; i < LEVELS; ++i)
+  { 
+    anNumPVSPoints[i] = 0;
+  }
   
   ros::WallTime startTime;
   
