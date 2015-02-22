@@ -71,6 +71,7 @@ protected:
   std::vector<KeyFrame*> GatherKeyFrames(std::vector<MapPoint*> vpPoints, bool bSource);
   
   CVD::Image<CVD::byte> ResizeImageToWindow(CVD::Image<CVD::byte> imOrig, double dWidthFrac, TooN::Matrix<2>& m2Scale);
+  TooN::Vector<2> RescalePoint(TooN::Vector<2> v2RootPos, int nLevel, TooN::Matrix<2> m2Scale);
   
   void UnSelectAllPoints();
   void ToggleSourceSelection(CVD::ImageRef irPixel);
@@ -82,8 +83,6 @@ protected:
   
   std::vector<MapPoint*> GatherSourcePoints(bool bOnlySelected);
   MeasPtrMap GatherSelectedTargetMeasurements();
-  
-  void InitOrthoDrawing();
 
   Map &mMap;   ///< Reference to the Map
   GLWindow2 &mGLWindow;  ///< Reference to the GL window

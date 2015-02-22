@@ -48,8 +48,6 @@ protected:
   void DrawCrosshairs(CVD::ImageRef irPos, TooN::Vector<4> v4Color, float fLineWidth);
   void DrawRectangle(CVD::ImageRef irBegin, CVD::ImageRef irEnd, TooN::Vector<4> v4Color, float fLineWidth);
   
-  void InitOrthoDrawing();
-  
   void PutPointsOnLayer(int nLayer, bool bOnlySelected);
   
   Map &mMap;

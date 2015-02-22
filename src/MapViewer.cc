@@ -286,6 +286,8 @@ void MapViewer::Draw()
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
   
+  mGLWindow.SetupWindowOrtho(); 
+  
   mMessageForUser << "Map: " << mMap.mlpPoints.size() << "P, " << mMap.mlpMultiKeyFrames.size() << "MKF";
   mMessageForUser << std::endl << "Selection Mode: ";
     
@@ -478,28 +480,10 @@ bool MapViewer::ProjectPoint(TooN::Vector<3> v3WorldPos, TooN::Vector<2>& v2Proj
   return true;
 }
 
-void MapViewer::InitOrthoDrawing()
-{
-  glDisable(GL_STENCIL_TEST);
-  glDisable(GL_DEPTH_TEST);
-  glDisable(GL_TEXTURE_2D);
-  glDisable(GL_TEXTURE_RECTANGLE_ARB);
-  glDisable(GL_LINE_SMOOTH);
-  glDisable(GL_POLYGON_SMOOTH);
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glColorMask(1,1,1,1);
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity();
-  mGLWindow.SetupWindowOrtho();
-}
-
 void MapViewer::DrawCrosshairs(CVD::ImageRef irPos, TooN::Vector<4> v4Color, float fLineWidth)
 {
   int nWidth = mGLWindow.size().x;
   int nHeight = mGLWindow.size().y;
-  
-  InitOrthoDrawing();
   
   glLineWidth(fLineWidth);
   CVD::glColor(v4Color);
@@ -509,8 +493,6 @@ void MapViewer::DrawCrosshairs(CVD::ImageRef irPos, TooN::Vector<4> v4Color, flo
 
 void MapViewer::DrawRectangle(CVD::ImageRef irBegin, CVD::ImageRef irEnd, TooN::Vector<4> v4Color, float fLineWidth)
 {
-  InitOrthoDrawing();
-  
   glLineWidth(fLineWidth);
   CVD::glColor(v4Color);
   

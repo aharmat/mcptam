@@ -280,13 +280,15 @@ void MapEditor::Run()
 {
   mpMapViewer->Init();
   
+  //ros::Rate rate(1);
+  
   // Loop until instructed to stop
   while(!mbDone && ros::ok())
   {
     // Required before drawing
     mpGLWindow->SetupViewport(); 
     mpGLWindow->SetupWindowOrtho(); 
-    mpGLWindow->SetupWindowRasterPos();
+    //mpGLWindow->SetupWindowRasterPos();
     //mpGLWindow->SetupVideoOrtho();
     //mpGLWindow->SetupVideoRasterPosAndZoom();
     
@@ -320,6 +322,8 @@ void MapEditor::Run()
     }
     
     mCallbackQueueROS.callAvailable();
+    
+    //rate.sleep();
   }
 }
 

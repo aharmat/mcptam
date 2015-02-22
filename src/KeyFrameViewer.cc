@@ -54,6 +54,12 @@ KeyFrameViewer::KeyFrameViewer(Map &map, GLWindow2 &glw)
 : mMap(map)
 , mGLWindow(glw)
 {
+  GUI.ParseLine("DrawLevel=0");
+  
+  std::stringstream ss;
+  ss << "Menu.AddMenuSlider KFViewer Level DrawLevel 0 " << LEVELS-1 << " KFViewer";
+  GUI.ParseLine(ss.str());
+  
   mnSourceIdx = 0;
   mnTargetIdx = -1;
   
@@ -203,8 +209,10 @@ CVD::Image<CVD::byte> KeyFrameViewer::ResizeImageToWindow(CVD::Image<CVD::byte> 
   double dNewWidth = irWindowSize.x * dWidthFrac;
   double dResizeRatio = dNewWidth / imOrig.size().x;
   
+  CVD::ImageRef irNewSize(dNewWidth, imOrig.size().y * dResizeRatio);
+  
   m2Scale = TooN::Identity;
-  m2Scale *= dResizeRatio;
+  m2Scale *= (double)irNewSize.x / imOrig.size().x;
   
   /*
   std::cout<<"Window width: "<< irWindowSize.x<<std::endl;
@@ -214,7 +222,7 @@ CVD::Image<CVD::byte> KeyFrameViewer::ResizeImageToWindow(CVD::Image<CVD::byte> 
   std::cout<<"Resize ratio: "<<dResizeRatio<<std::endl;
   */
   
-  CVD::Image<CVD::byte> imResized(CVD::ImageRef(dNewWidth, imOrig.size().y * dResizeRatio));
+  CVD::Image<CVD::byte> imResized(irNewSize);
   
   cv::Mat imOrigWrapped(imOrig.size().y, imOrig.size().x, CV_8U, imOrig.data(), imOrig.row_stride());
   cv::Mat imResizedWrapped(imResized.size().y, imResized.size().x, CV_8U, imResized.data(), imResized.row_stride());
@@ -222,6 +230,12 @@ CVD::Image<CVD::byte> KeyFrameViewer::ResizeImageToWindow(CVD::Image<CVD::byte> 
   
   return imResized;
 }
+
+TooN::Vector<2> KeyFrameViewer::RescalePoint(TooN::Vector<2> v2RootPos, int nLevel, TooN::Matrix<2> m2Scale)
+{
+  TooN::Vector<2> v2HalfPixelOffset = TooN::makeVector(0.5, 0.5);
+  return m2Scale * (LevelNPos(v2RootPos, nLevel) + v2HalfPixelOffset) - v2HalfPixelOffset;
+} 
 
 // Draw the current MultiKeyFrame
 void KeyFrameViewer::Draw()
@@ -236,8 +250,10 @@ void KeyFrameViewer::Draw()
     return;
   }
   
+  static gvar3<int> gvnDrawLevel("DrawLevel", 0, HIDDEN|SILENT);
+  
   mpKFSource = mvpSourceKeyFrames[mnSourceIdx];
-  mimSource= ResizeImageToWindow(mpKFSource->maLevels[0].image, 0.5, mm2SourceScale);
+  mimSource= ResizeImageToWindow(mpKFSource->maLevels[*gvnDrawLevel].image, 0.5, mm2SourceScale);
   
   CVD::ImageRef irTargetOffset = mirSourceOffset + CVD::ImageRef(mimSource.size().x,0);
   CVD::ImageRef irTitleTextOffset = CVD::ImageRef(mimSource.size().x*0.5 - 135,-20);
@@ -268,7 +284,19 @@ void KeyFrameViewer::Draw()
     Measurement* pMeas = mpKFSource->mmpMeasurements[pPoint];
 
     TooN::Vector<3> v3Color = gavLevelColors[pMeas->nLevel];
-    TooN::Vector<2> v2Point = mm2SourceScale*pMeas->v2RootPos + CVD::vec(mirSourceOffset);
+    TooN::Vector<2> v2Point = RescalePoint(pMeas->v2RootPos, *gvnDrawLevel, mm2SourceScale) + CVD::vec(mirSourceOffset);
+    
+    /*
+    if(i == 0)
+    {
+      std::cout<<"---------------"<<std::endl;
+      std::cout<<"Level: "<<*gvnDrawLevel<<std::endl;
+      std::cout<<"mm2SourceScale: "<<std::endl<<mm2SourceScale;
+      std::cout<<"pMeas->v2RootPos: "<<pMeas->v2RootPos<<std::endl;
+      std::cout<<"LevelNPos: "<<LevelNPos(pMeas->v2RootPos, *gvnDrawLevel)<<std::endl;
+      std::cout<<"v2Point: "<<v2Point<<std::endl;
+    }
+    */
     
     CVD::glColor(v3Color);
     
@@ -337,7 +365,7 @@ void KeyFrameViewer::Draw()
   // Now actually draw target KF
   if(mnTargetIdx != -1)
   {
-    CVD::Image<CVD::byte> imTarget = ResizeImageToWindow(mpKFTarget->maLevels[0].image, 0.5, mm2TargetScale);
+    CVD::Image<CVD::byte> imTarget = ResizeImageToWindow(mpKFTarget->maLevels[*gvnDrawLevel].image, 0.5, mm2TargetScale);
     
     glRasterPos(irTargetOffset);
     glDrawPixels(imTarget);
@@ -362,7 +390,7 @@ void KeyFrameViewer::Draw()
         continue;
       
       TooN::Vector<3> v3Color = gavLevelColors[pMeas->nLevel];
-      TooN::Vector<2> v2Point = mm2TargetScale*pMeas->v2RootPos + CVD::vec(irTargetOffset);
+      TooN::Vector<2> v2Point = RescalePoint(pMeas->v2RootPos, *gvnDrawLevel, mm2TargetScale) + CVD::vec(irTargetOffset);
       
       CVD::glColor(v3Color);
       
@@ -597,6 +625,8 @@ void KeyFrameViewer::ToggleSourceSelection(CVD::ImageRef irPixel)
 {
   if(!util::PointInRectangle(irPixel, mirSourceOffset, mimSource.size()))
     return;
+    
+  static gvar3<int> gvnDrawLevel("DrawLevel", 0, HIDDEN|SILENT);
   
   irPixel -= mirSourceOffset;
   
@@ -611,7 +641,7 @@ void KeyFrameViewer::ToggleSourceSelection(CVD::ImageRef irPixel)
     MapPoint* pPoint = vpSourcePoints[i];
     Measurement* pMeas = mpKFSource->mmpMeasurements[pPoint];
       
-    TooN::Vector<2> v2Point = mm2SourceScale*pMeas->v2RootPos;
+    TooN::Vector<2> v2Point = RescalePoint(pMeas->v2RootPos, *gvnDrawLevel, mm2SourceScale);
     
     double dDiff = TooN::norm(v2Selected - v2Point);
     if(dDiff < (mdPointRadius + mdSelectionThresh)) // && dDiff < dSmallestDiff)
@@ -660,6 +690,8 @@ CVD::ImageRef KeyFrameViewer::ClampLocToSource(CVD::ImageRef irLoc)
 
 void KeyFrameViewer::SetSourceSelectionInArea(CVD::ImageRef irBegin, CVD::ImageRef irEnd, bool bSelected)
 {
+  static gvar3<int> gvnDrawLevel("DrawLevel", 0, HIDDEN|SILENT);
+  
   irBegin = ClampLocToSource(irBegin);
   irEnd = ClampLocToSource(irEnd);
   
@@ -707,7 +739,7 @@ void KeyFrameViewer::SetSourceSelectionInArea(CVD::ImageRef irBegin, CVD::ImageR
     MapPoint* pPoint = vpSourcePoints[i];
     Measurement* pMeas = mpKFSource->mmpMeasurements[pPoint];
     
-    TooN::Vector<2> v2Point = mm2SourceScale*pMeas->v2RootPos + CVD::vec(mirSourceOffset);
+    TooN::Vector<2> v2Point = RescalePoint(pMeas->v2RootPos, *gvnDrawLevel, mm2SourceScale) + CVD::vec(mirSourceOffset);
     
     if(util::PointInRectangle(v2Point, v2RectCorner,  v2RectExtents))
     {
@@ -723,8 +755,6 @@ void KeyFrameViewer::DrawCrosshairs(CVD::ImageRef irPos, TooN::Vector<4> v4Color
   int nWidth = mimSource.size().x;
   int nHeight = mimSource.size().y;
   
-  InitOrthoDrawing();
-  
   glLineWidth(fLineWidth);
   CVD::glColor(v4Color);
   CVD::glLine(CVD::ImageRef(mirSourceOffset.x, irPos.y), CVD::ImageRef(mirSourceOffset.x+nWidth, irPos.y));
@@ -736,8 +766,6 @@ void KeyFrameViewer::DrawRectangle(CVD::ImageRef irBegin, CVD::ImageRef irEnd, T
   irBegin = ClampLocToSource(irBegin);
   irEnd = ClampLocToSource(irEnd);
   
-  InitOrthoDrawing();
-  
   glLineWidth(fLineWidth);
   CVD::glColor(v4Color);
   
@@ -747,22 +775,6 @@ void KeyFrameViewer::DrawRectangle(CVD::ImageRef irBegin, CVD::ImageRef irEnd, T
   glVertex(irEnd);
   glVertex(CVD::ImageRef(irBegin.x, irEnd.y));
   glEnd();
-}
-
-void KeyFrameViewer::InitOrthoDrawing()
-{
-  glDisable(GL_STENCIL_TEST);
-  glDisable(GL_DEPTH_TEST);
-  glDisable(GL_TEXTURE_2D);
-  glDisable(GL_TEXTURE_RECTANGLE_ARB);
-  glDisable(GL_LINE_SMOOTH);
-  glDisable(GL_POLYGON_SMOOTH);
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-  glColorMask(1,1,1,1);
-  glMatrixMode(GL_MODELVIEW);
-  glLoadIdentity();
-  mGLWindow.SetupWindowOrtho();
 }
 
 MeasPtrMap KeyFrameViewer::GatherSelectedTargetMeasurements()
