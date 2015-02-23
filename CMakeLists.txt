@@ -92,7 +92,7 @@ target_link_libraries(pose_calibrator ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${S
                                      
 add_executable(map_editor src/MainMapEditor.cc src/MapEditor.cc src/MapViewer.cc src/KeyFrameViewer.cc src/GLWindow2.cc src/GLWindowMenu.cc src/TaylorCamera.cc src/KeyFrame.cc 
                           src/MapPoint.cc src/Map.cc src/SmallBlurryImage.cc src/ShiTomasi.cc src/MiniPatch.cc src/DeletePointsAction.cc src/FitGroundPlaneAction.cc
-                          src/DeleteMeasurementsAction.cc)
+                          src/DeleteMeasurementsAction.cc src/PatchFinder.cc)
 add_dependencies(map_editor ${PROJECT_NAME}_gencpp)
 target_link_libraries(map_editor ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${OPENGL_glew_LIBRARY} ${OpenCV_LIBS} ${GVars3_LIBRARIES} ${LAPACK_LIBRARIES})
                                      

@@ -15,7 +15,7 @@ using namespace GVars3;
 MapViewer::MapViewer(Map &map, GLWindow2 &glw)
 : mMap(map)
 , mGLWindow(glw)
-, mfAttenuation{0.0f, 0.0f, 0.005f}
+, mfAttenuation{0.0f, 0.0f, 0.002f}
 {
   GUI.ParseLine("Menu.AddMenuToggle MapViewer \"Layer 4\" Layer4 MapViewer");
   GUI.ParseLine("Menu.AddMenuToggle MapViewer \"Layer 3\" Layer3 MapViewer");

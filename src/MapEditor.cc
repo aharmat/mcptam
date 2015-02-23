@@ -42,6 +42,7 @@
 #include <mcptam/OpenGL.h>
 #include <mcptam/Map.h>
 #include <mcptam/Utility.h>
+#include <mcptam/PatchFinder.h>
 #include <cvd/image_io.h>
 #include <stdlib.h>
 #include <fstream>
@@ -71,12 +72,15 @@ MapEditor::MapEditor(std::string windowName)
   GUI.ParseLine("Layer2=0");
   GUI.ParseLine("Layer3=0");
   GUI.ParseLine("Layer4=0");
+  GUI.ParseLine("MinMeas=2");
   
   GUI.ParseLine("GLWindow.AddMenu Menu");
   GUI.ParseLine("Menu.AddMenuButton MapViewer \"To KF View\" SwitchToKF");
   GUI.ParseLine("Menu.AddMenuButton MapViewer \"Save\" Save");
+  GUI.ParseLine("Menu.AddMenuSlider MapViewer \"Min Meas\" MinMeas 2 6 MapViewer");
   GUI.ParseLine("Menu.AddMenuButton KFViewer \"To Map View\" SwitchToMap");
   GUI.ParseLine("Menu.AddMenuButton KFViewer \"Save\" Save");
+  GUI.ParseLine("Menu.AddMenuSlider KFViewer \"Min Meas\" MinMeas 2 6 KFViewer");
   
   mNodeHandle.setCallbackQueue(&mCallbackQueueROS);
   mNodeHandlePriv.setCallbackQueue(&mCallbackQueueROS);
@@ -89,11 +93,15 @@ MapEditor::MapEditor(std::string windowName)
   mpMap = new Map;  
   mpMap->LoadFromFolder(mSaveFolder, mmPoses, mmCameraModels, false);
   
+  GenerateAllPossibleMeasurements();
+  
   mpMapViewer = new MapViewer(*mpMap, *mpGLWindow);
   mpKeyFrameViewer = new KeyFrameViewer(*mpMap, *mpGLWindow);
   
   mViewerType = MAP;
   mbCtrl = false;
+  
+  mnLastMinMeas = 2;
   
   mbDone = false;
 }
@@ -113,6 +121,100 @@ MapEditor::~MapEditor()
   delete mpMap;
   delete mpMapViewer;
   delete mpKeyFrameViewer;
+}
+
+void MapEditor::GenerateAllPossibleMeasurements()
+{
+  for(MultiKeyFramePtrList::iterator mkf_it = mpMap->mlpMultiKeyFrames.begin(); mkf_it != mpMap->mlpMultiKeyFrames.end(); ++mkf_it)
+  {
+    MultiKeyFrame& mkf = *(*mkf_it);
+    for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
+    {
+      KeyFrame& kf = *(kf_it->second);
+      
+      for(MapPointPtrList::iterator point_it = mpMap->mlpPoints.begin(); point_it != mpMap->mlpPoints.end(); ++point_it)
+      {
+        MapPoint& point = *(*point_it);
+        ReFind_Common(kf,point);
+      }
+    }
+  }
+}
+
+bool MapEditor::ReFind_Common(KeyFrame &kf, MapPoint &point)
+{
+  // abort if either a measurement is already in the map, or we've
+  // decided that this point-kf combo is beyond redemption
+  if(point.mMMData.spMeasurementKFs.count(&kf) || point.mMMData.spNeverRetryKFs.count(&kf))
+    return false;
+    
+  if(point.mbBad)
+    return false;
+  
+  if(kf.mpParent->mbBad)
+    return false;
+  
+  static PatchFinder finder;
+  TooN::Vector<3> v3Cam =  kf.mse3CamFromWorld * point.mv3WorldPos;
+  
+  TaylorCamera &camera = mmCameraModels[kf.mCamName];
+  TooN::Vector<2> v2Image = camera.Project(v3Cam);
+  
+  if(camera.Invalid())
+  {
+    point.mMMData.spNeverRetryKFs.insert(&kf);
+    return false;
+  }
+
+  CVD::ImageRef irImageSize = kf.maLevels[0].image.size();
+  if(v2Image[0] < 0 || v2Image[1] < 0 || v2Image[0] > irImageSize[0] || v2Image[1] > irImageSize[1])
+  {
+    point.mMMData.spNeverRetryKFs.insert(&kf);
+    return false;
+  }
+  
+  TooN::Matrix<2> m2CamDerivs = camera.GetProjectionDerivs();
+  finder.MakeTemplateCoarse(point, kf.mse3CamFromWorld, m2CamDerivs);
+  
+  if(finder.TemplateBad())
+  {
+    point.mMMData.spNeverRetryKFs.insert(&kf);
+    return false;
+  }
+  
+  int nScore;
+  bool bFound = finder.FindPatchCoarse(CVD::ir(v2Image), kf, 4, nScore);  // Very tight search radius!
+  if(!bFound)
+  {
+    point.mMMData.spNeverRetryKFs.insert(&kf);
+    return false;
+  }
+  
+  // If we found something, generate a measurement struct and put it in the map
+  Measurement* pMeas = new Measurement;
+  pMeas->nLevel = finder.GetLevel();
+  pMeas->eSource = Measurement::SRC_REFIND;
+  
+  if(finder.GetLevel() > 0)
+  {
+    finder.MakeSubPixTemplate();
+    finder.SetSubPixPos(finder.GetCoarsePosAsVector());
+    finder.IterateSubPixToConvergence(kf,8);
+    pMeas->v2RootPos = finder.GetSubPixPos();
+    pMeas->bSubPix = true;
+  }
+  else
+  {
+    pMeas->v2RootPos = finder.GetCoarsePosAsVector();
+    pMeas->bSubPix = false;
+  }
+  
+  if(kf.mmpMeasurements.count(&point))
+    ROS_BREAK(); // This should never happen, we checked for this at the start.
+  
+  kf.AddMeasurement(&point, pMeas);
+    
+  return true;
 }
 
 // This can be used with GUI.RegisterCommand to capture user input
@@ -280,6 +382,8 @@ void MapEditor::Run()
 {
   mpMapViewer->Init();
   
+  static gvar3<int> gvnMinMeas("MinMeas", 2, HIDDEN|SILENT);
+  
   //ros::Rate rate(1);
   
   // Loop until instructed to stop
@@ -297,6 +401,12 @@ void MapEditor::Run()
     glClear(GL_COLOR_BUFFER_BIT);
     
     std::stringstream captionStream;
+    
+    if(mnLastMinMeas != *gvnMinMeas)
+    {
+      mnLastMinMeas = *gvnMinMeas;
+      EnforceMinMeas(*gvnMinMeas);
+    }
     
     if(mViewerType == MAP)
     {
@@ -467,4 +577,22 @@ CVD::ImageRef MapEditor::NormalizeWindowLoc(CVD::ImageRef irLoc)
   irNormalizedLoc.y /= dYScale;
   
   return irNormalizedLoc;
+}
+
+void MapEditor::EnforceMinMeas(int nMinMeas)
+{
+  for(MapPointPtrList::iterator point_it = mpMap->mlpPoints.begin(); point_it != mpMap->mlpPoints.end(); ++point_it)
+  {
+    MapPoint& point = *(*point_it);
+   
+    if(point.mMMData.GoodMeasCount() < nMinMeas)
+    {
+      point.mbBad = true;
+      point.mbSelected = false;
+    }
+    else
+    {
+      point.mbBad = false;
+    }
+  }
 }

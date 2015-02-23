@@ -106,6 +106,12 @@ protected:
   
   void DoEditAction(std::shared_ptr<EditAction> pAction);
   
+  void GenerateAllPossibleMeasurements();
+  
+  bool ReFind_Common(KeyFrame &kf, MapPoint &point);
+  
+  void EnforceMinMeas(int nMinMeas);
+  
   CVD::ImageRef NormalizeWindowLoc(CVD::ImageRef irLoc);
   
   
@@ -135,6 +141,8 @@ protected:
   enum ViewerType{MAP, KF} mViewerType;
   
   bool mbCtrl;
+  
+  int mnLastMinMeas;
   
 };
 
