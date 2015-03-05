@@ -24,7 +24,6 @@ MapViewer::MapViewer(Map &map, GLWindow2 &glw)
   
   mse3WorldToRotCenter = TooN::SE3<>();
   mse3RotCenterToViewer = TooN::SE3<>::exp(TooN::makeVector(0,0,-5,0,0,0));
-  
   mse3ViewerFromWorld = (mse3WorldToRotCenter * mse3RotCenterToViewer).inverse();
   
   mdPanSensitivity = 0.005;

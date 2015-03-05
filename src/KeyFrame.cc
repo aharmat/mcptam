@@ -188,6 +188,7 @@ std::tuple<double,double,double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::byt
       // .. make a half-size image from the previous level..
       lev.image.resize(maLevels[i-1].image.size() / 2);
       CVD::halfSample(maLevels[i-1].image, lev.image);
+      CVD::convolveGaussian(lev.image, 1.0, 1.0);
       
       dDownsampleTime += (ros::WallTime::now()-startTime).toSec();
     }

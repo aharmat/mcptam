@@ -54,17 +54,19 @@ KeyFrameViewer::KeyFrameViewer(Map &map, GLWindow2 &glw)
 : mMap(map)
 , mGLWindow(glw)
 {
+  GUI.ParseLine("DrawOnlyLevel=0");
   GUI.ParseLine("DrawLevel=0");
   
   std::stringstream ss;
   ss << "Menu.AddMenuSlider KFViewer Level DrawLevel 0 " << LEVELS-1 << " KFViewer";
   GUI.ParseLine(ss.str());
+  GUI.ParseLine("Menu.AddMenuToggle KFViewer \"Only Level\" DrawOnlyLevel KFViewer");
   
   mnSourceIdx = 0;
   mnTargetIdx = -1;
   
   mnVerticalDrawOffset = 100;
-  mdPointSizeFrac = 1.0/300.0;
+  mdPointSizeFrac = 1.0/100.0;
   
   mdSelectionThresh = 1.0;
   mirSourceOffset = CVD::ImageRef(0,mnVerticalDrawOffset);
@@ -800,12 +802,15 @@ MeasPtrMap KeyFrameViewer::GatherSelectedTargetMeasurements()
 
 std::vector<MapPoint*> KeyFrameViewer::GatherSourcePoints(bool bOnlySelected)
 {
+  static gvar3<int> gvnDrawLevel("DrawLevel", 0, HIDDEN|SILENT);
+  static gvar3<int> gvnDrawOnlyLevel("DrawOnlyLevel", 0, HIDDEN|SILENT);
+  
   std::vector<MapPoint*> vpPoints;
   
   for(MeasPtrMap::iterator meas_it = mpKFSource->mmpMeasurements.begin(); meas_it != mpKFSource->mmpMeasurements.end(); ++meas_it)
   {
     MapPoint& point = *(meas_it->first);
-    //Measurement& meas = *(meas_it->second);
+    Measurement& meas = *(meas_it->second);
     
     if(point.mbDeleted)
       continue;
@@ -817,6 +822,9 @@ std::vector<MapPoint*> KeyFrameViewer::GatherSourcePoints(bool bOnlySelected)
       continue;
     
     if(point.mpPatchSourceKF != mpKFSource)
+      continue;
+      
+    if(*gvnDrawOnlyLevel && meas.nLevel != *gvnDrawLevel)
       continue;
       
     if(!bOnlySelected || point.mbSelected)

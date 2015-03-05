@@ -403,7 +403,16 @@ void System::GUICommandHandler(std::string command, std::string params)
     }
     else if(params == "a")
     {
-      mpTracker->AddNext();
+      if(mpMapMaker->Initializing())
+      {
+        ROS_INFO_STREAM("> Forcing end of initialization");
+        mpMapMaker->RequestStopInit();
+      }
+      else
+      {
+        ROS_INFO_STREAM("> Forcing adding of next MKF");
+        mpTracker->AddNext();
+      }
     }
     
     return;
