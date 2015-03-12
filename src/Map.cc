@@ -334,11 +334,10 @@ void Map::SaveToFolder(std::string folder)
   // Total number of MKFs
   ofs << nGoodMKFs <<std::endl;
   
-  int i=0;
-  for(MultiKeyFramePtrList::iterator mkf_it = mlpMultiKeyFrames.begin(); mkf_it != mlpMultiKeyFrames.end(); ++i, ++mkf_it)
+  for(MultiKeyFramePtrList::iterator mkf_it = mlpMultiKeyFrames.begin(); mkf_it != mlpMultiKeyFrames.end(); ++mkf_it)
   {
     MultiKeyFrame& mkf = *(*mkf_it);
-    mkf.mnID = i;
+    ROS_ASSERT(mkf.mnID >= 0);
     
     // If the save was requested before these were cleaned up, don't include them
     if(mkf.mbBad || mkf.mbDeleted)
@@ -347,7 +346,7 @@ void Map::SaveToFolder(std::string folder)
     // Store the conventional way of defining pose (ie inverse of PTAM)
     geometry_msgs::Pose pose = util::SE3ToPoseMsg(mkf.mse3BaseFromWorld.inverse());
     
-    ofs<<i;
+    ofs<<mkf.mnID;
     ofs<<", "<<pose.position.x<<", "<<pose.position.y<<", "<<pose.position.z;
     ofs<<", "<<pose.orientation.x<<", "<<pose.orientation.y<<", "<<pose.orientation.z<<", "<<pose.orientation.w<<std::endl;
     
@@ -403,7 +402,7 @@ void Map::SaveToFolder(std::string folder)
   // Total number of points
   ofs << nGoodPoints << std::endl;
   
-  i=0;
+  int i=0;
   for(MapPointPtrList::iterator point_it = mlpPoints.begin(); point_it != mlpPoints.end(); ++i, ++point_it)
   {
     MapPoint& point = *(*point_it);

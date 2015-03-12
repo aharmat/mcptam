@@ -111,6 +111,9 @@ struct Measurement
   bool bTransferred;          ///< Has this measurement been transferred over the network? Meaningless in standalone application
   bool bDeleted;              ///< Used only during map editing
   
+  // For finding matches after relocalization
+  cv::Mat matDescriptor;
+  
   int nID;  ///< Debugging ID
   
   //for testing
@@ -135,6 +138,7 @@ struct Level
   CVD::Image<CVD::byte> mask;              ///< The loaded mask
   CVD::Image<CVD::byte> image;             ///< The pyramid level pixels
   std::vector<CVD::ImageRef> vCorners;     ///< All FAST corners on this level
+  cv::Mat matBoW;                          ///< Bag of words descriptor for each FAST corner (same number of rows as vCorners has elements)
   std::vector<int> vCornerRowLUT;          ///< Row-index into the FAST corners, speeds up access
   std::vector<Candidate> vCandidates;      ///< Potential locations of new map points
   std::vector<std::pair<double, CVD::ImageRef> > vScoresAndMaxCorners;  ///< The best scoring points and their scores, used to generate candidates

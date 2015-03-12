@@ -132,9 +132,9 @@ bool MapMakerCalib::InitFromCalibImage(CalibImageTaylor &calibImage, double dSqu
       pMeas->v2RootPos = v2RootPos;
       pMeas->nLevel = l;
       pMeas->bSubPix = true;
-      pKF->mmpMeasurements[pNewPoint] = pMeas;
-
-      pNewPoint->mMMData.spMeasurementKFs.insert(pKF);
+      pKF->AddMeasurement(pNewPoint, pMeas);
+      //pKF->mmpMeasurements[pNewPoint] = pMeas;
+      //pNewPoint->mMMData.spMeasurementKFs.insert(pKF);
     }
   }
   
