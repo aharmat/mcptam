@@ -474,6 +474,10 @@ void MapMakerServerBase::AddStereoMapPoints(MultiKeyFrame& mkfSrc, int nLevel, i
       if(kfTarget.mpParent->mbBad)
         continue;
         
+      // Thin candidates before processing each target KF, since a point could have been made
+      // for a given candidate with the last target KF
+      ThinCandidates(kfSrc, nLevel);
+        
       ROS_DEBUG_STREAM("Target: "<<kfTarget.mCamName<<"  source candidate points: "<<level.vCandidates.size());
       for(unsigned int i = 0; i<level.vCandidates.size(); ++i)
       {
