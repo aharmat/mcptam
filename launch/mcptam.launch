@@ -43,6 +43,10 @@
   
   <param name="level_zero_points" type="bool" value="true" />
   
+  <param name="fabmap_training_data" type="string" value="$(find mcptam)/fabmapdata/StLuciaShortTraindata.yml" />
+  <param name="fabmap_vocabulary" type="string" value="$(find mcptam)/fabmapdata/StLuciaShortVocabulary.yml" />
+  <param name="fabmap_tree" type="string" value="$(find mcptam)/fabmapdata/StLuciaShortTree.yml" />
+  
   <!-- For no GUI, set headless:=true -->
   <param name="headless" type="bool" value="$(arg headless)" />
 </node>

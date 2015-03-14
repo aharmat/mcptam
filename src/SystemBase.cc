@@ -40,6 +40,7 @@
 #include <mcptam/SystemBase.h>
 #include <mcptam/OpenGL.h>
 #include <mcptam/Map.h>
+#include <mcptam/RelocaliserFabMap.h>
 #include <mcptam/VideoSourceMulti.h>
 #include <mcptam/Utility.h>
 #include <cvd/image_io.h>
@@ -180,6 +181,8 @@ SystemBase::SystemBase(std::string windowName, bool bFullSize, bool bDrawWindow)
       mmCameraModels.insert(std::pair<std::string,TaylorCamera>(camName, camera));
     }
   }
+  
+  mpRelocFabMap = new RelocaliserFabMap(*mpMap, mmCameraModels);
 }
 
 SystemBase::~SystemBase()
@@ -191,6 +194,7 @@ SystemBase::~SystemBase()
     delete mpVideoSourceMulti;
     
   delete mpMap;
+  delete mpRelocFabMap;
 }
 
 //  Calculates the average of the durations contained in the argument

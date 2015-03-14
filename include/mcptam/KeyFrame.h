@@ -76,13 +76,19 @@
 #include <atomic>
 #include <boost/circular_buffer.hpp>
 #include <boost/thread/mutex.hpp>
+#include <opencv2/core/core.hpp>
 
 class MapPoint;
 class SmallBlurryImage;
 
+namespace cv{
+  class PersistentFREAK;
+}
+
 // Don't change LEVELS without understanding the code! 
 // Lots of things are (unfortunately) hard coded for 4 levels
 #define LEVELS 4  
+#define RELOC_LEVEL 1
 #define MAX_DEPTH 10000
 #define MAX_SIGMA 10000
 #define MIN_FAST_THRESH 5
@@ -234,10 +240,12 @@ public:
   /// Erase all measurements
   void ClearMeasurements();
   
-  void AddMeasurement(MapPoint* pPoint, Measurement* pMeas);
+  void AddMeasurement(MapPoint* pPoint, Measurement* pMeas, bool bExtractDescriptor);
   
   /// Make the small blurry image
   void MakeSBI();
+  
+  void MakeExtractor();
   
   bool NoImage();
   
@@ -256,6 +264,9 @@ public:
   TooN::SE3<> mse3CamFromWorld;  ///< The current pose in the world frame, a product of mse3CamFromBase and the parent's mse3BaseFromWorld
 
   Level maLevels[LEVELS];  ///< Images, corners, etc lives in this array of pyramid levels
+  
+  cv::PersistentFREAK* mpExtractor;
+  
   MeasPtrMap mmpMeasurements;   ///< All the measurements associated with the keyframe as a map of MapPoint pointers to Measurement pointers  
   //MeasPtrMap mmpDeletedMeas;  ///< Queue of deleted measurements' map points, used to send information in client/server mode
   //MeasPtrMap mmpClearedMeas;

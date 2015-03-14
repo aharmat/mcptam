@@ -67,7 +67,7 @@ public:
      *  @param map The Map being worked on
      *  @param cameras The camera models
      *  @param bundleAdjuster Some derived class of BundleAdjusterBase that will be used to optimize the map (probably SingleBundle) */
-  MapMakerCalib(Map &map, TaylorCameraMap &cameras, BundleAdjusterBase &bundleAdjuster);
+  MapMakerCalib(Map &map, RelocaliserFabMap &reloc, TaylorCameraMap &cameras, BundleAdjusterBase &bundleAdjuster);
   
   /// Destructor
   virtual ~MapMakerCalib();

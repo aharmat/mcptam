@@ -731,7 +731,7 @@ void NetworkManager::AddMsg_To_KeyFrame(mcptam::NetworkKeyFrame &kf_msg, KeyFram
       pMeas->nLevel = meas_msg.nLevel;
       pMeas->bSubPix = meas_msg.bSubPix;
       
-      kf.AddMeasurement(pPoint, pMeas);
+      kf.AddMeasurement(pPoint, pMeas, false);
       //kf.mmpMeasurements[pPoint] = pMeas;
       //pPoint->mMMData.spMeasurementKFs.insert(&kf);
     }
@@ -974,7 +974,7 @@ void NetworkManager::UpdateMsg_ApplyTo_KeyFrame(mcptam::NetworkKeyFrame &kf_msg)
       pMeas->nLevel = meas_msg.nLevel;
       pMeas->bSubPix = meas_msg.bSubPix;
       
-      kf.AddMeasurement(pPoint, pMeas);
+      kf.AddMeasurement(pPoint, pMeas, true);
       //kf.mmpMeasurements[pPoint] = pMeas;
       //pPoint->mMMData.spMeasurementKFs.insert(&kf);
     }

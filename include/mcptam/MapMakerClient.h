@@ -77,7 +77,7 @@ public:
 
   /** @brief Need to call constructor with Map as argument
    *  @param map The Map being worked on */
-  MapMakerClient(Map &map);
+  MapMakerClient(Map &map, RelocaliserFabMap &reloc);
   virtual ~MapMakerClient();
   
   /// Overridden from CVD::Thread, this executes in its own thread

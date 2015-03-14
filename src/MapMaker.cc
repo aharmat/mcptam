@@ -45,9 +45,9 @@
 #include <mcptam/BundleAdjusterBase.h>
 #include <mcptam/MapMakerTiming.h>
 
-MapMaker::MapMaker(Map &map, TaylorCameraMap &cameras, BundleAdjusterBase &bundleAdjuster)
+MapMaker::MapMaker(Map &map, RelocaliserFabMap &reloc, TaylorCameraMap &cameras, BundleAdjusterBase &bundleAdjuster)
 : MapMakerBase(map, true)
-, MapMakerClientBase(map)
+, MapMakerClientBase(map, reloc)
 , MapMakerServerBase(map, cameras, bundleAdjuster)
 {
   mCreationTimingPub = mNodeHandlePriv.advertise<mcptam::MapMakerTiming>("timing_mkf_creation", 1, true);
@@ -397,6 +397,8 @@ bool MapMaker::Init(MultiKeyFrame*& pMKF_Incoming, bool bPutPlaneAtOrigin)
       kf.mpSBI = NULL;
     }
   }
+  
+  mRelocFabMap.Add(*pMKF);
     
   return InitFromMultiKeyFrame(pMKF, bPutPlaneAtOrigin);  // from MapMakerServerBase
 }
@@ -469,6 +471,10 @@ void MapMaker::AddMultiKeyFrameFromTopOfQueue()
       {
         pMKF->EraseBackLinksFromPoints();
         delete pMKF;
+      }
+      else
+      {
+        mRelocFabMap.Add(*pMKF);
       }
     }
   }

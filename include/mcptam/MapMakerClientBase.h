@@ -63,6 +63,7 @@
 #define __MAP_MAKER_CLIENT_BASE_H
 
 #include <mcptam/MapMakerBase.h>
+#include <mcptam/RelocaliserFabMap.h>
 #include <deque>
 #include <boost/thread/mutex.hpp>
 #include <ros/ros.h>
@@ -82,7 +83,7 @@ public:
 
   /** @brief Need to call constructor with Map as argument
    *  @param map The Map being worked on */
-  MapMakerClientBase(Map &map);
+  MapMakerClientBase(Map &map, RelocaliserFabMap &reloc);
   
   /// Destructor
   virtual ~MapMakerClientBase(){ };
@@ -181,6 +182,8 @@ protected:
    
   std::deque<MultiKeyFrame*> mqpMultiKeyFramesFromTracker;  ///< Queue of MultiKeyFrames from the tracker waiting to be processed
   boost::mutex mQueueMutex;     ///< Mutex to protect the MKF queue
+  
+  RelocaliserFabMap& mRelocFabMap;
 };
 
 #endif

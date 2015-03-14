@@ -212,7 +212,7 @@ bool MapEditor::ReFind_Common(KeyFrame &kf, MapPoint &point)
   if(kf.mmpMeasurements.count(&point))
     ROS_BREAK(); // This should never happen, we checked for this at the start.
   
-  kf.AddMeasurement(&point, pMeas);
+  kf.AddMeasurement(&point, pMeas, true);
     
   return true;
 }

@@ -40,6 +40,7 @@
 #include <mcptam/KeyFrame.h>
 #include <mcptam/ShiTomasi.h>
 #include <mcptam/SmallBlurryImage.h>
+#include <mcptam/PersistentFREAK.h>
 #include <mcptam/MapPoint.h>
 #include <mcptam/MEstimator.h>
 #include <mcptam/LevelHelpers.h>
@@ -75,12 +76,13 @@ KeyFrame::KeyFrame(MultiKeyFrame* pMKF, std::string name)
   , mpParent(pMKF)
 {
   mpSBI = NULL;
+  mpExtractor = NULL;
   mbActive = false;
   mdSceneDepthMean = MAX_DEPTH;
   mdSceneDepthSigma = MAX_SIGMA;
 }
 
-void KeyFrame::AddMeasurement(MapPoint* pPoint, Measurement* pMeas)
+void KeyFrame::AddMeasurement(MapPoint* pPoint, Measurement* pMeas, bool bExtractDescriptor)
 {
   ROS_ASSERT(!mmpMeasurements.count(pPoint));
   
@@ -88,6 +90,19 @@ void KeyFrame::AddMeasurement(MapPoint* pPoint, Measurement* pMeas)
   
   mmpMeasurements[pPoint] = pMeas;
   pPoint->mMMData.spMeasurementKFs.insert(this);
+  
+  if(bExtractDescriptor && pMeas->nLevel == RELOC_LEVEL)
+  {
+    ROS_ASSERT(mpExtractor);
+    TooN::Vector<2> v2LevelPos = LevelNPos(pMeas->v2RootPos, pMeas->nLevel);
+    std::vector<cv::KeyPoint> vKeyPoints(1);
+    vKeyPoints[0].pt.x = v2LevelPos[0];
+    vKeyPoints[0].pt.y = v2LevelPos[1];
+    vKeyPoints[0].size = 7.f;  // got this from OpenCV's implementation of FAST
+    
+    mpExtractor->compute(vKeyPoints, pMeas->matDescriptor);
+  }
+  
 }
 
 // Erase all measurements
@@ -107,6 +122,9 @@ KeyFrame::~KeyFrame()
 {
   if(mpSBI)
     delete mpSBI;
+    
+  if(mpExtractor)
+    delete mpExtractor;
     
   ClearMeasurements();
     
@@ -535,6 +553,8 @@ void KeyFrame::MakeKeyFrame_Rest()
   
   // Also, make a SmallBlurryImage of the keyframe: The relocaliser uses these.
   MakeSBI();
+  
+  MakeExtractor();
 }
 
 void KeyFrame::MakeSBI()
@@ -543,6 +563,16 @@ void KeyFrame::MakeSBI()
     mpSBI = new SmallBlurryImage(*this);  
   // Relocaliser also wants the jacobians..
   mpSBI->MakeJacs();
+}
+
+void KeyFrame::MakeExtractor()
+{
+  if(mpExtractor)
+    delete mpExtractor;
+    
+  Level& level = maLevels[RELOC_LEVEL];
+  cv::Mat imageWrapped(level.image.size().y, level.image.size().x, CV_8U, level.image.data(), level.image.row_stride());
+  mpExtractor = new cv::PersistentFREAK(imageWrapped, true, true);
 }
 
 // Calculates the distance of map points visible in a keyframe and their weights

@@ -54,6 +54,7 @@
 #include <ros/callback_queue.h>
 
 class Map;
+class RelocaliserFabMap;
 class VideoSourceMulti;
 
 /** @brief Base class for other System(...) classes, sets up commonly used objects and provides
@@ -120,6 +121,7 @@ protected:
   GLWindow2* mpGLWindow;  ///< The GL window
   
   Map *mpMap;   ///< Pointer to the Map
+  RelocaliserFabMap* mpRelocFabMap;
   
   ImageRefMap mmDrawOffsets;        ///< %Map of drawing offset coordinates
   TaylorCameraMap mmCameraModelsLive;   ///< The TaylorCamera models loaded from live cameras

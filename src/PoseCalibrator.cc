@@ -148,7 +148,7 @@ PoseCalibrator::PoseCalibrator()
   mResetSystemServer = mNodeHandlePriv.advertiseService("reset", &PoseCalibrator::ResetSystemCallback, this);
   
   mpBundleAdjuster = new BundleAdjusterSingle(*mpMap, mmCameraModels);
-  mpMapMaker = new MapMakerCalib(*mpMap, mmCameraModels, *mpBundleAdjuster);
+  mpMapMaker = new MapMakerCalib(*mpMap, *mpRelocFabMap, mmCameraModels, *mpBundleAdjuster);
   mpKeyFrameVisualizer = new KeyFrameVisualizer(*mpMap, *mpGLWindow, mmDrawOffsets, mpVideoSourceMulti->GetSizes());
   
   LoadLiveMasks(); 

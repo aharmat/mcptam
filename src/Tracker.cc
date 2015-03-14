@@ -85,9 +85,10 @@ bool Tracker::sbCollectAllPoints = true;
 
 // The constructor mostly sets up interal reference variables
 // to the other classes..
-Tracker::Tracker(Map &map, MapMakerClientBase &mapmaker, TaylorCameraMap &cameras, SE3Map poses, ImageRefMap offsets, GLWindow2* pWindow) 
+Tracker::Tracker(Map &map, RelocaliserFabMap &reloc, MapMakerClientBase &mapmaker, TaylorCameraMap &cameras, SE3Map poses, ImageRefMap offsets, GLWindow2* pWindow) 
   : mpCurrentMKF(NULL)
   , mMap(map)
+  , mRelocFabMap(reloc)
   , mMapMaker(mapmaker)
   , mRelocaliser(mMap, cameras)
   , mmFixedPoses(poses)
@@ -403,6 +404,9 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
   ros::WallTime startTimeTotal = ros::WallTime::now();
   
   TrackFrameSetup(imFrames, timestamp, bDraw);
+  
+  //debug
+  mRelocFabMap.FindBestPose(*mpCurrentMKF);
   
   for(unsigned j=0; j < mvAllCamNames.size(); ++j)
   {
@@ -1262,7 +1266,7 @@ void Tracker::RecordMeasurements()
       KeyFrame& kf = *mpCurrentMKF->mmpKeyFrames[camName];
       MapPoint& point = td.mPoint;
       
-      kf.AddMeasurement(&point, pMeas);
+      kf.AddMeasurement(&point, pMeas, false);
       //kf.mmpMeasurements[&point] = pMeas;
       //point.mMMData.spMeasurementKFs.insert(&kf);
       

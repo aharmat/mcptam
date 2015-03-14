@@ -47,9 +47,9 @@
 
 using namespace TooN;
 
-MapMakerCalib::MapMakerCalib(Map& map, TaylorCameraMap& cameras, BundleAdjusterBase &bundleAdjuster)
+MapMakerCalib::MapMakerCalib(Map& map, RelocaliserFabMap &reloc, TaylorCameraMap& cameras, BundleAdjusterBase &bundleAdjuster)
 : MapMakerBase(map, true)
-, MapMaker(map, cameras, bundleAdjuster)  // this will start parent's run thread
+, MapMaker(map, reloc, cameras, bundleAdjuster)  // this will start parent's run thread
 {
   // Increase outlier limits to be more lenient
   MapMakerClientBase::snMinOutliers = 40;
@@ -132,7 +132,8 @@ bool MapMakerCalib::InitFromCalibImage(CalibImageTaylor &calibImage, double dSqu
       pMeas->v2RootPos = v2RootPos;
       pMeas->nLevel = l;
       pMeas->bSubPix = true;
-      pKF->AddMeasurement(pNewPoint, pMeas);
+      
+      pKF->AddMeasurement(pNewPoint, pMeas, true);
       //pKF->mmpMeasurements[pNewPoint] = pMeas;
       //pNewPoint->mMMData.spMeasurementKFs.insert(pKF);
     }

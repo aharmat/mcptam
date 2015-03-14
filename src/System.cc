@@ -182,9 +182,9 @@ System::System()
   std::cout<<"Creating Bundle adjuster"<<std::endl;
   mpBundleAdjuster = new BundleAdjusterMulti(*mpMap, mmCameraModels, true, false);
   std::cout<<"Creating MapMaker"<<std::endl;
-  mpMapMaker = new MapMaker(*mpMap, mmCameraModels, *mpBundleAdjuster);
+  mpMapMaker = new MapMaker(*mpMap, *mpRelocFabMap, mmCameraModels, *mpBundleAdjuster);
   std::cout<<"Creating Tracker"<<std::endl;
-  mpTracker = new Tracker(*mpMap, *mpMapMaker, mmCameraModels, mmPosesLive, mmDrawOffsets, mpGLWindow);
+  mpTracker = new Tracker(*mpMap, *mpRelocFabMap, *mpMapMaker, mmCameraModels, mmPosesLive, mmDrawOffsets, mpGLWindow);
    std::cout<<"Creating keyframe viewer"<<std::endl;
   mpKeyFrameVisualizer = new KeyFrameVisualizer(*mpMap, *mpGLWindow, mmDrawOffsets, mpVideoSourceMulti->GetSizes());
   

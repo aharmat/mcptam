@@ -45,9 +45,9 @@
 #include <mcptam/BundleAdjusterBase.h>
 #include <std_srvs/Empty.h>
 
-MapMakerClient::MapMakerClient(Map &map)
+MapMakerClient::MapMakerClient(Map &map, RelocaliserFabMap &reloc)
 : MapMakerBase(map, false)
-, MapMakerClientBase(map)
+, MapMakerClientBase(map, reloc)
  // The network manager needs to be bound to the appropriate callback functions
 , mNetworkManager(boost::bind(&MapMakerClient::AddCallback, this, _1, _2), 
                   boost::bind(&MapMakerClient::DeleteCallback, this, _1, _2), 

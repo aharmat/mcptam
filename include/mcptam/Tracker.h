@@ -78,6 +78,7 @@
 
 class TrackerData;
 class Map;
+class RelocaliserFabMap;
 class MapMakerClientBase;
 
 /// Using a boost intrusive_ptr allows claiming a MapPoint as "used", so it won't
@@ -125,7 +126,7 @@ public:
    *  @param poses The fixed poses of the cameras relative to a base frame
    *  @param offsets The drawing offsets for the images, determines layout of video stream drawn to window
    *  @param pWindow Pointer to the OpenGL window */
-  Tracker(Map &map, MapMakerClientBase &mapmaker, TaylorCameraMap &cameras, SE3Map poses, ImageRefMap offsets, GLWindow2* pWindow); 
+  Tracker(Map &map, RelocaliserFabMap &reloc, MapMakerClientBase &mapmaker, TaylorCameraMap &cameras, SE3Map poses, ImageRefMap offsets, GLWindow2* pWindow); 
   
   /// Destructor
   ~Tracker();
@@ -383,6 +384,7 @@ protected:
   
   // The major components to which the tracker needs access:
   Map &mMap;                                ///< The Map, consisting of points, multikeyframes and keyframes
+  RelocaliserFabMap &mRelocFabMap;
   MapMakerClientBase &mMapMaker;              ///< The class which maintains the map
   TaylorCameraMap mmCameraModels;             ///< Camera projection models
   TaylorCameraMap mmCameraModelsSBI;          ///< Camera projection models again, their image sizes will be resized by SmallBlurryImage

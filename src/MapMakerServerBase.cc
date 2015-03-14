@@ -535,7 +535,7 @@ void MapMakerServerBase::AddInitDepthMapPoints(MultiKeyFrame& mkfSrc, int nLevel
       pMeas->nLevel = nLevel;
       pMeas->eSource = Measurement::SRC_ROOT;
       
-      kfSrc.AddMeasurement(pPointNew, pMeas);
+      kfSrc.AddMeasurement(pPointNew, pMeas, true);
       //kfSrc.mmpMeasurements[pPointNew] = pMeas;
       //pPointNew->mMMData.spMeasurementKFs.insert(&kfSrc);
     }
@@ -893,8 +893,8 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame &kfSrc, KeyFrame &kfTarget, i
   pMeasTarget->v2RootPos = v2SubPixPos;
   
   // Record map point and its measurement in the right places
-  kfSrc.AddMeasurement(pPointNew, pMeasSrc);
-  kfTarget.AddMeasurement(pPointNew, pMeasTarget);
+  kfSrc.AddMeasurement(pPointNew, pMeasSrc, true);
+  kfTarget.AddMeasurement(pPointNew, pMeasTarget, true);
   
   //kfSrc.mmpMeasurements[pPointNew] = pMeasSrc;
   //kfTarget.mmpMeasurements[pPointNew] = pMeasTarget;
@@ -989,7 +989,7 @@ bool MapMakerServerBase::ReFind_Common(KeyFrame &kf, MapPoint &point)
   if(kf.mmpMeasurements.count(&point))
     ROS_BREAK(); // This should never happen, we checked for this at the start.
   
-  kf.AddMeasurement(&point, pMeas);
+  kf.AddMeasurement(&point, pMeas, true);
   
   //kf.mmpMeasurements[&point] = pMeas;
   //point.mMMData.spMeasurementKFs.insert(&kf);

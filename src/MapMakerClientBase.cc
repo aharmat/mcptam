@@ -49,8 +49,9 @@ double MapMakerClientBase::sdOutlierMultiplier = 1.0;
 double MapMakerClientBase::sdMaxScaledMKFDist = 0.1; //0.3;
 double MapMakerClientBase::sdMaxScaledKFDist = 0.1; //0.3;
 
-MapMakerClientBase::MapMakerClientBase(Map& map)
+MapMakerClientBase::MapMakerClientBase(Map& map, RelocaliserFabMap &reloc)
   : MapMakerBase(map, true)  // This will be skipped since inheritance is virtual!
+  , mRelocFabMap(reloc)
 {
   Reset();
 };
@@ -67,6 +68,8 @@ void MapMakerClientBase::Reset()
     delete mqpMultiKeyFramesFromTracker.front();
     mqpMultiKeyFramesFromTracker.pop_front();
   }
+  
+  mRelocFabMap.Reset();
 }
 
 // Points that are considered outliers by the Tracker are marked with a bad flag

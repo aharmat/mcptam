@@ -761,8 +761,9 @@ void Map::LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCam
         pPoint->RefreshPixelVectors();
       }
       
-      pKF->mmpMeasurements[pPoint] = pMeas;
-      pPoint->mMMData.spMeasurementKFs.insert(pKF);
+      pKF->AddMeasurement(pPoint, pMeas, true);
+      //pKF->mmpMeasurements[pPoint] = pMeas;
+      //pPoint->mMMData.spMeasurementKFs.insert(pKF);
       
       measCounter++;
     }
@@ -890,7 +891,10 @@ void Map::MakeSnapshot()
       // Only do this after the level 0 image has been filled in
       // But only if the original KF had an SBI
       if(kf.mpSBI)
-        pKFSnapshot->MakeSBI();      
+        pKFSnapshot->MakeSBI();
+        
+      if(kf.mpExtractor)
+	    pKFSnapshot->MakeExtractor();
     }
   
     mlpMultiKeyFramesSnapshot.push_back(pMKFSnapshot);
@@ -917,10 +921,13 @@ void Map::MakeSnapshot()
     pPointSnapshot->mv3PixelDown_W = point.mv3PixelDown_W;
     pPointSnapshot->mv3PixelRight_W = point.mv3PixelRight_W;
 
+    // This is replaced by the KF's AddMeasurement function later
+    /*
     for(std::set<KeyFrame*>::iterator kf_it = point.mMMData.spMeasurementKFs.begin(); kf_it != point.mMMData.spMeasurementKFs.end(); ++kf_it)
     {
       pPointSnapshot->mMMData.spMeasurementKFs.insert(translateKF(MKFTranslator, *kf_it));
     }
+    */
     
     for(std::set<KeyFrame*>::iterator kf_it = point.mMMData.spNeverRetryKFs.begin(); kf_it != point.mMMData.spNeverRetryKFs.end(); ++kf_it)
     {
@@ -963,7 +970,8 @@ void Map::MakeSnapshot()
         pMeasSnapshot->bTransferred = meas.bTransferred;
         pMeasSnapshot->nID = meas.nID;
         
-        pKFSnapshot->mmpMeasurements[pPointSnapshot] = pMeasSnapshot;
+        pKFSnapshot->AddMeasurement(pPointSnapshot, pMeasSnapshot, true);
+        //pKFSnapshot->mmpMeasurements[pPointSnapshot] = pMeasSnapshot;
       }
     }
   }
