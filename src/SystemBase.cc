@@ -182,7 +182,7 @@ SystemBase::SystemBase(std::string windowName, bool bFullSize, bool bDrawWindow)
     }
   }
   
-  mpRelocFabMap = new RelocaliserFabMap(*mpMap, mmCameraModels);
+  mpRelocFabMap = new RelocaliserFabMap(*mpMap, *mpGLWindow, mmDrawOffsets, mmCameraModels);
 }
 
 SystemBase::~SystemBase()

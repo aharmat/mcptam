@@ -91,18 +91,30 @@ void KeyFrame::AddMeasurement(MapPoint* pPoint, Measurement* pMeas, bool bExtrac
   mmpMeasurements[pPoint] = pMeas;
   pPoint->mMMData.spMeasurementKFs.insert(this);
   
-  if(bExtractDescriptor && pMeas->nLevel == RELOC_LEVEL)
+  if(bExtractDescriptor)
+  {
+    CreateMeasurementDescriptor(*pMeas);
+  }
+}
+
+void KeyFrame::CreateMeasurementDescriptor(Measurement& meas)
+{
+  if(meas.nLevel == RELOC_LEVEL)
   {
     ROS_ASSERT(mpExtractor);
-    TooN::Vector<2> v2LevelPos = LevelNPos(pMeas->v2RootPos, pMeas->nLevel);
+    ROS_ASSERT(meas.matDescriptor.empty());
+    
+    TooN::Vector<2> v2LevelPos = LevelNPos(meas.v2RootPos, meas.nLevel);
     std::vector<cv::KeyPoint> vKeyPoints(1);
     vKeyPoints[0].pt.x = v2LevelPos[0];
     vKeyPoints[0].pt.y = v2LevelPos[1];
     vKeyPoints[0].size = 7.f;  // got this from OpenCV's implementation of FAST
     
-    mpExtractor->compute(vKeyPoints, pMeas->matDescriptor);
+    mpExtractor->compute(vKeyPoints, meas.matDescriptor);
+    
+    // if pMeas->matDescriptor is empty, it means the measurement point was too close
+    // to the border and the extractor couldn't create a descriptor for it
   }
-  
 }
 
 // Erase all measurements
@@ -555,7 +567,15 @@ void KeyFrame::MakeKeyFrame_Rest()
   MakeSBI();
   
   MakeExtractor();
+  
+  // Make sure that every measurement has a descriptor at this point
+  for(MeasPtrMap::iterator meas_it = mmpMeasurements.begin(); meas_it != mmpMeasurements.end(); meas_it++)
+  {
+    Measurement& meas = *(meas_it->second);
+    CreateMeasurementDescriptor(meas);
+  }
 }
+      
 
 void KeyFrame::MakeSBI()
 {
@@ -956,6 +976,14 @@ double MultiKeyFrame::Distance(MultiKeyFrame &other)
   }
   
   return dMinDist;
+}
+
+void MultiKeyFrame::UpdateCamsFromWorld()
+{
+  for(KeyFramePtrMap::iterator kf_it = mmpKeyFrames.begin(); kf_it != mmpKeyFrames.end(); ++kf_it)
+  {
+    kf_it->second->mse3CamFromWorld = kf_it->second->mse3CamFromBase * mse3BaseFromWorld; // CHECK!! GOOD
+  }
 }
 
 // ------------------------------------------- Other stuff -------------------------------------------------------------

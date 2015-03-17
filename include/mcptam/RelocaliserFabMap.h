@@ -52,11 +52,16 @@
 #include <ros/ros.h>
 
 class Map;
+class GLWindow2;
 class KeyFrame;
 struct Level;
 
 namespace cv {
 	class BOWImgDescriptorExtractor;
+  class DescriptorMatcher;
+  class Mat;
+  class DMatch;
+  class FeatureDetector;
   
   namespace of2 {
     class FabMap;
@@ -75,15 +80,15 @@ public:
    *  @param map The Map being worked on
    *  @param camera The TaylorCamera model
    *  @param camName The name of the camera */
-  RelocaliserFabMap(Map &map, TaylorCamera camera, std::string camName); 
+  RelocaliserFabMap(Map &map, GLWindow2& window, ImageRefMap offsets, TaylorCamera camera, std::string camName);
   
   /** @param map The Map being worked on
    *  @param cameras The TaylorCamera models */
-  RelocaliserFabMap(Map &map, TaylorCameraMap cameras);
+  RelocaliserFabMap(Map &map, GLWindow2& window, ImageRefMap offsets, TaylorCameraMap cameras);
   
   ~RelocaliserFabMap();
   
-  bool FindBestPose(MultiKeyFrame &mkfCurrent);
+  bool FindBestPose(MultiKeyFrame &mkfCurrent, bool bDraw);
   
   void Add(MultiKeyFrame &mkfCurrent);
   
@@ -94,6 +99,9 @@ public:
   void Reset();
   
   static double sdMinLoopProbability;   
+  static int snMinFinalMatches;
+  static double sdMaxPixelError;
+  static int snNumFitTrials;
   
 protected:
 
@@ -101,10 +109,26 @@ protected:
   
   void ComputeBoW(Level& level);
   
+  void ComputeFinalMatchDescriptors(KeyFrame& kf, cv::Mat& matDescriptors, std::vector<TooN::Vector<2> >& vRootPos);
+  
+  void GatherMeasurementDescriptors(KeyFrame& kf, cv::Mat& matDescriptors, std::vector<MapPoint*>& vpMapPoints);
+  
+  double OptimizePose(KeyFrame& kfSrc, const KeyFrame& kfTarget, const std::vector<TooN::Vector<2> >& vSourceRootPos, const std::vector<MapPoint*>& vpMapPoints, const std::vector<cv::DMatch>& vMatches);
+  
+  TooN::Vector<6> PoseUpdateStep(KeyFrame& kf, TrackerDataPtrVector& vTD, int nIter, double dOverrideSigma, double& dMeanWeightedErrorSquared);
+  
+  TooN::Vector<6> CalcPoseUpdate(TrackerDataPtrVector& vTD, double dOverrideSigma, double& dMeanWeightedErrorSquared);
+  
+  double EvaluateMatch(KeyFrame& kfSource, cv::Mat& matSourceDescriptors, std::vector<TooN::Vector<2> >& vSourceRootPos, KeyFrame& kfTarget, CVD::ImageRef irTargetOffset=CVD::ImageRef(-1,-1));
+  
+  
   Map &mMap;   ///< Reference to the Map
+  GLWindow2& mGLWindow;
+  ImageRefMap mmDrawOffsets;
   TaylorCameraMap mmCameraModels;   ///< All the camera models being used in the system
   TooN::SE3<> mse3Best;   ///< The 3D pose transform of the last attempted recovery
   
+  cv::FeatureDetector* mpDetector;
   cv::BOWImgDescriptorExtractor* mpDescriptorExtractor;
   cv::of2::FabMap* mpFabMap;
   
@@ -113,8 +137,11 @@ protected:
   ros::NodeHandle mNodeHandlePriv;  ///< ROS node handle with private namespace
   
   std::map<int, KeyFrame*> mmFabMapToKeyFrame;
+  cv::DescriptorMatcher* mpFinalMatcher;
   
   boost::mutex mMutex;
+  
+  double mdMaxPixelErrorSquared;
 
 };
 

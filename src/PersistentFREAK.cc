@@ -76,7 +76,7 @@ PersistentFREAK::PersistentFREAK(const Mat& img, bool orientationNormalized,
                                  int nOctaves,
                                  const vector<int>& selectedPairs)
 : FREAK(orientationNormalized, scaleNormalized, patternScale, nOctaves, selectedPairs)
-, image(img)
+, image(img.clone())
 {
   ROS_ASSERT(!image.empty());
   
@@ -111,16 +111,21 @@ void PersistentFREAK::compute(vector<KeyPoint>& keypoints, Mat& descriptors ) co
             if( kpScaleIdx[k] >= FREAK_NB_SCALES )
                 kpScaleIdx[k] = FREAK_NB_SCALES-1;
 
+            //std::cout<<"Testing keypoint idx: "<<k<<std::endl;
+           
             if( keypoints[k].pt.x <= patternSizes[kpScaleIdx[k]] || //check if the description at this specific position and scale fits inside the image
                  keypoints[k].pt.y <= patternSizes[kpScaleIdx[k]] ||
                  keypoints[k].pt.x >= image.cols-patternSizes[kpScaleIdx[k]] ||
                  keypoints[k].pt.y >= image.rows-patternSizes[kpScaleIdx[k]]
                )
             {
+                //std::cout<<"Erasing keypoint idx: "<<k<<"  pt: ("<<keypoints[k].pt.x<<", "<<keypoints[k].pt.y<<")  pattern size: "<<patternSizes[kpScaleIdx[k]]<<"  image size: ("<<image.cols<<", "<<image.rows<<")"<<std::endl;
                 keypoints.erase(kpBegin+k);
                 kpScaleIdx.erase(ScaleIdxBegin+k);
             }
         }
+        
+        //std::cout<<"Keypoints size: "<<keypoints.size()<<std::endl;
     }
     else
     {

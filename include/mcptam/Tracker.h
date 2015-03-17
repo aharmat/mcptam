@@ -72,7 +72,6 @@
 #include <mcptam/TrackerTiming.h>
 #include <sstream>
 #include <vector>
-#include <boost/intrusive_ptr.hpp>
 #include <TooN/TooN.h>
 #include <ros/ros.h>
 
@@ -80,29 +79,6 @@ class TrackerData;
 class Map;
 class RelocaliserFabMap;
 class MapMakerClientBase;
-
-/// Using a boost intrusive_ptr allows claiming a MapPoint as "used", so it won't
-/// be deleted until it is released. See MapPoint.
-typedef std::vector<boost::intrusive_ptr<TrackerData> > TrackerDataPtrVector;
-
-/// Can't put a LEVEL-sized array of objects into another STL container, so use this intermediary
-template<typename T>
-struct LevelsArray
-{
-  inline T& operator[] (unsigned i)
-  {
-    return array[i];
-  }
-  
-  T array[LEVELS];
-};
-
-typedef LevelsArray<TrackerDataPtrVector> TDVLevels;
-typedef LevelsArray<int> IntLevels;
-typedef LevelsArray<std::vector<TooN::Vector<2> > > V2Levels;
-
-typedef std::map<std::string, IntLevels > IntLevelsMap;
-typedef std::map<std::string, V2Levels > V2LevelsMap;
 
 /** @brief Determines the pose of the system from stream of camera images
  * 
@@ -362,9 +338,6 @@ protected:
   
   /// The motion model is updated after TrackMap has found a new pose
   void UpdateMotionModel();       
-  
-  /// Update the camera-from-world poses of the current KeyFrames, based on the current MultiKeyFrame's pose and the fixed relative transforms
-  void UpdateCamsFromWorld();
   
   /// Calculate the difference between the last pose and the current pose by comparing SmallBlurryImages
   /** @return The pose difference as a 6-vector */

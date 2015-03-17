@@ -277,7 +277,7 @@ void TrackerCalib::TrackFrame(CVD::Image<CVD::byte>& imFrame, ros::Time timestam
       
         mpCurrentMKF->mse3BaseFromWorld = mpCalibImage->mse3CamFromWorld;
         mpCurrentMKF->mse3BaseFromWorld.get_translation() *= mdSquareSize;
-        UpdateCamsFromWorld();
+        mpCurrentMKF->UpdateCamsFromWorld();
       }
     }
     
@@ -367,7 +367,7 @@ void TrackerCalib::TrackFrame(CVD::Image<CVD::byte>& imFrame, ros::Time timestam
         
         mpCurrentMKF->mse3BaseFromWorld = mpCalibImage->mse3CamFromWorld;
         mpCurrentMKF->mse3BaseFromWorld.get_translation() *= mdSquareSize;
-        UpdateCamsFromWorld();
+        mpCurrentMKF->UpdateCamsFromWorld();
         
         TrackMap();
         AssessOverallTrackingQuality();  //  Check if we're lost or if tracking is poor.

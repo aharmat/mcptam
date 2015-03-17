@@ -88,7 +88,7 @@ namespace cv{
 // Don't change LEVELS without understanding the code! 
 // Lots of things are (unfortunately) hard coded for 4 levels
 #define LEVELS 4  
-#define RELOC_LEVEL 1
+#define RELOC_LEVEL 1  // don't put this on level 0, too heavy computationally
 #define MAX_DEPTH 10000
 #define MAX_SIGMA 10000
 #define MIN_FAST_THRESH 5
@@ -242,6 +242,8 @@ public:
   
   void AddMeasurement(MapPoint* pPoint, Measurement* pMeas, bool bExtractDescriptor);
   
+  void CreateMeasurementDescriptor(Measurement& meas);
+  
   /// Make the small blurry image
   void MakeSBI();
   
@@ -337,6 +339,9 @@ public:
    *  @param other The other MultiKeyFrame 
    *  @return The calculated distance */
   double Distance(MultiKeyFrame &other);
+  
+  /// Update the camera-from-world poses of the KeyFrames, based on the MultiKeyFrame's pose and the fixed relative transforms
+  void UpdateCamsFromWorld();
   
   /// Call ClearMeasurements on all owned KeyFrames
   void ClearMeasurements();

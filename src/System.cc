@@ -125,6 +125,8 @@ System::System()
     GUI.ParseLine("AddingMKFs=1");
     GUI.ParseLine("UpdatingPoints=1");
     GUI.ParseLine("CrossCamera=1");
+    GUI.ParseLine("DrawReloc=0");
+    GUI.ParseLine("RelocFabMap=1");
     
     static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN|SILENT);
     *gvnLevelZeroPoints = SystemBase::sbLevelZeroPoints;
@@ -153,6 +155,8 @@ System::System()
     // Debug Menu
     GUI.ParseLine("Menu.AddMenuButton Debug \"< Back\" \"\" Root");
     GUI.ParseLine("Menu.AddMenuToggle Debug \"CrossCam\" CrossCamera Debug");
+    GUI.ParseLine("Menu.AddMenuToggle Debug \"Draw Reloc\" DrawReloc Debug");
+    GUI.ParseLine("Menu.AddMenuToggle Debug \"RelocFabMap\" RelocFabMap Debug");
     GUI.ParseLine("Menu.AddMenuButton Debug \"Save Map\" SaveMap Debug");
     GUI.ParseLine("Menu.AddMenuButton Debug \"Scale Down\" ScaleMapDown Debug");
     GUI.ParseLine("Menu.AddMenuButton Debug \"Scale Up\" ScaleMapUp Debug");

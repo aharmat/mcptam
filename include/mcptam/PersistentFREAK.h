@@ -20,7 +20,7 @@ public:
            
 protected:
     
-  const Mat& image;
+  Mat image;
   Mat imgIntegral;
 };
 

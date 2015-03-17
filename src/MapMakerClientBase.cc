@@ -231,20 +231,20 @@ bool MapMakerClientBase::IsDistanceToNearestKeyFrameExcessive(KeyFrame &kf)
 // Child KeyFrames that don't have the mbActive flag set are deleted
 void MapMakerClientBase::ProcessIncomingKeyFrames(MultiKeyFrame &mkf)
 {
-  for(KeyFramePtrMap::iterator it = mkf.mmpKeyFrames.begin(); it != mkf.mmpKeyFrames.end() ; )
+  for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end() ; )
   {
-    KeyFrame* pKF = it->second;
+    KeyFrame* pKF = kf_it->second;
     
     if(!pKF->mbActive)
     {
       pKF->EraseBackLinksFromPoints();  // Just a precaution
       delete pKF;
-      mkf.mmpKeyFrames.erase(it++);
+      mkf.mmpKeyFrames.erase(kf_it++);
     }
     else
     {
       pKF->maLevels[0].image.make_unique();  // In case they didn't have deep copies
-      it++;
+      kf_it++;
     }
   }
 }

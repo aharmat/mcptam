@@ -62,6 +62,9 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+//debug
+#include <tf/transform_broadcaster.h>
+
 using namespace TooN;
 using namespace GVars3;
 
@@ -215,7 +218,7 @@ void Tracker::InitCurrentMKF(const SE3<>& pose)
     mpCurrentMKF->mmpKeyFrames[camName] = pKF;
   }
   
-  UpdateCamsFromWorld();
+  mpCurrentMKF->UpdateCamsFromWorld();
 }
 
 // Set the feature extraction masks for the camera images
@@ -403,10 +406,44 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
   ros::WallTime startTime;
   ros::WallTime startTimeTotal = ros::WallTime::now();
   
+  //debug
+  /*
+  static gvar3<int> gvnDrawReloc("DrawReloc", 0, HIDDEN|SILENT);
+  if(*gvnDrawReloc && bDraw)
+    bDraw = false;
+  else if(*gvnDrawReloc && !bDraw)
+    *gvnDrawReloc = 0;
+  */
+  
   TrackFrameSetup(imFrames, timestamp, bDraw);
   
   //debug
-  mRelocFabMap.FindBestPose(*mpCurrentMKF);
+  /*
+  TooN::SE3<> se3Saved = mpCurrentMKF->mse3BaseFromWorld;
+  static tf::TransformBroadcaster br;
+  tf::Transform transform;
+  
+  if(mRelocFabMap.FindBestPose(*mpCurrentMKF, *gvnDrawReloc))
+  {
+    tf::poseMsgToTF(util::SE3ToPoseMsg(GetCurrentPose().inverse()), transform);
+    br.sendTransform(tf::StampedTransform(transform, GetCurrentTimestamp(), "vision_world", "vision_pose_fabmap_recover"));
+  
+    //restore
+    mpCurrentMKF->mse3BaseFromWorld = se3Saved;
+    mpCurrentMKF->UpdateCamsFromWorld();
+  }
+  */
+  /*
+  if(AttemptRecovery())
+  {
+	  tf::poseMsgToTF(util::SE3ToPoseMsg(GetCurrentPose().inverse()), transform);
+    br.sendTransform(tf::StampedTransform(transform, GetCurrentTimestamp(), "vision_world", "vision_pose_sbi_recover"));
+    
+    //restore
+    mpCurrentMKF->mse3BaseFromWorld = se3Saved;
+    mpCurrentMKF->UpdateCamsFromWorld();
+  }
+  */
   
   for(unsigned j=0; j < mvAllCamNames.size(); ++j)
   {
@@ -520,32 +557,57 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
 // but the way it is now gives a snappier response and I prefer it.
 bool Tracker::AttemptRecovery()
 {
-  bool bSuccess = false;
-  for(unsigned i=0; i < mvAllCamNames.size(); ++i)
+  static gvar3<int> gvnDrawReloc("DrawReloc", 0, HIDDEN|SILENT);
+  static gvar3<int> gvnRelocFabMap("RelocFabMap", 1, HIDDEN|SILENT);
+  
+  bool bSuccess;
+  
+  if(*gvnRelocFabMap)
   {
-    std::string camName = mvAllCamNames[i];
-    bool bRelocGood = mRelocaliser.AttemptRecovery(*mpCurrentMKF->mmpKeyFrames[camName]);
+    if(*gvnDrawReloc)
+    {
+      // A bit hacky, since we've already drawn some stuff to the screen
+      // in TrackFrameSetup, and now we want to draw the relocalizer instead
+      // so just clear with black and draw some more
+      glClearColor(0,0,0,1);
+      glClear(GL_COLOR_BUFFER_BIT);
+      
+      // Disable drawing in the main Tracker routines (told you this was hacky)
+      mbDraw = false;
+    }
     
-    std::cout<<"Relocalization good: "<<bRelocGood<<std::endl;
-    
-    if(!bRelocGood)
-      continue;
-    
-    // The pose returned is for a KeyFrame, so we have to calculate the appropriate base MultiKeyFrame pose from it
-    SE3<> se3Best = mRelocaliser.BestPose();
-    mse3StartPose = mpCurrentMKF->mse3BaseFromWorld = mpCurrentMKF->mmpKeyFrames[camName]->mse3CamFromBase.inverse() * se3Best;  // CHECK!! GOOD
-    
-    std::cout<<"mse3StartPose: "<<std::endl<<mse3StartPose<<std::endl;
-    
-    bSuccess = true;
-    break;
+    bSuccess = mRelocFabMap.FindBestPose(*mpCurrentMKF, *gvnDrawReloc);
   }
- 
+  else
+  {
+    bSuccess = false;
+    for(unsigned i=0; i < mvAllCamNames.size(); ++i)
+    {
+      std::string camName = mvAllCamNames[i];
+      bool bRelocGood = mRelocaliser.AttemptRecovery(*mpCurrentMKF->mmpKeyFrames[camName]);
+      
+      if(!bRelocGood)
+        continue;
+      
+      // The pose returned is for a KeyFrame, so we have to calculate the appropriate base MultiKeyFrame pose from it
+      SE3<> se3Best = mRelocaliser.BestPose();
+      mpCurrentMKF->mse3BaseFromWorld = mpCurrentMKF->mmpKeyFrames[camName]->mse3CamFromBase.inverse() * se3Best;  // CHECK!! GOOD
+      mpCurrentMKF->UpdateCamsFromWorld();
+      
+      bSuccess = true;
+      break;
+    }
+  }
+  
+  static tf::TransformBroadcaster br;
+  tf::Transform transform;
+  tf::poseMsgToTF(util::SE3ToPoseMsg(GetCurrentPose().inverse()), transform);
+  br.sendTransform(tf::StampedTransform(transform, GetCurrentTimestamp(), "vision_world", "vision_pose_recover"));
   
   if(!bSuccess)
     return false;
   
-  UpdateCamsFromWorld();
+  mse3StartPose = mpCurrentMKF->mse3BaseFromWorld;
   mv6BaseVelocity = Zeros;
   mbJustRecoveredSoUseCoarse = true;
   return true;
@@ -647,15 +709,6 @@ void Tracker::TrackForInitialMap()
   else
     mMessageForUser << "Press spacebar to build initial map." << std::endl;
   
-}
-
-// // Update the camera-from-world poses of the current KeyFrames, based on the current MultiKeyFrame's pose and the fixed relative transforms
-void Tracker::UpdateCamsFromWorld()
-{
-  for(KeyFramePtrMap::iterator kf_it = mpCurrentMKF->mmpKeyFrames.begin(); kf_it != mpCurrentMKF->mmpKeyFrames.end(); ++kf_it)
-  {
-    kf_it->second->mse3CamFromWorld = kf_it->second->mse3CamFromBase * mpCurrentMKF->mse3BaseFromWorld; // CHECK!! GOOD
-  }
 }
   
 // Finds the Potentialy Visible Set, ie TrackerDatas referencing MapPoints that should be seen from one camera
@@ -805,7 +858,7 @@ Vector<6> Tracker::PoseUpdateStep(std::vector<TrackerDataPtrVector>& vIterationS
   mpCurrentMKF->mse3BaseFromWorld = SE3<>::exp(v6Update) * mpCurrentMKF->mse3BaseFromWorld;
   
   // Update the KeyFrame cam-from-world poses
-  UpdateCamsFromWorld();
+  mpCurrentMKF->UpdateCamsFromWorld();
     
   return v6Update;
 }
@@ -831,7 +884,7 @@ Vector<6> Tracker::PoseUpdateStepLinear(std::vector<TrackerDataPtrVector>& vIter
   mpCurrentMKF->mse3BaseFromWorld = SE3<>::exp(v6Update) * mpCurrentMKF->mse3BaseFromWorld;
   
   // Update the KeyFrame cam-from-world poses
-  UpdateCamsFromWorld();
+  mpCurrentMKF->UpdateCamsFromWorld();
       
   return v6Update;
 }
@@ -1533,7 +1586,7 @@ void Tracker::ApplyMotionModel()
   mpCurrentMKF->mse3BaseFromWorld = SE3<>::exp(v6Motion) * mse3StartPose;
   
   // Need to do this last after base pose updated
-  UpdateCamsFromWorld();
+  mpCurrentMKF->UpdateCamsFromWorld();
 }
 
 // The motion model is updated after TrackMap has found a new pose

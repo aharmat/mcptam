@@ -22,7 +22,7 @@ find_package(GVars3 REQUIRED)
 find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
 
-include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${SUITESPARSE_INCLUDE_DIRS} ${CVD_INCLUDE_DIR} 
+include_directories(include thirdparty ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${SUITESPARSE_INCLUDE_DIRS} ${CVD_INCLUDE_DIR} 
                     ${GVars3_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS})
 
 link_directories(${catkin_LIBRARY_DIRS} ${Boost_LIBRARY_DIRS} ${SUITESPARSE_LIBRARY_DIRS} ${OpenCV_LIB_DIR} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
@@ -51,7 +51,8 @@ add_executable(mcptam src/Main.cc src/GLWindow2.cc src/GLWindowMenu.cc src/Video
                       src/SystemBase.cc src/SystemFrontendBase.cc src/System.cc src/TaylorCamera.cc src/KeyFrame.cc src/MapPoint.cc src/Map.cc 
                       src/SmallBlurryImage.cc src/ShiTomasi.cc src/MapMaker.cc src/MapMakerBase.cc src/MapMakerClientBase.cc src/MapMakerServerBase.cc 
                       src/PatchFinder.cc src/Relocaliser.cc src/Tracker.cc src/KeyFrameVisualizer.cc 
-                      src/BundleAdjusterBase.cc src/MiniPatch.cc src/BundleAdjusterMulti.cc src/ChainBundle.cc src/RelocaliserFabMap.cc src/PersistentFREAK.cc)
+                      src/BundleAdjusterBase.cc src/MiniPatch.cc src/BundleAdjusterMulti.cc src/ChainBundle.cc src/RelocaliserFabMap.cc src/PersistentFREAK.cc
+                      thirdparty/p3p/P3p.cpp)
 add_dependencies(mcptam ${PROJECT_NAME}_gencpp)
 target_link_libraries(mcptam ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${OpenCV_LIBS} ${GVars3_LIBRARIES}
                              ${G2O_STUFF_LIBRARY} ${G2O_CORE_LIBRARY} ${G2O_SOLVER_CHOLMOD} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
