@@ -126,7 +126,7 @@ System::System()
     GUI.ParseLine("UpdatingPoints=1");
     GUI.ParseLine("CrossCamera=1");
     GUI.ParseLine("DrawReloc=0");
-    GUI.ParseLine("RelocFabMap=1");
+    GUI.ParseLine("RelocFabMap=0");
     
     static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN|SILENT);
     *gvnLevelZeroPoints = SystemBase::sbLevelZeroPoints;
@@ -417,6 +417,10 @@ void System::GUICommandHandler(std::string command, std::string params)
         ROS_INFO_STREAM("> Forcing adding of next MKF");
         mpTracker->AddNext();
       }
+    }
+    else if(params == "f")
+    {
+      mpTracker->ForceRecovery();
     }
     
     return;

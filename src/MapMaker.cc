@@ -112,19 +112,12 @@ void MapMaker::Reset()
 {
   ROS_DEBUG("MapMaker: Reset");
   
-  MapMakerClientBase::Reset();
-  MapMakerServerBase::Reset();
-  
   std::cout<<"Calling MapMakerBase::Reset()"<<std::endl;
   MapMakerBase::Reset();  // reset the actual map
   std::cout<<"Done MapMakerBase::Reset()"<<std::endl;
   
-  /*
-  if(mMap.mbGood)
-  {
-    ApplyGlobalTransformationToMap(CalcPlaneAligner()); 
-  }
-  */
+  MapMakerClientBase::Reset();  // call this after base reset so that FabMap can load if map exists
+  MapMakerServerBase::Reset();
   
   //debug
   mbRescale = false;

@@ -48,7 +48,7 @@
 #include <cvd/gl_helpers.h>
 
 // Static member
-double RelocaliserFabMap::sdMinLoopProbability = 0.75;
+double RelocaliserFabMap::sdMinLoopProbability = 0.1;
 int RelocaliserFabMap::snMinFinalMatches = 5;
 double RelocaliserFabMap::sdMaxPixelError = 10.0;
 int RelocaliserFabMap::snNumFitTrials = 600;
@@ -171,6 +171,7 @@ void RelocaliserFabMap::Init()
 	mpDescriptorExtractor->setVocabulary(matVocabulary);
   
   nFabMapSize = 0;
+  mmFabMapToKeyFrame.clear();
   
   mpFinalMatcher = new cv::BFMatcher();
   
@@ -385,10 +386,16 @@ bool RelocaliserFabMap::FindBestPose(MultiKeyFrame &mkfCurrent, bool bDraw)
     KeyFrame& kf = *(kf_it->second);
     Level& level = kf.maLevels[RELOC_LEVEL];
     
+    if(!kf.mbActive)
+      continue;
+    
     ComputeBoW(level);
     
     if(level.matBoW.empty())
+    {
+      std::cerr<<"BoW empty, skipping "<<kf.mCamName<<std::endl;
       continue;
+    }
     
     std::vector<cv::of2::IMatch> vFabMapMatches;
     
@@ -412,7 +419,10 @@ bool RelocaliserFabMap::FindBestPose(MultiKeyFrame &mkfCurrent, bool bDraw)
     }
     
     if(vFabMapMatchesPruned.empty())  // No match found for this KF
+    {
+      std::cerr<<"No match found for "<<kf.mCamName<<std::endl;
       continue;
+    }
       
     std::cout<<"Kept "<<vFabMapMatchesPruned.size()<<" matches out of "<<vFabMapMatches.size()<<std::endl;
     

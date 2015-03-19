@@ -70,6 +70,15 @@ void MapMakerClientBase::Reset()
   }
   
   mRelocFabMap.Reset();
+  
+  if(mMap.mbGood)  // load up FabMap with existing map
+  {
+    for(MultiKeyFramePtrList::iterator mkf_it = mMap.mlpMultiKeyFrames.begin(); mkf_it != mMap.mlpMultiKeyFrames.end(); ++mkf_it)
+    {
+      MultiKeyFrame& mkf = *(*mkf_it);
+      mRelocFabMap.Add(mkf);
+    }
+  }
 }
 
 // Points that are considered outliers by the Tracker are marked with a bad flag

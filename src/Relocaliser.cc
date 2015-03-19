@@ -100,8 +100,11 @@ void Relocaliser::ScoreKFs(KeyFrame &kfCurrent)
     for(KeyFramePtrMap::iterator jit = mkf.mmpKeyFrames.begin(); jit != mkf.mmpKeyFrames.end(); ++jit)
     {
       KeyFrame& kf = *(jit->second);
+      
+      /*
       if(kfCurrent.mCamName != kf.mCamName)  // only look at same camera
         continue;
+      */
         
       if(!kf.mpSBI)
       {

@@ -173,6 +173,8 @@ public:
   /// regardless of other metrics
   void AddNext();
   
+  void ForceRecovery();
+  
   // Static members
   static double sdRotationEstimatorBlur; ///< Amount of blur when constructing SmallBlurryImage
   static bool sbUseRotationEstimator; ///< Should pre-estimate the rotation using SmallBlurryImages
@@ -421,6 +423,9 @@ protected:
   
   //testing
   bool mbAddNext;   ///< Add the next MKF now
+  bool mbForceRecovery; ///< Enter relocalization mode, even if not lost
+  
+  double mdLastSigmaSquared;
   
 };
 

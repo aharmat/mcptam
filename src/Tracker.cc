@@ -144,6 +144,7 @@ void Tracker::Reset(bool bSavePose, bool bResetMap)
   mbInitRequested = false;
   mbPutPlaneAtOrigin = true;
   mbAddNext = false;
+  mbForceRecovery = false;
   mmSimpleMeas.clear();
    
   mLastProcessTime = ros::Time::now();
@@ -200,6 +201,11 @@ void Tracker::AddNext()
 { 
   if(mMap.mbGood && !IsLost())
     mbAddNext = true; 
+}
+
+void Tracker::ForceRecovery()
+{ 
+  mbForceRecovery = true;
 }
 
 // Generate a new MultiKeyFrame with a given pose and its children KeyFrames with the fixed camera poses
@@ -457,13 +463,15 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
   // Decide what to do - if there is a map, try to track the map ...
   if(mMap.mbGood)
   {
-    if(!IsLost())  // .. but only if we're not lost!
+    if(!IsLost() && !mbForceRecovery)  // .. but only if we're not lost! and not requesting forced relocalization
     {
       startTime = ros::WallTime::now();
       ApplyMotionModel(); 
       timingMsg.motion = (ros::WallTime::now() - startTime).toSec();     // 
       TrackMap();               //  These three lines do the main tracking work.
       UpdateMotionModel();      //
+      
+      mMessageForUser << "Last tracker sigma squared: "<<mdLastSigmaSquared << std::endl;
     
       AssessOverallTrackingQuality();  //  Check if we're lost or if tracking is poor.
       
@@ -527,6 +535,7 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
       mMessageForUser << "** Attempting recovery **";
       if(AttemptRecovery())
       {
+        mbForceRecovery = false;
         TrackMap();
         AssessOverallTrackingQuality();
         ReleasePointLock();  // Important! Do this whenever tracking step has finished
@@ -584,7 +593,12 @@ bool Tracker::AttemptRecovery()
     for(unsigned i=0; i < mvAllCamNames.size(); ++i)
     {
       std::string camName = mvAllCamNames[i];
-      bool bRelocGood = mRelocaliser.AttemptRecovery(*mpCurrentMKF->mmpKeyFrames[camName]);
+      KeyFrame& kf = *mpCurrentMKF->mmpKeyFrames[camName];
+      
+      if(!kf.mbActive)
+        continue;
+      
+      bool bRelocGood = mRelocaliser.AttemptRecovery(kf);
       
       if(!bRelocGood)
         continue;
@@ -1487,8 +1501,8 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
     else 
       dSigmaSquared = Huber::FindSigmaSquared(vErrorSquared);
   
+    mdLastSigmaSquared = dSigmaSquared;
   }
-  //std::cout<<"CalcPoseUpdate: dSigmaSquared: "<<dSigmaSquared<<std::endl;
   
   // The TooN WLSCholesky class handles reweighted least squares.
   // It just needs errors and jacobians.
@@ -1630,15 +1644,24 @@ void Tracker::AddNewKeyFrame()
 void Tracker::AssessOverallTrackingQuality()
 {
   TrackingQuality overall_quality = BAD;
-  for(unsigned i=0; i < mvAllCamNames.size(); ++i)
-  {
-    std::string camName = mvAllCamNames[i];
-    TrackingQuality quality = AssessTrackingQuality(camName);
-    mmTrackingQuality[camName] = quality;
   
-    // TrackingQuality enums are ordered from BAD to GOOD, so GOOD is highest numerical value
-    if(quality > overall_quality)
-      overall_quality = quality;
+  if(mdLastSigmaSquared < 4000)
+  {
+    for(unsigned i=0; i < mvAllCamNames.size(); ++i)
+    {
+      std::string camName = mvAllCamNames[i];
+      TrackingQuality quality = AssessTrackingQuality(camName);
+      mmTrackingQuality[camName] = quality;
+    
+      // TrackingQuality enums are ordered from BAD to GOOD, so GOOD is highest numerical value
+      if(quality > overall_quality)
+        overall_quality = quality;
+    }
+  }
+  
+  if(overall_quality == GOOD && mdLastSigmaSquared > 2000)
+  {
+    overall_quality = DODGY;
   }
   
   if(overall_quality == DODGY)
@@ -1655,11 +1678,15 @@ void Tracker::AssessOverallTrackingQuality()
     if(mnLostFrames > Tracker::snLostFrameThresh)
       mnLostFrames = Tracker::snLostFrameThresh;
   }
-  else if(overall_quality == GOOD)
+  else if(overall_quality == DODGY)
   {
     mnLostFrames--;
     if(mnLostFrames < 0)
       mnLostFrames = 0;
+  }
+  else if(overall_quality == GOOD)
+  {
+    mnLostFrames = 0;
   }
     
   mOverallTrackingQuality = overall_quality;
