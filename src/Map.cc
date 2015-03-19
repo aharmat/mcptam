@@ -241,7 +241,7 @@ void Map::EmptyTrash()
 }
 
 // Saves all map information to a file
-void Map::SaveToFolder(std::string folder)
+void Map::SaveToFolder(std::string folder, std::string postfix)
 { 
   // Erase existing images in folder
   std::string execString = "exec rm -r " + folder + "/*.jpg"; 
@@ -361,7 +361,7 @@ void Map::SaveToFolder(std::string folder)
       
       if(kf.maLevels[0].image.totalsize() > 0)
       {
-        ss<<folder<<"/mkf"<<mkf.mnID<<"_"<<camName<<"_image.jpg";
+        ss<<folder<<"/mkf"<<mkf.mnID<<"_"<<camName<<postfix<<"_image.jpg";
         imageStream.open(ss.str().c_str());
         if(!imageStream.is_open())
         {
@@ -378,7 +378,7 @@ void Map::SaveToFolder(std::string folder)
         {
           ss.str(std::string());
           ss.clear();
-          ss<<folder<<"/mkf"<<mkf.mnID<<"_"<<camName<<"_mask.jpg";
+          ss<<folder<<"/mkf"<<mkf.mnID<<"_"<<camName<<postfix<<"_mask.jpg";
           imageStream.open(ss.str().c_str());
           
           if(!imageStream.is_open())
@@ -414,7 +414,7 @@ void Map::SaveToFolder(std::string folder)
     
     ofs<<i;
     ofs<<", "<<point.mv3WorldPos[0]<<", "<<point.mv3WorldPos[1]<<", "<<point.mv3WorldPos[2];
-    ofs<<", "<<point.mpPatchSourceKF->mpParent->mnID<<", "<<point.mpPatchSourceKF->mCamName;
+    ofs<<", "<<point.mpPatchSourceKF->mpParent->mnID<<", "<<point.mpPatchSourceKF->mCamName<<postfix;
     ofs<<", "<<point.mbFixed<<", "<<point.mbOptimized<<std::endl;
   }
   
@@ -444,7 +444,7 @@ void Map::SaveToFolder(std::string folder)
         if(meas.bDeleted)
           continue;
         
-        ofs<<mkf.mnID<<", "<<kf.mCamName<<", "<<point.mnID<<", ";
+        ofs<<mkf.mnID<<", "<<kf.mCamName<<postfix<<", "<<point.mnID<<", ";
         ofs<<meas.v2RootPos[0]<<", "<<meas.v2RootPos[1]<<", "<<meas.nLevel<<", "<<meas.bSubPix<<", "<<meas.eSource<<std::endl;
       }
     }

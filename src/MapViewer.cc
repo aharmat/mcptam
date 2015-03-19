@@ -6,6 +6,7 @@
 #include <mcptam/Utility.h>
 #include <mcptam/DeletePointsAction.h>
 #include <mcptam/FitGroundPlaneAction.h>
+#include <mcptam/FlipZAction.h>
 #include <iomanip>
 #include <cvd/gl_helpers.h>
 #include <gvars3/instances.h>
@@ -548,6 +549,11 @@ bool MapViewer::GUICommandHandler(std::string command, std::string params, std::
     {
       std::shared_ptr<FitGroundPlaneAction> pFitAction(new FitGroundPlaneAction( &mMap, GatherSelected() ));
       pAction = std::dynamic_pointer_cast<EditAction>(pFitAction);
+    }
+    else if(params == "z")
+    {
+      std::shared_ptr<FlipZAction> pFlipAction(new FlipZAction( &mMap ));
+      pAction = std::dynamic_pointer_cast<EditAction>(pFlipAction);
     }
     else if(params == "1" || params == "2" || params == "3" || params == "4")
     {

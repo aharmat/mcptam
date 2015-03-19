@@ -167,7 +167,7 @@ void MapMaker::run()
     {
       ROS_ASSERT(!mSaveFolder.empty());
       ROS_INFO_STREAM("------------- Saving map to  "<<mSaveFolder);
-      mMap.SaveToFolder(mSaveFolder);
+      mMap.SaveToFolder(mSaveFolder, "saved");
       mbMapSave = false;
       mSaveFolder = "";
     }

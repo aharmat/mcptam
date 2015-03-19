@@ -129,7 +129,7 @@ public:
 
   void Restore();
   
-  void SaveToFolder(std::string folder);
+  void SaveToFolder(std::string folder, std::string postfix="");
   
   void LoadFromFolder(std::string folder, SE3Map mPoses, TaylorCameraMap mCameraModels, bool bFix);
   

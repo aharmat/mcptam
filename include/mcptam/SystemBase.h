@@ -106,7 +106,7 @@ protected:
   /// Creates a new VideoSourceMulti object
   VideoSourceMulti* InitVideoSource();
   
-  void SaveCamerasToFolder(std::string folder);
+  void SaveCamerasToFolder(std::string folder, std::string postfix="");
   
   void LoadCamerasFromFolder(std::string folder);
   

@@ -235,7 +235,7 @@ VideoSourceMulti* SystemBase::InitVideoSource()
 }
 
 // Saves all map information to a folder
-void SystemBase::SaveCamerasToFolder(std::string folder)
+void SystemBase::SaveCamerasToFolder(std::string folder, std::string postfix)
 { 
   std::string calibrationsFile = folder + "/calibrations.dat";
   std::ofstream ofs(calibrationsFile.c_str());
@@ -275,7 +275,7 @@ void SystemBase::SaveCamerasToFolder(std::string folder)
     // 7 - affine transform param d
     // 8 - affine transform param e
     
-    ofs<<camName<<", "<<irImageSize.x<<", "<<irImageSize.y<<", "<<v9Params[4]<<", "<<v9Params[5];
+    ofs<<camName<<postfix<<", "<<irImageSize.x<<", "<<irImageSize.y<<", "<<v9Params[4]<<", "<<v9Params[5];
     ofs<<", "<<v9Params[0]<<", "<<0<<", "<<v9Params[1]<<", "<<v9Params[2]<<", "<<v9Params[3];
     ofs<<", "<<v9Params[6]<<", "<<v9Params[7]<<", "<<v9Params[8];
       
@@ -313,7 +313,7 @@ void SystemBase::SaveCamerasToFolder(std::string folder)
     // Store the conventional way of defining pose (ie inverse of PTAM)
     geometry_msgs::Pose pose = util::SE3ToPoseMsg(se3Pose.inverse());
     
-    ofs<<camName;
+    ofs<<camName<<postfix;
     ofs<<", "<<pose.position.x<<", "<<pose.position.y<<", "<<pose.position.z;
     ofs<<", "<<pose.orientation.x<<", "<<pose.orientation.y<<", "<<pose.orientation.z<<", "<<pose.orientation.w<<std::endl;
   }

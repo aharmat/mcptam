@@ -360,7 +360,7 @@ void System::GUICommandHandler(std::string command, std::string params)
     ROS_ASSERT(!mSaveFolder.empty());
   
     mpMapMaker->RequestMapSave(mSaveFolder);
-    SaveCamerasToFolder(mSaveFolder);
+    SaveCamerasToFolder(mSaveFolder, "saved");
     
     return;
   }
