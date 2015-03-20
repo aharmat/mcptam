@@ -5,8 +5,9 @@
 #include <mcptam/OpenGL.h>
 #include <mcptam/Utility.h>
 #include <mcptam/DeletePointsAction.h>
-#include <mcptam/FitGroundPlaneAction.h>
-#include <mcptam/FlipZAction.h>
+#include <mcptam/FitPlaneAction.h>
+#include <mcptam/FlipAxisAction.h>
+#include <mcptam/MoveAxisAction.h>
 #include <iomanip>
 #include <cvd/gl_helpers.h>
 #include <gvars3/instances.h>
@@ -49,6 +50,10 @@ void MapViewer::Init()
   mSelectionStatus = READY;
   
   mbMKey = false;
+  mbPKey = false;
+  mbFKey = false;
+  mbUpKey = false;
+  mbDownKey = false;
 }
 
 void MapViewer::DrawMapDots(int nPointVis)
@@ -122,7 +127,7 @@ void MapViewer::DrawMapDots(int nPointVis)
   
   glPointParameterfv(GL_POINT_DISTANCE_ATTENUATION, mfOldAttenuation);
   
-  mdLastMaxViewerZ = dMaxViewerZ;
+  mdLastMaxViewerZ = std::max(dMaxViewerZ, 50.0);
 }
 
 void MapViewer::DrawGrid()
@@ -189,13 +194,17 @@ void MapViewer::DrawGrid()
     glVertex3d(dMax, (double)y * dGridInterval, 0.0);
   }
   
+  glEnd();
+  
+  glLineWidth(3);
+  glBegin(GL_LINES);
   glColor3f(1,0,0);
   glVertex3d(0,0,0);
   glVertex3d(1,0,0);
   glColor3f(0,1,0);
   glVertex3d(0,0,0);
   glVertex3d(0,1,0);
-  glColor3f(1,1,1);
+  glColor3f(0,0,1);
   glVertex3d(0,0,0);
   glVertex3d(0,0,1);
   glEnd();
@@ -346,12 +355,15 @@ void MapViewer::Draw()
   mMessageForUser << std::endl << "Pan: SHIFT + Middle mouse";
   mMessageForUser << std::endl;
   mMessageForUser << std::endl << "COMMANDS";
-  mMessageForUser << std::endl << "  A: Toggle selecting all points";
-  mMessageForUser << std::endl << "  B: Enter box select mode / Switch to box un-select mode";
-  mMessageForUser << std::endl << "ESC: Exit box select mode";
-  mMessageForUser << std::endl << "  #: Numbers 1-4, not the # key. Toggle layer visibility.";
-  mMessageForUser << std::endl << "M+#: Put selected points on layer # (1-4)";
-  mMessageForUser << std::endl << "DEL: Delete selected points (careful about selected points on hidden layers)";
+  mMessageForUser << std::endl << "              A: Toggle selecting all points";
+  mMessageForUser << std::endl << "              B: Enter box select mode / Switch to box un-select mode";
+  mMessageForUser << std::endl << "            ESC: Exit box select mode";
+  mMessageForUser << std::endl << "              #: Numbers 1-4, not the # key. Toggle layer visibility.";
+  mMessageForUser << std::endl << "          M + #: Put selected points on layer # (1-4)";
+  mMessageForUser << std::endl << "      P + X/Y/Z: Align given plane (normal) to selected points";
+  mMessageForUser << std::endl << "      F + X/Y/Z: Flip given plane (normal)";
+  mMessageForUser << std::endl << "Up/Down + X/Y/Z: Translate map +/- 1m in given axis direction";
+  mMessageForUser << std::endl << "             DEL: Delete selected points (careful about selected points on hidden layers)";
 }
 
 std::string MapViewer::GetMessageForUser()
@@ -424,7 +436,7 @@ void MapViewer::DrawCamera(TooN::SE3<> se3CfromW, bool bSmall)
   glColor3f(0,1,0);
   glVertex3f(0.0f, 0.0f, 0.0f);
   glVertex3f(0.0f, 0.1f, 0.0f);
-  glColor3f(1,1,1);
+  glColor3f(0,0,1);
   glVertex3f(0.0f, 0.0f, 0.0f);
   glVertex3f(0.0f, 0.0f, 0.1f);
   glEnd();
@@ -545,15 +557,31 @@ bool MapViewer::GUICommandHandler(std::string command, std::string params, std::
       std::shared_ptr<DeletePointsAction> pDeleteAction(new DeletePointsAction( GatherSelected() ));
       pAction = std::dynamic_pointer_cast<EditAction>(pDeleteAction);
     }
-    else if(params == "g")
+    else if(params == "x" || params == "y" || params == "z")
     {
-      std::shared_ptr<FitGroundPlaneAction> pFitAction(new FitGroundPlaneAction( &mMap, GatherSelected() ));
-      pAction = std::dynamic_pointer_cast<EditAction>(pFitAction);
-    }
-    else if(params == "z")
-    {
-      std::shared_ptr<FlipZAction> pFlipAction(new FlipZAction( &mMap ));
-      pAction = std::dynamic_pointer_cast<EditAction>(pFlipAction);
+      int nDim = (params == "x") ? 0 : ((params == "y") ? 1 : 2);
+      
+      if(mbPKey)
+      {
+        std::shared_ptr<FitPlaneAction> pFitAction(new FitPlaneAction( &mMap, GatherSelected(), nDim ));
+        pAction = std::dynamic_pointer_cast<EditAction>(pFitAction);
+      }
+      else if(mbFKey)
+      {
+        std::shared_ptr<FlipAxisAction> pFlipAction(new FlipAxisAction( &mMap, nDim ));
+        pAction = std::dynamic_pointer_cast<EditAction>(pFlipAction);
+      }
+      else if(mbUpKey)
+      {
+        std::shared_ptr<MoveAxisAction> pMoveAction(new MoveAxisAction( &mMap, nDim, 1.0 ));
+        pAction = std::dynamic_pointer_cast<EditAction>(pMoveAction);
+      }
+      else if(mbDownKey)
+      {
+        std::shared_ptr<MoveAxisAction> pMoveAction(new MoveAxisAction( &mMap, nDim, -1.0 ));
+        pAction = std::dynamic_pointer_cast<EditAction>(pMoveAction);
+      }
+      
     }
     else if(params == "1" || params == "2" || params == "3" || params == "4")
     {
@@ -586,6 +614,22 @@ bool MapViewer::GUICommandHandler(std::string command, std::string params, std::
     {
       mbMKey = true;
     }
+    else if(params == "p")
+    {
+      mbPKey = true;
+    }
+    else if(params == "f")
+    {
+      mbFKey = true;
+    }
+    else if(params == "Up")
+    {
+      mbUpKey = true;
+    }
+    else if(params == "Down")
+    {
+      mbDownKey = true;
+    }
     
     bHandled = true;
   }
@@ -595,6 +639,22 @@ bool MapViewer::GUICommandHandler(std::string command, std::string params, std::
     if(params == "m")
     {
       mbMKey = false;
+    }
+    else if(params == "p")
+    {
+      mbPKey = false;
+    }
+    else if(params == "f")
+    {
+      mbFKey = false;
+    }
+    else if(params == "Up")
+    {
+      mbUpKey = false;
+    }
+    else if(params == "Down")
+    {
+      mbDownKey = false;
     }
     
     bHandled = true;

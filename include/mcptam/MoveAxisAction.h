@@ -1,5 +1,5 @@
-#ifndef __FLIP_Z_ACTION_H
-#define __FLIP_Z_ACTION_H
+#ifndef __MOVE_AXIS_ACTION_H
+#define __MOVE_AXIS_ACTION_H
 
 #include <mcptam/EditAction.h>
 #include <TooN/se3.h>
@@ -8,11 +8,11 @@
 class Map;
 class MapPoint;
 
-class FlipZAction : public EditAction
+class MoveAxisAction : public EditAction
 {
 public:
 
-  FlipZAction(Map* pMap);
+  MoveAxisAction(Map* pMap, int nDim, double dDist);
   
 protected:
 

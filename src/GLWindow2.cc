@@ -341,6 +341,10 @@ std::string GLWindow2::ConvertKey (int key)
     case XK_Undo: s="Undo"; break;
     case XK_Control_L: s="Ctrl"; break;
     case XK_Control_R: s="Ctrl"; break;
+    case XK_Left: s="Left"; break;
+    case XK_Right: s="Right"; break;
+    case XK_Up: s="Up"; break;
+    case XK_Down: s="Down"; break;
     default: std::cout << "Got unkown keysym: " << std::hex << key << std::dec << std::endl;
   }
 

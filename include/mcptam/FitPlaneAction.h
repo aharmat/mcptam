@@ -1,5 +1,5 @@
-#ifndef __FIT_GROUND_PLANE_ACTION_H
-#define __FIT_GROUND_PLANE_ACTION_H
+#ifndef __FIT_PLANE_ACTION_H
+#define __FIT_PLANE_ACTION_H
 
 #include <mcptam/EditAction.h>
 #include <TooN/se3.h>
@@ -8,11 +8,11 @@
 class Map;
 class MapPoint;
 
-class FitGroundPlaneAction : public EditAction
+class FitPlaneAction : public EditAction
 {
 public:
 
-  FitGroundPlaneAction(Map* pMap, std::vector<MapPoint*> vpPoints);
+  FitPlaneAction(Map* pMap, std::vector<MapPoint*> vpPoints, int nDim);
   
 protected:
 
@@ -20,7 +20,7 @@ protected:
   virtual void UndoInternal();
   
   void ApplyGlobalTransformationToMap(TooN::SE3<> se3NewFromOld);
-  TooN::SE3<> CalcPlaneAligner();
+  TooN::SE3<> CalcPlaneAligner(int nDim);
 
   Map* mpMap;
   std::vector<MapPoint*> mvpPoints;

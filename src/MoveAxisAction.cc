@@ -1,26 +1,33 @@
-#include <mcptam/FlipZAction.h>
+#include <mcptam/MoveAxisAction.h>
 #include <mcptam/Map.h>
 #include <mcptam/MapPoint.h>
 #include <TooN/TooN.h>
 #include <TooN/SymEigen.h>
 
-FlipZAction::FlipZAction(Map* pMap)
+MoveAxisAction::MoveAxisAction(Map* pMap, int nDim, double dDist)
 : mpMap(pMap)
 {
-  mse3NewFromOld = TooN::SE3<>::exp(TooN::makeVector(0,0,0,M_PI,0,0));
+  TooN::Vector<6> v6Transform = TooN::Zeros;
+  v6Transform[nDim] = dDist; 
+  
+  mse3NewFromOld = TooN::SE3<>::exp(v6Transform);
 }
 
-void FlipZAction::DoInternal()
+void MoveAxisAction::DoInternal()
 {
+  //std::cout<<"MoveAxisAction::DoInternal"<<std::endl;
+  //std::cout<<"Applying transformation: "<<std::endl<<mse3NewFromOld<<std::endl;
   ApplyGlobalTransformationToMap(mse3NewFromOld);
 }
 
-void FlipZAction::UndoInternal()
+void MoveAxisAction::UndoInternal()
 {
+  //std::cout<<"MoveAxisAction::UndoInternal"<<std::endl;
+  //std::cout<<"Applying transformation: "<<std::endl<<mse3NewFromOld.inverse()<<std::endl;
   ApplyGlobalTransformationToMap(mse3NewFromOld.inverse());
 }
   
-void FlipZAction::ApplyGlobalTransformationToMap(TooN::SE3<> se3NewFromOld)
+void MoveAxisAction::ApplyGlobalTransformationToMap(TooN::SE3<> se3NewFromOld)
 {
   for(MultiKeyFramePtrList::iterator mkf_it = mpMap->mlpMultiKeyFrames.begin(); mkf_it != mpMap->mlpMultiKeyFrames.end(); ++mkf_it)
   {

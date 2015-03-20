@@ -83,6 +83,120 @@ RelocaliserFabMap::RelocaliserFabMap(Map &map, GLWindow2& window, ImageRefMap of
 
 void RelocaliserFabMap::Init()
 {
+  mpDetector = cv::Ptr<cv::FeatureDetector>(new cv::StarFeatureDetector()); //(32, 10, 18, 18, 20);
+  mpFinalMatcher = cv::Ptr<cv::DescriptorMatcher>(new cv::BFMatcher());
+  mpExtractor = cv::Ptr<cv::DescriptorExtractor>(new cv::SURF(1000, 4, 2, false, true)); //new cv::FREAK(true, true, 22.0f, 4);
+  
+  nFabMapSize = 0;
+  mmFabMapToKeyFrame.clear();
+  
+  if(mMap.mbGood)
+  {
+    InitFromMap();
+  }
+  else
+  {
+    InitFromFiles();
+  }
+}
+
+void RelocaliserFabMap::InitFromMap()
+{
+  std::cout<<"================================================"<<std::endl;
+  std::cout<<"======= RelocaliserFabMap::InitFromMap ======="<<std::endl;
+  std::cout<<"================================================"<<std::endl;
+  
+  cv::of2::BOWMSCTrainer trainer;
+  
+  std::map<KeyFrame*, std::vector<cv::KeyPoint> > mKeyFrameKeyPoints;
+  
+  for(MultiKeyFramePtrList::iterator mkf_it = mMap.mlpMultiKeyFrames.begin(); mkf_it != mMap.mlpMultiKeyFrames.end(); ++mkf_it)
+  {
+    MultiKeyFrame& mkf = *(*mkf_it);
+    for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
+    {
+      KeyFrame& kf = *(kf_it->second);
+      Level& level = kf.maLevels[RELOC_LEVEL];
+      
+      cv::Mat imageWrapped(level.image.size().y, level.image.size().x, CV_8U, level.image.data(), level.image.row_stride());
+      std::vector<cv::KeyPoint>& vKeyPoints = mKeyFrameKeyPoints[&kf];
+      mpDetector->detect(imageWrapped, vKeyPoints);
+      
+      if(vKeyPoints.empty())
+        continue;
+        
+      cv::Mat matDescriptors;
+      mpExtractor->compute(imageWrapped, vKeyPoints, matDescriptors);
+      
+      trainer.add(matDescriptors);
+    }
+  }
+  
+  cv::Mat matVocabulary = trainer.cluster();
+  
+	cv::Ptr<cv::DescriptorMatcher> pMatcher = cv::DescriptorMatcher::create("FlannBased"); // alternative: "BruteForce"
+	mpBoWExtractor = cv::Ptr<cv::BOWImgDescriptorExtractor>(new cv::BOWImgDescriptorExtractor(mpExtractor, pMatcher));
+	mpBoWExtractor->setVocabulary(matVocabulary);
+  
+  cv::Mat matTrainData;
+  
+  for(MultiKeyFramePtrList::iterator mkf_it = mMap.mlpMultiKeyFrames.begin(); mkf_it != mMap.mlpMultiKeyFrames.end(); ++mkf_it)
+  {
+    MultiKeyFrame& mkf = *(*mkf_it);
+    for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
+    {
+      KeyFrame& kf = *(kf_it->second);
+      Level& level = kf.maLevels[RELOC_LEVEL];
+      
+      cv::Mat imageWrapped(level.image.size().y, level.image.size().x, CV_8U, level.image.data(), level.image.row_stride());
+      ROS_ASSERT(mKeyFrameKeyPoints.count(&kf));
+      std::vector<cv::KeyPoint>& vKeyPoints = mKeyFrameKeyPoints[&kf];
+      
+      if(vKeyPoints.empty())
+        continue;
+        
+      mpBoWExtractor->compute(imageWrapped, vKeyPoints, level.matBoW);
+      matTrainData.push_back(level.matBoW);
+    }
+  }
+  
+  cv::of2::ChowLiuTree treeBuilder;
+  treeBuilder.add(matTrainData);
+  cv::Mat matTree = treeBuilder.make();
+  
+  // Create FabMap object
+	int nOptions = 0;
+	nOptions |= cv::of2::FabMap::SAMPLED;
+	nOptions |= cv::of2::FabMap::CHOW_LIU;
+	mpFabMap = new cv::of2::FabMap2(matTree, 0.39, 0, nOptions);
+	mpFabMap->addTraining(matTrainData);
+  
+  for(MultiKeyFramePtrList::iterator mkf_it = mMap.mlpMultiKeyFrames.begin(); mkf_it != mMap.mlpMultiKeyFrames.end(); ++mkf_it)
+  {
+    MultiKeyFrame& mkf = *(*mkf_it);
+    for(KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
+    {
+      KeyFrame& kf = *(kf_it->second);
+      Level& level = kf.maLevels[RELOC_LEVEL];
+      
+      if(level.matBoW.empty())
+        continue;
+        
+      mpFabMap->add(level.matBoW);
+      mmFabMapToKeyFrame[nFabMapSize] = &kf;
+      nFabMapSize++;
+    }
+  }
+  
+  
+}
+
+void RelocaliserFabMap::InitFromFiles()
+{
+  std::cout<<"================================================"<<std::endl;
+  std::cout<<"======= RelocaliserFabMap::InitFromFiles ======="<<std::endl;
+  std::cout<<"================================================"<<std::endl;
+  
   std::string trainingDataPath;
   mNodeHandlePriv.param<std::string>("fabmap_training_data", trainingDataPath ,"");
   
@@ -164,30 +278,18 @@ void RelocaliserFabMap::Init()
 	mpFabMap = new cv::of2::FabMap2(matTree, 0.39, 0, nOptions);
 	mpFabMap->addTraining(matTrainingData);
   
-  mpDetector = new cv::StarFeatureDetector(); //(32, 10, 18, 18, 20);
-  cv::Ptr<cv::DescriptorExtractor> pExtractor = new cv::SURF(1000, 4, 2, false, true); //new cv::FREAK(true, true, 22.0f, 4);
 	cv::Ptr<cv::DescriptorMatcher> pMatcher = cv::DescriptorMatcher::create("FlannBased"); // alternative: "BruteForce"
-	mpDescriptorExtractor = new cv::BOWImgDescriptorExtractor(pExtractor, pMatcher);
-	mpDescriptorExtractor->setVocabulary(matVocabulary);
-  
-  nFabMapSize = 0;
-  mmFabMapToKeyFrame.clear();
-  
-  mpFinalMatcher = new cv::BFMatcher();
-  
+	mpBoWExtractor = cv::Ptr<cv::BOWImgDescriptorExtractor>(new cv::BOWImgDescriptorExtractor(mpExtractor, pMatcher));
+	mpBoWExtractor->setVocabulary(matVocabulary);
 };
 
 RelocaliserFabMap::~RelocaliserFabMap()
 {
-  delete mpDetector;
-  delete mpDescriptorExtractor;
   delete mpFabMap;
-  delete mpFinalMatcher;
 }
 
 void RelocaliserFabMap::Reset()
 {
-  delete mpDescriptorExtractor;
   delete mpFabMap;
   
   Init();
@@ -219,11 +321,12 @@ void RelocaliserFabMap::Add(MultiKeyFrame &mkfCurrent)
 
 void RelocaliserFabMap::ComputeBoW(Level& level)
 {
+  /*
   if(level.vCorners.empty())
     return;
   
   // Put all corners from level into a vector of OpenCV keypoints
-  /*
+  
   std::vector<cv::KeyPoint> vKeyPoints(level.vCorners.size());
   
   for(unsigned i=0; i < level.vCorners.size(); ++i)
@@ -243,7 +346,7 @@ void RelocaliserFabMap::ComputeBoW(Level& level)
 	if(vKeyPoints.empty())
     return;
   
-  mpDescriptorExtractor->compute(imageWrapped, vKeyPoints, level.matBoW);
+  mpBoWExtractor->compute(imageWrapped, vKeyPoints, level.matBoW);
 }
 
 void RelocaliserFabMap::ComputeFinalMatchDescriptors(KeyFrame& kf, cv::Mat& matDescriptors, std::vector<TooN::Vector<2> >& vRootPos)

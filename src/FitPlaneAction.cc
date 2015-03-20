@@ -1,27 +1,31 @@
-#include <mcptam/FitGroundPlaneAction.h>
+#include <mcptam/FitPlaneAction.h>
 #include <mcptam/Map.h>
 #include <mcptam/MapPoint.h>
 #include <TooN/TooN.h>
 #include <TooN/SymEigen.h>
 
-FitGroundPlaneAction::FitGroundPlaneAction(Map* pMap, std::vector<MapPoint*> vpPoints)
+FitPlaneAction::FitPlaneAction(Map* pMap, std::vector<MapPoint*> vpPoints, int nDim)
 : mpMap(pMap)
 , mvpPoints(vpPoints)
 {
-  mse3NewFromOld = CalcPlaneAligner();
+  mse3NewFromOld = CalcPlaneAligner(nDim);
 }
 
-void FitGroundPlaneAction::DoInternal()
+void FitPlaneAction::DoInternal()
 {
+  //std::cout<<"FitPlaneAction::DoInternal"<<std::endl;
+  //std::cout<<"Applying transformation: "<<std::endl<<mse3NewFromOld<<std::endl;
   ApplyGlobalTransformationToMap(mse3NewFromOld);
 }
 
-void FitGroundPlaneAction::UndoInternal()
+void FitPlaneAction::UndoInternal()
 {
+  //std::cout<<"FitPlaneAction::UndoInternal"<<std::endl;
+  //std::cout<<"Applying transformation: "<<std::endl<<mse3NewFromOld.inverse()<<std::endl;
   ApplyGlobalTransformationToMap(mse3NewFromOld.inverse());
 }
   
-void FitGroundPlaneAction::ApplyGlobalTransformationToMap(TooN::SE3<> se3NewFromOld)
+void FitPlaneAction::ApplyGlobalTransformationToMap(TooN::SE3<> se3NewFromOld)
 {
   for(MultiKeyFramePtrList::iterator mkf_it = mpMap->mlpMultiKeyFrames.begin(); mkf_it != mpMap->mlpMultiKeyFrames.end(); ++mkf_it)
   {
@@ -42,7 +46,7 @@ void FitGroundPlaneAction::ApplyGlobalTransformationToMap(TooN::SE3<> se3NewFrom
   }
 }
 
-TooN::SE3<> FitGroundPlaneAction::CalcPlaneAligner()
+TooN::SE3<> FitPlaneAction::CalcPlaneAligner(int nDim)
 {
   int nRansacs = 500;
   TooN::Vector<3> v3BestMean = TooN::Zeros;
@@ -139,16 +143,24 @@ TooN::SE3<> FitGroundPlaneAction::CalcPlaneAligner()
   
   // If mean of inliers Z is negative, we want positive plane normal to put camera above plane
   // If mean of inliers Z is positive, we want negative plane normal to put camera above plane
-  if(v3MeanOfInliers[2] < 0 && v3Normal[2] < 0)
+  if(v3MeanOfInliers[nDim] < 0 && v3Normal[nDim] < 0)
     v3Normal *= -1.0;
-  else if(v3MeanOfInliers[2] > 0 && v3Normal[2] > 0)
+  else if(v3MeanOfInliers[nDim] > 0 && v3Normal[nDim] > 0)
     v3Normal *= -1.0;
   
+  int nOtherDim = nDim + 1;
+  if(nOtherDim > 2)
+    nOtherDim = 0;
+    
+  int nLastDim = nOtherDim + 1;
+  if(nLastDim > 2)
+    nLastDim = 0;
+  
   TooN::Matrix<3> m3Rot = TooN::Identity;
-  m3Rot[2] = v3Normal;
-  m3Rot[0] = m3Rot[0] - (v3Normal * (m3Rot[0] * v3Normal));
-  TooN::normalize(m3Rot[0]);
-  m3Rot[1] = m3Rot[2] ^ m3Rot[0];
+  m3Rot[nDim] = v3Normal;
+  m3Rot[nOtherDim] = m3Rot[nOtherDim] - (v3Normal * (m3Rot[nOtherDim] * v3Normal));
+  TooN::normalize(m3Rot[nOtherDim]);
+  m3Rot[nLastDim] = m3Rot[nDim] ^ m3Rot[nOtherDim];
   
   TooN::SE3<> se3Aligner;
   se3Aligner.get_rotation() = m3Rot;

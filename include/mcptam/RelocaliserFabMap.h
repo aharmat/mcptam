@@ -59,6 +59,7 @@ struct Level;
 namespace cv {
 	class BOWImgDescriptorExtractor;
   class DescriptorMatcher;
+  class DescriptorExtractor;
   class Mat;
   class DMatch;
   class FeatureDetector;
@@ -107,6 +108,10 @@ protected:
 
   void Init();
   
+  void InitFromMap();
+  
+  void InitFromFiles();
+  
   void ComputeBoW(Level& level);
   
   void ComputeFinalMatchDescriptors(KeyFrame& kf, cv::Mat& matDescriptors, std::vector<TooN::Vector<2> >& vRootPos);
@@ -128,8 +133,6 @@ protected:
   TaylorCameraMap mmCameraModels;   ///< All the camera models being used in the system
   TooN::SE3<> mse3Best;   ///< The 3D pose transform of the last attempted recovery
   
-  cv::FeatureDetector* mpDetector;
-  cv::BOWImgDescriptorExtractor* mpDescriptorExtractor;
   cv::of2::FabMap* mpFabMap;
   
   int nFabMapSize;
@@ -137,7 +140,11 @@ protected:
   ros::NodeHandle mNodeHandlePriv;  ///< ROS node handle with private namespace
   
   std::map<int, KeyFrame*> mmFabMapToKeyFrame;
-  cv::DescriptorMatcher* mpFinalMatcher;
+  
+  cv::Ptr<cv::DescriptorMatcher> mpFinalMatcher;
+  cv::Ptr<cv::DescriptorExtractor> mpExtractor;
+  cv::Ptr<cv::FeatureDetector> mpDetector;
+  cv::Ptr<cv::BOWImgDescriptorExtractor> mpBoWExtractor;
   
   boost::mutex mMutex;
   

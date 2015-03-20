@@ -477,7 +477,9 @@ void MapEditor::GUICommandHandler(std::string command, std::string params)
     {
       if(mbCtrl)
       {
-        std::cout<<"UNDO"<<std::endl;
+        std::cout<<"About to UNDO"<<std::endl;
+        std::cout<<"  undo stack size: "<<mspUndoStack.size()<<std::endl;
+        std::cout<<"  redo stack size: "<<mspRedoStack.size()<<std::endl;
         
         if(!mspUndoStack.empty())
         {
@@ -493,7 +495,9 @@ void MapEditor::GUICommandHandler(std::string command, std::string params)
     {
       if(mbCtrl)
       {
-        std::cout<<"REDO"<<std::endl;
+        std::cout<<"About REDO"<<std::endl;
+        std::cout<<"  undo stack size: "<<mspUndoStack.size()<<std::endl;
+        std::cout<<"  redo stack size: "<<mspRedoStack.size()<<std::endl;
         
         if(!mspRedoStack.empty())
         {
