@@ -61,6 +61,7 @@ double MapMakerServerBase::sdInitDepth = 3.0;
 std::string MapMakerServerBase::ssInitPointMode = "both";  // options: "stereo", "idp", "both"
 double MapMakerServerBase::sdInitCovThresh = 1.0;
 bool MapMakerServerBase::sbLargePointTest = true;
+bool MapMakerServerBase::sbOnlyFirstCameraGeneratesPoints = false;
 
 MapMakerServerBase::MapMakerServerBase(Map& map, TaylorCameraMap &cameras, BundleAdjusterBase& bundleAdjuster)
   : MapMakerBase(map, true)  // This will be skipped since inheritance is virtual!
@@ -452,6 +453,9 @@ void MapMakerServerBase::AddStereoMapPoints(MultiKeyFrame& mkfSrc, int nLevel, i
 {
   for(KeyFramePtrMap::iterator it = mkfSrc.mmpKeyFrames.begin(); it != mkfSrc.mmpKeyFrames.end(); it++)
   {
+    if(MapMakerServerBase::sbOnlyFirstCameraGeneratesPoints && it != mkfSrc.mmpKeyFrames.begin())
+      break;
+    
     KeyFrame &kfSrc = *(it->second);
     Level &level = kfSrc.maLevels[nLevel];
     ThinCandidates(kfSrc, nLevel);

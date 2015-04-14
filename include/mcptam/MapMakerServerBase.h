@@ -96,6 +96,7 @@ public:
   static std::string ssInitPointMode;             ///< Point initialization mode -- 0: stereo only, 1: idp only, 2+: both
   static double sdInitCovThresh;          ///< Feature position covariance threshold to end initialization phase
   static bool sbLargePointTest;
+  static bool sbOnlyFirstCameraGeneratesPoints;
   
 protected:
 
