@@ -82,7 +82,6 @@ VideoSourceSingle::VideoSourceSingle(bool bGetPoseSeparately)
   
   ROS_INFO("VideoSourceSingle: Got first image, extracting size");
   mirSize = CVD::ImageRef(mCVPtr->image.cols,mCVPtr->image.rows);
-  mirFullScaleSize = CVD::ImageRef(mirSize.x * mirBinning.x, mirSize.y * mirBinning.y);
   
   // Acquire the calibration info
   mbAcquiredInfo = false;
@@ -95,6 +94,8 @@ VideoSourceSingle::VideoSourceSingle(bool bGetPoseSeparately)
   // Don't need info after getting one message so just shut it down
   mInfoSub.shutdown();  
   ROS_INFO("VideoSourceSingle: Got calibration info");
+  
+  mirFullScaleSize = CVD::ImageRef(mirSize.x * mirBinning.x, mirSize.y * mirBinning.y);
   
   // Acquire pose info
   if(mbGetPoseSeparately)

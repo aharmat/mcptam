@@ -33,3 +33,11 @@ Visit the MCPTAM website (https://github.com/aharmat/mcptam).
 For more information, refer to the MCPTAM Wiki (https://github.com/aharmat/mcptam/wiki).
 
 A Getting-Started Guide is available on the Wiki, or a snapshot can be found in the file Getting-Started.pdf.
+
+If you use this software, please cite the following papers:
+
+A. Harmat, M. Trentini and I. Sharf "Multi-Camera Tracking and Mapping for Unmanned Aerial Vehicles in Unstructured Environments" in Journal of Intelligent and Robotic Systems, vol. 78, no. 2, pp. 291-317, May 2015 (http://link.springer.com/article/10.1007%2Fs10846-014-0085-y)
+ 
+A. Harmat, I. Sharf and M. Trentini "Parallel Tracking and Mapping with Multiple Cameras on an Unmanned Aerial Vehicle" in Intelligent Robotics and Applications Lecture Notes in Computer Science, vol. 7506, pp. 421-432, 2012 (http://link.springer.com/chapter/10.1007%2F978-3-642-33509-9_42)
+
+

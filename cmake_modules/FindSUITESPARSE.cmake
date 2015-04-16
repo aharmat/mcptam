@@ -38,18 +38,15 @@ if( WIN32 )
    ENDIF( SUITESPARSE_LIBRARY_DIRS )  
 
 else( WIN32 )
-   IF( APPLE)
+   IF(APPLE)
 	   FIND_PATH( CHOLMOD_INCLUDE_DIR cholmod.h
-        	      PATHS  /opt/local/include/ufsparse )
+        	      PATHS /opt/local/include/ufsparse
+			    /usr/local/include )
 
            FIND_PATH( SUITESPARSE_LIBRARY_DIR
-                      NAMES libSuiteSparse.dylib
-                      PATHS /opt/local/lib )
-
-           list ( APPEND SUITESPARSE_LIBRARY_DIRS ${SUITESPARSE_LIBRARY_DIR} )
-
-           list ( APPEND SUITESPARSE_LIBRARIES SuiteSparse)
-
+                      NAMES libcholmod.a
+                      PATHS /opt/local/lib
+			    /usr/local/lib )
    ELSE(APPLE)
 	   FIND_PATH( CHOLMOD_INCLUDE_DIR cholmod.h
         	      PATHS /usr/local/include 
@@ -57,15 +54,14 @@ else( WIN32 )
         	            /usr/include/suitesparse/ 
         	            ${CMAKE_SOURCE_DIR}/MacOS/Libs/cholmod
               	      PATH_SUFFIXES cholmod/ CHOLMOD/ )
-
    	
            FIND_PATH( SUITESPARSE_LIBRARY_DIR
-                      NAMES libcholmod.so 
+                      NAMES libcholmod.so libcholmod.a
                       PATHS /usr/lib 
-                            /usr/lib64 
+                            /usr/lib64
+                            /usr/lib/x86_64-linux-gnu
+                            /usr/lib/i386-linux-gnu
                             /usr/local/lib )
-
-
    ENDIF(APPLE)
 
    # Add cholmod include directory to collection include directories
@@ -73,32 +69,31 @@ else( WIN32 )
 	list ( APPEND SUITESPARSE_INCLUDE_DIRS ${CHOLMOD_INCLUDE_DIR} )
    ENDIF( CHOLMOD_INCLUDE_DIR )
 
-
    # if we found the library, add it to the defined libraries
    IF ( SUITESPARSE_LIBRARY_DIR )
 
-       # Skipped, as this is set for apple in the block above
-       if (NOT APPLE)
-         list ( APPEND SUITESPARSE_LIBRARIES amd)
-         list ( APPEND SUITESPARSE_LIBRARIES btf)
-         list ( APPEND SUITESPARSE_LIBRARIES camd)
-         list ( APPEND SUITESPARSE_LIBRARIES ccolamd)
-         list ( APPEND SUITESPARSE_LIBRARIES cholmod)
-         list ( APPEND SUITESPARSE_LIBRARIES colamd)
- #       list ( APPEND SUITESPARSE_LIBRARIES csparse)
-         list ( APPEND SUITESPARSE_LIBRARIES cxsparse)
-         list ( APPEND SUITESPARSE_LIBRARIES klu)
- #       list ( APPEND SUITESPARSE_LIBRARIES spqr)
-         list ( APPEND SUITESPARSE_LIBRARIES umfpack)
-         list ( APPEND SUITESPARSE_LIBRARIES lapack)
-       endif()
-   
+       list ( APPEND SUITESPARSE_LIBRARIES amd)
+       list ( APPEND SUITESPARSE_LIBRARIES btf)
+       list ( APPEND SUITESPARSE_LIBRARIES camd)
+       list ( APPEND SUITESPARSE_LIBRARIES ccolamd)
+       list ( APPEND SUITESPARSE_LIBRARIES cholmod)
+       list ( APPEND SUITESPARSE_LIBRARIES colamd)
+ #     list ( APPEND SUITESPARSE_LIBRARIES csparse)
+       list ( APPEND SUITESPARSE_LIBRARIES cxsparse)
+       list ( APPEND SUITESPARSE_LIBRARIES klu)
+ #     list ( APPEND SUITESPARSE_LIBRARIES spqr)
+       list ( APPEND SUITESPARSE_LIBRARIES umfpack)
+
+       IF (APPLE)
+           list ( APPEND SUITESPARSE_LIBRARIES suitesparseconfig)
+       ENDIF (APPLE)
+
        # Metis and spqr are optional
        FIND_LIBRARY( SUITESPARSE_METIS_LIBRARY
                      NAMES metis
                      PATHS ${SUITESPARSE_LIBRARY_DIR} )
        IF (SUITESPARSE_METIS_LIBRARY)			
-	  list ( APPEND SUITESPARSE_LIBRARIES ${SUITESPARSE_METIS_LIBRARY})
+	  list ( APPEND SUITESPARSE_LIBRARIES metis)
        ENDIF(SUITESPARSE_METIS_LIBRARY)
 
        if(EXISTS  "${CHOLMOD_INCLUDE_DIR}/SuiteSparseQR.hpp")
@@ -120,11 +115,14 @@ else( WIN32 )
    
 endif( WIN32 )
 
+
 IF (SUITESPARSE_INCLUDE_DIRS AND SUITESPARSE_LIBRARIES)
    IF(WIN32)
     list (APPEND SUITESPARSE_INCLUDE_DIRS ${CHOLMOD_INCLUDE_DIR}/../../UFconfig )
    ENDIF(WIN32)
    SET(SUITESPARSE_FOUND TRUE)
+   MESSAGE(STATUS "Found SuiteSparse")
 ELSE (SUITESPARSE_INCLUDE_DIRS AND SUITESPARSE_LIBRARIES)
    SET( SUITESPARSE_FOUND FALSE )
+   MESSAGE(FATAL_ERROR "Unable to find SuiteSparse")
 ENDIF (SUITESPARSE_INCLUDE_DIRS AND SUITESPARSE_LIBRARIES)

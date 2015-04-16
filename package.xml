@@ -1,13 +1,13 @@
 <package>
   <name>mcptam</name>
-  <version>0.1.1</version>
+  <version>0.1.2</version>
   <description>
      MCPTAM
   </description>
   <author>Adam Harmat, Michael Tribou</author>
   <maintainer email="adam.harmat@mail.mcgill.ca">Adam Harmat</maintainer>
-  <license>see http://www.robots.ox.ac.uk/~gk/PTAM/download.html</license>
-  <url>http://ros.org/wiki/mcptam</url>
+  <license>GPV v3 http://www.gnu.org/licenses/gpl-3.0.html</license>
+  <url>https://github.com/aharmat/mcptam/wiki</url>
   
   <buildtool_depend>catkin</buildtool_depend>
   
@@ -23,10 +23,6 @@
   <build_depend>visualization_msgs</build_depend>
   <build_depend>dynamic_reconfigure</build_depend>
   <build_depend>pcl_ros</build_depend>
-  <build_depend>suitesparse</build_depend>
-  <build_depend>cvd</build_depend>
-  <build_depend>GVars3</build_depend>
-  <build_depend>OpenGL</build_depend>
   <build_depend>message_generation</build_depend>
   <build_depend>libg2o</build_depend>
   
@@ -42,10 +38,6 @@
   <run_depend>visualization_msgs</run_depend>
   <run_depend>dynamic_reconfigure</run_depend>
   <run_depend>pcl_ros</run_depend>
-  <run_depend>suitesparse</run_depend>
-  <run_depend>cvd</run_depend>
-  <run_depend>GVars3</run_depend>
-  <run_depend>OpenGL</run_depend>
   <run_depend>message_runtime</run_depend>
   <run_depend>libg2o</run_depend>
 

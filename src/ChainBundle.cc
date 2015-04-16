@@ -278,6 +278,33 @@ class VertexRelPoint : public g2o::BaseVertex<3, TooN::Vector<3> >
         _estimate *= 1e5/dDistAfter;
       if(dDistAfter < 1e-5)
         _estimate *= 1e-5/dDistAfter;
+      
+      /*
+      TooN::Vector<3> v3PointInCamDir = _estimate;
+      TooN::normalize(v3PointInCamDir);
+      
+      TooN::Vector<3> v3Axis = v3PointInCamDir ^ TooN::makeVector(0,0,1);
+      double angle = asin(TooN::norm(v3Axis));
+      
+      if(angle != 0)
+      {
+        TooN::normalize(v3Axis);
+        v3Axis *= angle;
+      }
+      
+      TooN::SO3<> Rp = TooN::SO3<>::exp(v3Axis);
+      
+      double d_beta = update[0];  // rotation about x axis
+      double d_alpha = update[1]; // rotation about y axis
+      double d_rho = update[2];
+      
+      _estimate = (1/(1+d_rho)) * (Rp.inverse() * TooN::SO3<>::exp(TooN::makeVector(d_beta,d_alpha,0)) * Rp * _estimate);
+      double dDist = TooN::norm(_estimate);
+      if(dDist > 1e5)
+        _estimate *= 1e5/dDist;
+      if(dDist < 1e-5)
+        _estimate *= 1e-5/dDist;
+      */
     }
     
     // The current point estimate transformed into global cartesian coordinates
@@ -436,11 +463,11 @@ class EdgeChainMeas : public g2o::BaseMultiEdge<2, TooN::Vector<2> >
       
       /*
       // Option 1:
-      std::vector<JacobianType, g2o::aligned_allocator<JacobianType> > _jacobianOplusTemp(_vertices.size());
+      std::vector<JacobianType, Eigen::aligned_allocator<JacobianType> > _jacobianOplusTemp(_vertices.size());
       */
       
       // Option 2:
-      std::vector<JacobianType, g2o::aligned_allocator<JacobianType> >& _jacobianOplusTemp = _jacobianOplus;
+      std::vector<JacobianType, Eigen::aligned_allocator<JacobianType> >& _jacobianOplusTemp = _jacobianOplus;
       
       const VertexRelPoint* pPointVertex = dynamic_cast<const VertexRelPoint*>(_vertices.back());
       ROS_ASSERT(pPointVertex);
@@ -592,6 +619,32 @@ class EdgeChainMeas : public g2o::BaseMultiEdge<2, TooN::Vector<2> >
         // d_rho, change in inverse depth
         m3Jac.T()[2] = -1*v3PointInCam / dRho;
         
+        /*
+        TooN::Vector<3> v3PointInCam = pPointVertex->estimate();
+        TooN::Vector<3> v3PointInCamDir = v3PointInCam;
+        TooN::normalize(v3PointInCamDir);
+        
+        TooN::Vector<3> v3Axis = v3PointInCamDir ^ TooN::makeVector(0,0,1);
+        double angle = asin(TooN::norm(v3Axis));
+        
+        if(angle != 0)
+        {
+          TooN::normalize(v3Axis);
+          v3Axis *= angle;
+        }
+        
+        TooN::SO3<> Rp = TooN::SO3<>::exp(v3Axis);
+        TooN::Matrix<3> m3Jac;
+        
+        // d_beta, rotation about x axis
+        m3Jac.T()[0] = Rp.inverse() * (TooN::SO3<>::generator_field(0,Rp*v3PointInCam));
+        
+        // d_alpha, rotation about y axis
+        m3Jac.T()[1] = Rp.inverse() * (TooN::SO3<>::generator_field(1,Rp*v3PointInCam));
+        
+        // d_rho, change in inverse depth
+        m3Jac.T()[2] = -1*v3PointInCam;
+        */
         // If you want to use XYZ parameterization for the updates, use this instead
         // Make sure that the same thing is done in VertexRelPoint::oplusImpl
         // The logic behind this is that the perturbations in the XYZ frame are simply the unit vectors
