@@ -50,7 +50,7 @@
 
 using namespace TooN;
 
-bool SystemBase::sbLevelZeroPoints = false;
+//bool SystemBase::sbLevelZeroPoints = false;
 
 SystemBase::SystemBase(std::string windowName, bool bFullSize, bool bDrawWindow)
 : mNodeHandlePriv("~")
@@ -90,6 +90,15 @@ SystemBase::SystemBase(std::string windowName, bool bFullSize, bool bDrawWindow)
         mmPosesLive[camName] = se3Pose;
       }
     }
+  }
+  
+  double dExtrinsicScale;
+  if(mNodeHandlePriv.getParam("extrinsic_scale", dExtrinsicScale))
+  {
+    for(SE3Map::iterator pose_it = mmPoses.begin(); pose_it != mmPoses.end(); ++pose_it)
+    {
+      pose_it->second.get_translation() *= dExtrinsicScale;
+    }  
   }
   
   // Create camera models here

@@ -338,7 +338,7 @@ public:
    *  Uses the KeyFrame::Distance function to compute pairwise distances
    *  @param other The other MultiKeyFrame 
    *  @return The calculated distance */
-  double Distance(MultiKeyFrame &other);
+  double Distance(MultiKeyFrame &other, bool bScaleBySceneDepth=false);
   
   /// Update the camera-from-world poses of the KeyFrames, based on the MultiKeyFrame's pose and the fixed relative transforms
   void UpdateCamsFromWorld();

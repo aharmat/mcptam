@@ -126,6 +126,8 @@ public:
    *  @return The pose covariance */  
   inline TooN::Matrix<6> GetCurrentCovariance() { return mm6PoseCovariance; }
   
+  inline double GetCurrentSceneDepth(){ return mpCurrentMKF->mdTotalDepthMean; }
+  
   /** @brief Get the Frobenius norm of the current pose covariance
    *  @return The pose covariance norm */  
   inline double GetCurrentCovarianceNorm() { return norm_fro(mm6PoseCovariance) * ( mnTotalAttempted/(double)mnNumInliers );  }

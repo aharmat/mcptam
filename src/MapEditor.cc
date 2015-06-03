@@ -463,7 +463,7 @@ void MapEditor::GUICommandHandler(std::string command, std::string params)
   
   if(command=="Save")
   {
-    mpMap->SaveToFolder(mSaveFolder);
+    mpMap->SaveToFolder(mSaveFolder, true);
     ROS_INFO_STREAM("Saved map to "<<mSaveFolder);
   }
   
@@ -514,7 +514,7 @@ void MapEditor::GUICommandHandler(std::string command, std::string params)
       if(mbCtrl)
       {
         // Save map
-        mpMap->SaveToFolder(mSaveFolder);
+        mpMap->SaveToFolder(mSaveFolder, true);
         ROS_INFO_STREAM("Saved map to "<<mSaveFolder);
       }
     }

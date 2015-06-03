@@ -99,7 +99,7 @@ void KeyFrame::AddMeasurement(MapPoint* pPoint, Measurement* pMeas, bool bExtrac
 
 void KeyFrame::CreateMeasurementDescriptor(Measurement& meas)
 {
-  if(meas.nLevel == RELOC_LEVEL)
+  if(meas.nLevel == RELOC_LEVEL && maLevels[RELOC_LEVEL].image.totalsize() > 0)
   {
     ROS_ASSERT(mpExtractor);
     ROS_ASSERT(meas.matDescriptor.empty());
@@ -952,9 +952,10 @@ double MultiKeyFrame::LinearDist(MultiKeyFrame &other)
 }
 
 // Calculates the distance between this MultiKeyFrame and the argument as the minimum distance between any of their KeyFrames
-double MultiKeyFrame::Distance(MultiKeyFrame &other)
+double MultiKeyFrame::Distance(MultiKeyFrame &other, bool bScaleBySceneDepth)
 {
   double dMinDist = std::numeric_limits<double>::max();
+  double dMinDistScaled = dMinDist;
   
   for(KeyFramePtrMap::iterator kf1_it = mmpKeyFrames.begin(); kf1_it != mmpKeyFrames.end(); ++kf1_it)
   {
@@ -969,12 +970,21 @@ double MultiKeyFrame::Distance(MultiKeyFrame &other)
         continue;
       
       double dDist = kf1.Distance(kf2);
-      if(dDist < dMinDist)
-        dMinDist = dDist;
       
+	  double dMeanSceneDepth = (kf1.mdSceneDepthMean + kf2.mdSceneDepthMean)/2;
+	  double dDistScaled = dDist * (1.0/dMeanSceneDepth);	 
+      
+      if(dDist < dMinDist)
+      {
+        dMinDist = dDist; 
+        dMinDistScaled = dDistScaled;
+	  }
     }
   }
   
+  if(bScaleBySceneDepth)
+	return dMinDistScaled;
+	
   return dMinDist;
 }
 

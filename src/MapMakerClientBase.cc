@@ -135,20 +135,20 @@ bool MapMakerClientBase::NeedNewMultiKeyFrame(MultiKeyFrame &mkf)
   }
   
   MultiKeyFrame *pClosestMKF = ClosestMultiKeyFrame(mkf);
-  double dDist = mkf.Distance(*pClosestMKF);
+  double dDistScaled = mkf.Distance(*pClosestMKF, true);
   
-  ROS_DEBUG_STREAM("Closest dist in map: "<<dDist);
+  ROS_DEBUG_STREAM("Closest dist (scaled) in map: "<<dDistScaled);
   
   // See if there's anything closer in the queue
   MultiKeyFrame *pClosestMKFInQueue = ClosestMultiKeyFrameInQueue(mkf);
   if(pClosestMKFInQueue)
   {
-    double dDistInQueue = mkf.Distance(*pClosestMKFInQueue);
-    ROS_DEBUG_STREAM("Closest dist in queue: "<<dDistInQueue);
-    dDist = std::min(dDist,dDistInQueue);
+    double dDistScaledInQueue = mkf.Distance(*pClosestMKFInQueue, true);
+    ROS_DEBUG_STREAM("Closest dist (scaled) in queue: "<<dDistScaledInQueue);
+    dDistScaled = std::min(dDistScaled,dDistScaledInQueue);
   }
   
-  dDist *= (1.0 / mkf.mdTotalDepthMean);  // scale by depth
+  //dDist *= (1.0 / mkf.mdTotalDepthMean);  // scale by depth
   
   int nEffectiveSize = mMap.mlpMultiKeyFrames.size();
   if(nEffectiveSize == 2)
@@ -156,9 +156,9 @@ bool MapMakerClientBase::NeedNewMultiKeyFrame(MultiKeyFrame &mkf)
     
   double dMapSizeFactor = 1.0 - (1.0 / (0.5 + nEffectiveSize));
   double dThresh = MapMakerClientBase::sdMaxScaledMKFDist * dMapSizeFactor;
-  bool bNeed = dDist > dThresh;
+  bool bNeed = dDistScaled > dThresh;
   
-  ROS_INFO_STREAM("NeedNewMultiKeyFrame: dist: "<<dDist<<" mean depth: "<<mkf.mdTotalDepthMean<<" thresh: "<< dThresh << " need: "<<(bNeed ? "yes" : "no"));
+  ROS_INFO_STREAM("NeedNewMultiKeyFrame: dist (scaled): "<<dDistScaled<<" thresh: "<< dThresh << " need: "<<(bNeed ? "yes" : "no"));
   
   return bNeed;
 }

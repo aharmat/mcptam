@@ -73,7 +73,7 @@ public:
   /// Frees dynamically allocated objects
   ~SystemBase();
   
-  static bool sbLevelZeroPoints;  // This should really be in SystemFrontendBase, PoseCalibrator inheriting from SystemBase is the problem
+  //static bool sbLevelZeroPoints;  // This should really be in SystemFrontendBase, PoseCalibrator inheriting from SystemBase is the problem
   
 protected:
 

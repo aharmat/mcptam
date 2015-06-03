@@ -241,18 +241,21 @@ void Map::EmptyTrash()
 }
 
 // Saves all map information to a file
-void Map::SaveToFolder(std::string folder, std::string postfix)
+void Map::SaveToFolder(std::string folder, bool bKeepExistingImages, std::string postfix)
 { 
-  // Erase existing images in folder
-  std::string execString = "exec rm -r " + folder + "/*.jpg"; 
-  int nRet = std::system(execString.c_str());
-  
-  if(nRet < 0)
+  if(!bKeepExistingImages)
   {
-    ROS_ERROR("=======================================================================");
-    ROS_ERROR(" COULD NOT ERASE EXISTING IMAGES IN SAVE FOLDER, NOT WRITING MAP DATA!");
-    ROS_ERROR("=======================================================================");
-    return;
+	  // Erase existing images in folder
+	  std::string execString = "exec rm -r " + folder + "/*.jpg"; 
+	  int nRet = std::system(execString.c_str());
+	  
+	  if(nRet < 0)
+	  {
+		ROS_ERROR("=======================================================================");
+		ROS_ERROR(" COULD NOT ERASE EXISTING IMAGES IN SAVE FOLDER, NOT WRITING MAP DATA!");
+		ROS_ERROR("=======================================================================");
+		return;
+	  }
   }
   
   // Count the number of good MKFs, MapPoints, and Measurements
@@ -306,7 +309,6 @@ void Map::SaveToFolder(std::string folder, std::string postfix)
   }
   
   
-
   // Don't need to erase existing map.dat file, since it will be overwritten
   std::string mapFile = folder + "/map.dat";
   
@@ -359,7 +361,7 @@ void Map::SaveToFolder(std::string folder, std::string postfix)
       std::stringstream ss;
       std::ofstream imageStream;
       
-      if(kf.maLevels[0].image.totalsize() > 0)
+      if(!bKeepExistingImages && kf.maLevels[0].image.totalsize() > 0)
       {
         ss<<folder<<"/mkf"<<mkf.mnID<<"_"<<camName<<postfix<<"_image.jpg";
         imageStream.open(ss.str().c_str());

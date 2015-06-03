@@ -169,7 +169,8 @@ void SystemFrontendBase::PublishPose()
   pose_cov_msg.header.frame_id = "vision_world";
   
   SE3<> pose = mpTracker->GetCurrentPose().inverse();
-  Matrix<3> rot = pose.get_rotation().get_matrix();
+  //Matrix<3> rot = pose.get_rotation().get_matrix();
+  /*
   TooN::Matrix<6> cov = mpTracker->GetCurrentCovariance();
   
   // clear cross correlation
@@ -179,15 +180,20 @@ void SystemFrontendBase::PublishPose()
   // Change covariance matrix frame from camera to world
   cov.slice<0,0,3,3>() = rot * cov.slice<0,0,3,3>() * rot.T();
   cov.slice<3,3,3,3>() = rot * cov.slice<3,3,3,3>() * rot.T();
+  */
+  
+  TooN::Matrix<6> cov = TooN::Identity;
+  cov.slice<0,0,3,3>() *= mpTracker->GetCurrentSceneDepth() * 0.01;
+  cov.slice<3,3,3,3>() *= 0.001;
   
   // Some hacky heuristics here
   if(mpTracker->GetTrackingQuality() == Tracker::GOOD)
   {
-    cov = cov *1e2;
+    cov = cov *1;
   }
   else if(mpTracker->GetTrackingQuality() == Tracker::DODGY)
   {
-    cov = cov *1e5;
+    cov = cov *1e3;
   }
   else if(mpTracker->GetTrackingQuality() == Tracker::BAD)
   {

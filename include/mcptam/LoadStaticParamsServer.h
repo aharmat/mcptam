@@ -73,8 +73,9 @@ void LoadStaticParamsServer()
   nh_priv.getParam("mm_init_point_mode", MapMakerServerBase::ssInitPointMode);  // options: "stereo", "idp", "both"
   nh_priv.getParam("mm_init_cov_thresh", MapMakerServerBase::sdInitCovThresh);
   nh_priv.getParam("mm_large_point_test", MapMakerServerBase::sbLargePointTest);
+  nh_priv.getParam("mm_only_first_cam", MapMakerServerBase::sbOnlyFirstCameraGeneratesPoints);
   
-  nh_priv.getParam("level_zero_points", SystemBase::sbLevelZeroPoints);
+  //nh_priv.getParam("level_zero_points", SystemBase::sbLevelZeroPoints);
 }
 
 

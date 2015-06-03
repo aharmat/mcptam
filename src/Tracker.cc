@@ -1645,7 +1645,7 @@ void Tracker::AssessOverallTrackingQuality()
 {
   TrackingQuality overall_quality = BAD;
   
-  if(mdLastSigmaSquared < 4000)
+  if(mdLastSigmaSquared < 5000)
   {
     for(unsigned i=0; i < mvAllCamNames.size(); ++i)
     {

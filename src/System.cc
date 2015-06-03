@@ -121,15 +121,18 @@ System::System()
     GUI.ParseLine("DrawOnlyLevel=0");
     GUI.ParseLine("DrawLevel=0");
     GUI.ParseLine("GlareMasking=0");
-    GUI.ParseLine("LevelZeroPoints=0");
+    GUI.ParseLine("LevelZeroPoints=1");
     GUI.ParseLine("AddingMKFs=1");
     GUI.ParseLine("UpdatingPoints=1");
     GUI.ParseLine("CrossCamera=1");
     GUI.ParseLine("DrawReloc=0");
     GUI.ParseLine("RelocFabMap=0");
     
+    bool bLevelZeroPoints;
+    mNodeHandlePriv.param<bool>("level_zero_points", bLevelZeroPoints, true);
+    
     static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN|SILENT);
-    *gvnLevelZeroPoints = SystemBase::sbLevelZeroPoints;
+    *gvnLevelZeroPoints = bLevelZeroPoints;
     
     static gvar3<int> gvnAddingMKFs("AddingMKFs", 1, HIDDEN|SILENT);
     static gvar3<int> gvnUpdatingPoints("UpdatingPoints", 1, HIDDEN|SILENT);
