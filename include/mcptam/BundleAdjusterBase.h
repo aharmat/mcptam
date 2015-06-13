@@ -95,6 +95,8 @@ public:
   double GetMeanChiSquared(){ return mdMeanChiSquared; }
   /// The sigma squared value of the robust kernel
   double GetSigmaSquared(){ return mdSigmaSquared; }
+  /// The total number of iterations performed
+  int GetTotalIterations(){ return mnTotalIterations; }
   /// Tell the adjuster whether to use Tukey test on measurements
   void UseTukey(bool bUse){ mbUseTukey = bUse; }
   /// Tell the adjuster whether to do a couple of iterations, update the map, then continue or run to convergence first
@@ -152,6 +154,8 @@ protected:
   bool mbUseTwoStep;              ///< Stop optimization early to initialize new points quickly, then continue
   bool mbUseRobust;               ///< Use robustification on measurements
   
+  int mnTotalIterations;          ///< Total number of iterations performed during the last run (not just accepted iterations)
+
   TaylorCameraMap mmCameraModels;  ///< The camera models
   
   std::map<MapPoint*, int> mmPoint_BundleID;      ///< %Map FROM MapPoint* TO point id

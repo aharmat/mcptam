@@ -946,6 +946,28 @@ class UpdateHelpersAction : public g2o::HyperGraphAction
     HelperMap& _mHelpers;  ///< Reference to the helper map
 };
 
+class UpdateTotalIterationsAction : public g2o::HyperGraphAction
+{
+  public:
+  
+    UpdateTotalIterationsAction(g2o::OptimizationAlgorithmLevenberg* pAlgorithm, int* pTotalIterations)
+    : _pAlgorithm(pAlgorithm)
+    , _pTotalIterations(pTotalIterations)
+    { }
+    
+    virtual HyperGraphAction* operator()(const g2o::HyperGraph* graph, Parameters* parameters = 0)
+    {
+      *_pTotalIterations += _pAlgorithm->levenbergIteration();
+      
+      return this;
+    }
+     
+  protected:
+  
+    g2o::OptimizationAlgorithmLevenberg* _pAlgorithm;
+    int* _pTotalIterations;
+};
+
 
 /** @brief Checks to see if optimization converged by comparing the RMS value of the last update vector to a given threshold.
  * 
@@ -1151,6 +1173,9 @@ ChainBundle::ChainBundle(TaylorCameraMap& cameraModels, bool bUseRobust, bool bU
   mpConvergedResidualAction = new CheckConvergedResidualAction(ChainBundle::sdUpdatePercentConvergenceLimit);
   mpOptimizer->addPostIterationAction(mpConvergedResidualAction);
   
+  mpUpdateTotalIterationsAction = new UpdateTotalIterationsAction(pAlgorithm, &mnTotalIterations);
+  mpOptimizer->addPostIterationAction(mpUpdateTotalIterationsAction);
+  
   mdLastMaxCov = std::numeric_limits<double>::max();
   mbConverged = false;
 }
@@ -1298,11 +1323,17 @@ int ChainBundle::Compute(bool *pAbortSignal, int nNumIter, double dUserLambda)
   }
   
   ros::WallTime start = ros::WallTime::now();
+  mnTotalIterations = 0;
   int nCounter = mpOptimizer->optimize(nNumIter);
   ROS_INFO_STREAM("Optimization took "<<ros::WallTime::now() - start<<" seconds, nCounter: "<<nCounter);
   ROS_DEBUG_STREAM("Done ComputeStep, "<<nCounter<<" iterations accepted out of a max of "<<nNumIter);
   
   mbHitMaxIterations = (nCounter == nNumIter);
+  
+  if(nCounter > 0)
+  {
+    ROS_ASSERT(mnTotalIterations > 0);
+  }
   
   // Mostly for debugging, display the final error
   {
@@ -1370,6 +1401,7 @@ int ChainBundle::Compute(bool *pAbortSignal, int nNumIter, double dUserLambda)
   // Now we're goint to get the max covariance of the point depths
   // Gather the point vertices
   g2o::OptimizableGraph::VertexContainer vPointVertices;
+  int nNumPoses = 0;
   for(g2o::OptimizableGraph::VertexContainer::const_iterator vertex_it = mpOptimizer->activeVertices().begin(); vertex_it != mpOptimizer->activeVertices().end(); vertex_it++)
   {
     if((*vertex_it)->fixed())
@@ -1378,11 +1410,13 @@ int ChainBundle::Compute(bool *pAbortSignal, int nNumIter, double dUserLambda)
     int dim = (*vertex_it)->dimension();
     if(dim == 3)
       vPointVertices.push_back(*vertex_it);
+    else
+      nNumPoses++;
   }
   
   SparseBlockMatrix<MatrixXd> spinv;  // This will hold the covariance matrices
   
-  if(mpOptimizer->computeMarginals(spinv, vPointVertices))
+  if(nNumPoses < 3 && mpOptimizer->computeMarginals(spinv, vPointVertices))
   {
     ROS_INFO("computeMarginals() success!");
     std::vector<double> vCov22;
@@ -1410,7 +1444,7 @@ int ChainBundle::Compute(bool *pAbortSignal, int nNumIter, double dUserLambda)
   else
   {
     ROS_WARN("computeMarginals() failed!");
-    mdLastMaxCov = std::numeric_limits<double>::max();
+    mdLastMaxCov = 0; //std::numeric_limits<double>::max();
   }
     
   return nCounter;

@@ -85,7 +85,7 @@ class UpdateHelpersAction;
 class PoseChainHelper;
 class RobustKernelAdaptive;
 class RobustKernelData;
-
+class UpdateTotalIterationsAction;
 
 typedef std::map<std::vector<int>, PoseChainHelper*> HelperMap;
 
@@ -147,6 +147,8 @@ public:
   /// Has bundle adjustment converged?
   inline bool Converged() { return mbConverged;} 
   
+  inline int TotalIterations(){ return mnTotalIterations; }
+  
   /// Get point position after adjustment
   /** @param n The index of the point
    *  @return The position of the point (in the parent camera frame!) */
@@ -193,6 +195,7 @@ protected:
   CheckConvergedUpdateMagAction* mpConvergedUpdateMagAction; ///< Check if optimizer converged based on magnitude of the update vector
   CheckConvergedResidualAction* mpConvergedResidualAction;   ///< Check if optimizer converged based on change in residual error
   UpdateHelpersAction* mpUpdateHelpersAction;                ///< Update the pose chain helper transforms
+  UpdateTotalIterationsAction* mpUpdateTotalIterationsAction;
   
   std::vector<std::tuple<int,int,std::string> > mvOutlierMeasurementIdx;  ///< Holds outlier measurements, encoded as described in GetOutlierMeasurements()
   
@@ -210,6 +213,8 @@ protected:
   bool mbUseRobust; ///< Use robustification of errors?
   bool mbUseTukey;  ///< Use the Tukey test for outliers
   bool mbVerbose;   ///< Print lots of stuff?
+  
+  int mnTotalIterations;
   
 };
 

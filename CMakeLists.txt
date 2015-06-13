@@ -17,10 +17,13 @@ find_package(CVD REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(GLUT REQUIRED)
+#SET (G2O_ROOT "/home/aharmat/Sources/g2o")
 find_package(G2O REQUIRED)
 find_package(GVars3 REQUIRED)
 find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
+
+message(STATUS "G2O_CORE_LIBRARY=${G2O_CORE_LIBRARY}")
 
 include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${SUITESPARSE_INCLUDE_DIRS} ${CVD_INCLUDE_DIR} 
                     ${GVars3_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS})

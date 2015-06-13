@@ -198,14 +198,16 @@ void MapMaker::run()
       timingMsg.map_num_mkfs = mMap.mlpMultiKeyFrames.size();
       timingMsg.map_num_points = mMap.mlpPoints.size();
       
-      ros::Time start = ros::Time::now();
+      ros::WallTime start = ros::WallTime::now();
       
       int nAccepted = mBundleAdjuster.BundleAdjustRecent(vOutliers);
       //mdMaxCov = mBundleAdjuster.GetMaxCov();
       
-      ros::Time nowTime = ros::Time::now();
-      timingMsg.elapsed = (nowTime - start).toSec();
-      timingMsg.header.stamp = nowTime;
+      timingMsg.elapsed = (ros::WallTime::now()- start).toSec();
+      timingMsg.header.stamp = ros::Time::now();
+      timingMsg.accepted = nAccepted;
+      timingMsg.total = mBundleAdjuster.GetTotalIterations();
+      mLocalTimingPub.publish(timingMsg);
       
       ROS_DEBUG_STREAM("Accepted iterations: "<<nAccepted);
       ROS_DEBUG_STREAM("Number of outliers: "<<vOutliers.size());
@@ -225,9 +227,6 @@ void MapMaker::run()
         mnNumConsecutiveFailedBA = 0;
         HandleOutliers(vOutliers);
         PublishMapVisualization();
-        
-        timingMsg.elapsed /= nAccepted;
-        mLocalTimingPub.publish(timingMsg);
       }
     }
     
@@ -255,13 +254,15 @@ void MapMaker::run()
       timingMsg.map_num_mkfs = mMap.mlpMultiKeyFrames.size();
       timingMsg.map_num_points = mMap.mlpPoints.size();
       
-      ros::Time start = ros::Time::now();
+      ros::WallTime start = ros::WallTime::now();
       
       int nAccepted = mBundleAdjuster.BundleAdjustAll(vOutliers);
       
-      ros::Time nowTime = ros::Time::now();
-      timingMsg.elapsed = (nowTime - start).toSec();
-      timingMsg.header.stamp = nowTime;
+      timingMsg.elapsed = (ros::WallTime::now() - start).toSec();
+      timingMsg.header.stamp = ros::Time::now();
+      timingMsg.accepted = nAccepted;
+      timingMsg.total = mBundleAdjuster.GetTotalIterations();
+      mGlobalTimingPub.publish(timingMsg);
       
       mdMaxCov = mBundleAdjuster.GetMaxCov();
       
@@ -283,9 +284,6 @@ void MapMaker::run()
         mnNumConsecutiveFailedBA = 0;
         HandleOutliers(vOutliers);
         PublishMapVisualization();
-        
-        timingMsg.elapsed /= nAccepted;
-        mGlobalTimingPub.publish(timingMsg);
         
         if(mState == MM_INITIALIZING && (mdMaxCov < MapMakerServerBase::sdInitCovThresh || mbStopInit)) 
         {
@@ -437,7 +435,7 @@ void MapMaker::AddMultiKeyFrameFromTopOfQueue()
   timingMsg.map_num_mkfs = mMap.mlpMultiKeyFrames.size();
   timingMsg.map_num_points = mMap.mlpPoints.size();
   
-  ros::Time start = ros::Time::now();
+  ros::WallTime start = ros::WallTime::now();
   
   if(mState == MM_RUNNING)
   {
@@ -465,9 +463,8 @@ void MapMaker::AddMultiKeyFrameFromTopOfQueue()
     mMap.MoveDeletedMultiKeyFramesToTrash();
   }
   
-  ros::Time nowTime = ros::Time::now();
-  timingMsg.elapsed = (nowTime - start).toSec();
-  timingMsg.header.stamp = nowTime;
+  timingMsg.elapsed = (ros::WallTime::now() - start).toSec();
+  timingMsg.header.stamp = ros::Time::now();
   mCreationTimingPub.publish(timingMsg);
   
   lock.lock();

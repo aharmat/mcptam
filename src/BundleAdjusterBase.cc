@@ -64,9 +64,14 @@ void BundleAdjusterBase::Reset()
   mbBundleAbortRequested = false;
   
   mdMaxCov = std::numeric_limits<double>::max();
+  mdSigmaSquared = std::numeric_limits<double>::max(); 
+  mdMeanChiSquared = std::numeric_limits<double>::max();
+  
   mbUseTukey = false;
   mbUseTwoStep = false;
   mbUseRobust = true;
+  
+  mnTotalIterations = -1;
 }
 
 // Get a certain number of neighbors of a given MultiKeyFrame

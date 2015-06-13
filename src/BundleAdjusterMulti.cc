@@ -205,21 +205,27 @@ int BundleAdjusterMulti::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std:
   // Do only a couple of iterations to the get map approximately right, this way new points can be used
   // by the tracker sooner than if we waited for a lengthy adjustment
   int nAccepted = 0;
+  mnTotalIterations = 0;
   
   if(mbUseTwoStep)
   {
     nAccepted = AdjustAndUpdate(multiBundle, spAdjustSet, spMapPoints, 10);
+    mnTotalIterations = multiBundle.TotalIterations();
   
     if(nAccepted < 0)
       return nAccepted;
     
     if(!multiBundle.Converged())  // Do more iterations
-      nAccepted = AdjustAndUpdate(multiBundle, spAdjustSet, spMapPoints);
+    {
+      nAccepted += AdjustAndUpdate(multiBundle, spAdjustSet, spMapPoints);
+      mnTotalIterations += multiBundle.TotalIterations();
+    }
   }
   else
   {
     // Run the bundle adjuster. This returns the number of successful iterations
     nAccepted = AdjustAndUpdate(multiBundle, spAdjustSet, spMapPoints);
+    mnTotalIterations = multiBundle.TotalIterations();
   }
   
   if(nAccepted < 0)
