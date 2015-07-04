@@ -372,10 +372,8 @@ void MapMakerBase::PublishMapPoints()
   
 #if ROS_VERSION_MINIMUM(1, 9, 56)   // Hydro or above, uses new PCL library
   pcl_conversions::toPCL(ros::Time::now(), pointMsg->header.stamp);
-
 #else
   pointMsg->header.stamp = ros::Time::now();
-
 #endif
   
   for(MapPointPtrList::iterator point_it = mMap.mlpPoints.begin(); point_it != mMap.mlpPoints.end(); ++point_it)
@@ -397,10 +395,8 @@ void MapMakerBase::PublishMapPoints()
      
     pointMsg->points.push_back(pclPoint);
   }
-  ROS_INFO_STREAM("MapMakerBase: publishing.");
-  
+ 
   mMapPointsPub.publish(pointMsg);
-  ROS_INFO_STREAM("MapMakerBase: done publishing.");
 }
 
 // Publish MKFs as a marker array
@@ -470,8 +466,6 @@ void MapMakerBase::MKFToMarker(MultiKeyFrame& mkf, visualization_msgs::Marker& m
 // Publish the map points, then the MKFs
 void MapMakerBase::PublishMapVisualization()
 {
-  ROS_INFO_STREAM("MapMakerBase: PublishMapVisualization starting.");
- 	
   ROS_DEBUG(" >>>>>>>>>>>>>>>> PUBLISHING MAP VISUALIZATION <<<<<<<<<<<<<<<<<<<<<<<");
   PublishMapPoints();
   PublishMapMKFs();
