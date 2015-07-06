@@ -48,6 +48,7 @@
 #include <ros/common.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include <fstream>
 
 MapMakerBase::MapMakerBase(Map& map, bool bAdvertise)
@@ -370,7 +371,7 @@ void MapMakerBase::PublishMapPoints()
   pointMsg->is_dense = false;
   
 #if ROS_VERSION_MINIMUM(1, 9, 56)   // Hydro or above, uses new PCL library
-  pointMsg->header.stamp = ros::Time::now().toNSec();
+  pcl_conversions::toPCL(ros::Time::now(), pointMsg->header.stamp);
 #else
   pointMsg->header.stamp = ros::Time::now();
 #endif
@@ -394,7 +395,7 @@ void MapMakerBase::PublishMapPoints()
      
     pointMsg->points.push_back(pclPoint);
   }
-  
+ 
   mMapPointsPub.publish(pointMsg);
 }
 
