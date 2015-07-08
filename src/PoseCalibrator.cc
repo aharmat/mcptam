@@ -163,7 +163,7 @@ PoseCalibrator::PoseCalibrator()
   for(TaylorCameraMap::iterator it = mmCameraModels.begin(); it != mmCameraModels.end(); it++)
   {
     std::string camName = it->first;
-    mmTrackers[camName] = new TrackerCalib(*mpMap, *mpMapMaker, mmCameraModels, camName, mmDrawOffsets[camName], mirPatternSize, mdSquareSize, mpGLWindow);
+    mmTrackers[camName] = new TrackerCalib(*mpMap, *mpRelocFabMap, *mpMapMaker, mmCameraModels, camName, mmDrawOffsets[camName], mirPatternSize, mdSquareSize, mpGLWindow);
     mmTrackers[camName]->SetMasks(mmMasksLive);
   }
   

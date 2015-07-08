@@ -77,7 +77,7 @@ public:
      *  @param irPatternSize Size of the checkerboard pattern we are looking for
      *  @param dSquareSize The real world edge length of a checkerboard square
      *  @param pWindow Pointer to the OpenGL window*/
-  TrackerCalib(Map &map, MapMakerClientBase &mapMaker, TaylorCameraMap cameras, std::string cameraName, CVD::ImageRef irOffset, CVD::ImageRef irPatternSize, double dSquareSize, GLWindow2* pWindow);
+  TrackerCalib(Map &map, RelocaliserFabMap &reloc, MapMakerClientBase &mapMaker, TaylorCameraMap cameras, std::string cameraName, CVD::ImageRef irOffset, CVD::ImageRef irPatternSize, double dSquareSize, GLWindow2* pWindow);
   
   /** @brief The main working part of TrackerCalib, call this every frame
    *  @param imFrame An image containing the latest acquisition from the camera we've been assigned

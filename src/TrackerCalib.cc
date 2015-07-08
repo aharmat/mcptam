@@ -64,9 +64,9 @@
 using namespace TooN;
 using namespace GVars3;
 
-TrackerCalib::TrackerCalib(Map &map, MapMakerClientBase& mapMaker, TaylorCameraMap cameras, std::string cameraName, CVD::ImageRef irOffset, CVD::ImageRef irPatternSize, double dSquareSize, GLWindow2* pWindow)
+TrackerCalib::TrackerCalib(Map &map, RelocaliserFabMap &reloc, MapMakerClientBase& mapMaker, TaylorCameraMap cameras, std::string cameraName, CVD::ImageRef irOffset, CVD::ImageRef irPatternSize, double dSquareSize, GLWindow2* pWindow)
     // Tracker wants pose and draw offset maps, but we only have one camera so those don't really make sense. Generate some default values for it.
-  : Tracker(map, mapMaker, cameras, GetInitPoseMap(cameraName), GetInitOffsetMap(cameraName, irOffset), pWindow)
+  : Tracker(map, reloc, mapMaker, cameras, GetInitPoseMap(cameraName), GetInitOffsetMap(cameraName, irOffset), pWindow)
   , mirPatternSize(irPatternSize)
   , mdSquareSize(dSquareSize)
   , mCamName(cameraName)
