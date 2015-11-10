@@ -249,28 +249,28 @@ void CameraGroupSubscriber::ImageCallback(const sensor_msgs::ImageConstPtr& msg1
   try
   {
     if(mNumCams > 0)
-      mmLastImages[mvCameraNames[0]] = cv_bridge::toCvShare(msg1);
+      mmLastImages[mvCameraNames[0]] = cv_bridge::toCvShare(msg1,sensor_msgs::image_encodings::MONO8);
    
     if(mNumCams > 1)
-      mmLastImages[mvCameraNames[1]] = cv_bridge::toCvShare(msg2);
+      mmLastImages[mvCameraNames[1]] = cv_bridge::toCvShare(msg2,sensor_msgs::image_encodings::MONO8);
       
     if(mNumCams > 2)
-      mmLastImages[mvCameraNames[2]] = cv_bridge::toCvShare(msg3);
+      mmLastImages[mvCameraNames[2]] = cv_bridge::toCvShare(msg3,sensor_msgs::image_encodings::MONO8);
       
     if(mNumCams > 3)
-      mmLastImages[mvCameraNames[3]] = cv_bridge::toCvShare(msg4);
+      mmLastImages[mvCameraNames[3]] = cv_bridge::toCvShare(msg4,sensor_msgs::image_encodings::MONO8);
       
     if(mNumCams > 4)
-      mmLastImages[mvCameraNames[4]] = cv_bridge::toCvShare(msg5);
+      mmLastImages[mvCameraNames[4]] = cv_bridge::toCvShare(msg5,sensor_msgs::image_encodings::MONO8);
       
     if(mNumCams > 5)
-      mmLastImages[mvCameraNames[5]] = cv_bridge::toCvShare(msg6);
+      mmLastImages[mvCameraNames[5]] = cv_bridge::toCvShare(msg6,sensor_msgs::image_encodings::MONO8);
       
     if(mNumCams > 6)
-      mmLastImages[mvCameraNames[6]] = cv_bridge::toCvShare(msg7);
+      mmLastImages[mvCameraNames[6]] = cv_bridge::toCvShare(msg7,sensor_msgs::image_encodings::MONO8);
       
     if(mNumCams > 7)
-      mmLastImages[mvCameraNames[7]] = cv_bridge::toCvShare(msg8);
+      mmLastImages[mvCameraNames[7]] = cv_bridge::toCvShare(msg8,sensor_msgs::image_encodings::MONO8);
   }
   catch (cv_bridge::Exception& e)
   {

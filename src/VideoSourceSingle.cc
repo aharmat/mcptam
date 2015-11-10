@@ -125,7 +125,7 @@ void VideoSourceSingle::ImageCallback(const sensor_msgs::ImageConstPtr& imageMsg
   try
   {
     // Try a conversion
-    mCVPtr = cv_bridge::toCvShare(imageMsg);
+    mCVPtr = cv_bridge::toCvShare(imageMsg,sensor_msgs::image_encodings::MONO8);
   }
   catch (cv_bridge::Exception& e)
   {
