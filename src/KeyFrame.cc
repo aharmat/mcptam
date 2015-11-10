@@ -64,11 +64,48 @@ using namespace TooN;
 double KeyFrame::sdCandidateThresh = 70;
 double KeyFrame::sdDistanceMeanDiffFraction = 0.5;
 //double KeyFrame::saThreshDerivs[LEVELS]  = {-600, -200, -50, -12};
-double KeyFrame::sdCandidateTopFraction= 0.8;
-std::string KeyFrame::ssCandidateType = "fast";
+double KeyFrame::sdCandidateTopFraction= 0.7;
+std::string KeyFrame::ssCandidateType = "shi";
 std::string KeyFrame::ssCandidateCriterion = "percent";
-bool KeyFrame::sbAdaptiveThresh = true;
+bool KeyFrame::sbAdaptiveThresh = false;
 int Level::snNumPrev = 2;
+
+
+LevelBinArray::LevelBinArray(int x, int y)
+{
+	nx = x;
+	ny = y;
+	
+	for( int i=0; i<nx; i++)
+	{
+		for(int j=0; j<ny; j++)
+		{
+		
+				BinInfo b;
+				b.maxScore = 0;
+				b.isInit = false;
+				bins.push_back(b);
+		}
+	}
+}
+
+int LevelBinArray::pointToIndex(double px, double py)
+{
+	    //std::cout<<pix_x<<","<<pix_y<<std::endl;
+		double xres = pix_x / nx;
+		double yres = pix_y / ny;
+		int bindx = floor((px) / xres) ;
+        int bindy = floor((py) / yres) ;
+
+         if(bindx < 0 || bindx >=nx || bindy<0 || bindy>ny) //invalid bin
+         {
+            return -1;
+         }
+         else
+         {
+            return bindx+ny*bindy; //linear index of bin
+         }
+}
 
 KeyFrame::KeyFrame(MultiKeyFrame* pMKF, std::string name)
   : mCamName(name)
@@ -78,21 +115,61 @@ KeyFrame::KeyFrame(MultiKeyFrame* pMKF, std::string name)
   mbActive = false;
   mdSceneDepthMean = MAX_DEPTH;
   mdSceneDepthSigma = MAX_SIGMA;
+  
+  //init the bin information
+  
+  for(int i=0; i<LEVELS; i++)
+  {
+		if(i==0) //fine level
+		{
+			LevelBinArray l(5*4,4*4);
+			mBins.push_back(l);
+						
+		}
+		else if(i==1) //next level
+		{
+			LevelBinArray l(4*4,3*4);
+			mBins.push_back(l);
+		}
+		else if(i==2) //next level
+		{
+			LevelBinArray l(3*4,2*4);
+			mBins.push_back(l);
+		}
+		else if(i==3) //next level
+		{
+			LevelBinArray l(2*4,2*4);
+			mBins.push_back(l);
+		}
+		else
+		{
+			ROS_ERROR("Using more then 4 levels");
+		}
+  }
 }
 
 void KeyFrame::AddMeasurement(MapPoint* pPoint, Measurement* pMeas)
 {
-  ROS_ASSERT(!mmpMeasurements.count(pPoint));
+  if(mmpMeasurements.count(pPoint)) //safety: we've already added the measurements, don't add again!
+	return;
+  
   
   boost::mutex::scoped_lock lock(mMeasMutex);
   
   mmpMeasurements[pPoint] = pMeas;
-  pPoint->mMMData.spMeasurementKFs.insert(this);
+ 
+ if(!(mpParent->isBufferMKF)) //This keyframe is NOT part of a buffer, add measurements to global points
+ {
+ 	pPoint->mMMData.spMeasurementKFs.insert(this);
+ }
+ 
 }
 
 // Erase all measurements
 void KeyFrame::ClearMeasurements()
 {
+	
+  //std::cout<<"locking mutex" << std::endl;	
   boost::mutex::scoped_lock lock(mMeasMutex);
   
   for(MeasPtrMap::iterator it = mmpMeasurements.begin(); it != mmpMeasurements.end(); ++it)
@@ -101,6 +178,8 @@ void KeyFrame::ClearMeasurements()
   }
   
   mmpMeasurements.clear();
+		  
+   //std::cout<<"done clearing" <<std::endl;	
 }
 
 KeyFrame::~KeyFrame()
@@ -178,6 +257,7 @@ std::tuple<double,double,double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::byt
   {
     Level &lev = maLevels[i];
     
+        
     if(i!=0)
     {  
       if(bPushBack)
@@ -188,6 +268,12 @@ std::tuple<double,double,double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::byt
       // .. make a half-size image from the previous level..
       lev.image.resize(maLevels[i-1].image.size() / 2);
       CVD::halfSample(maLevels[i-1].image, lev.image);
+      
+      //test: print out the size of the image
+      
+      
+      
+      //std::cout<<"imsize: "<< lev.image.size()<<std::endl;
       
       dDownsampleTime += (ros::WallTime::now()-startTime).toSec();
     }
@@ -203,8 +289,16 @@ std::tuple<double,double,double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::byt
     lev.vScoresAndMaxCorners.clear();
     lev.vFastFrequency = TooN::Zeros;
     lev.nFastThresh = 0;
-    
+        
     startTime = ros::WallTime::now();
+    
+    for(int b_itr = 0; b_itr<mBins[i].bins.size(); b_itr++)
+    {
+		mBins[i].bins[b_itr].maxScore = 0;
+		mBins[i].bins[b_itr].isInit = false;
+	}
+    
+    
     
     // Use some OpenCV images because they provide an easy way to do dilation, threshold, and bitwise AND
     // We'll just use OpenCV Mat headers to wrap the underlying CVD Image data, so there's very little computational effort involved
@@ -321,24 +415,83 @@ std::tuple<double,double,double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::byt
     
       if(i == 0)
       {
-        fast_corner_detect_10(lev.image, lev.vCorners, 10);
-        lev.nFastThresh = 10;
+		/*//CVD::SubImage<CVD::byte> subimg = lev.image.sub_image(CVD::ImageRef(0,400), CVD::ImageRef(900,200));
+		//CVD::BasicImage<CVD::byte> bsubimg(subimg.data());
+		//subimg = 
+        //fast_corner_detect_9(&subimg, lev.vCorners, 40);
+        //fast_corner_detect_9(subimg, lev.vCorners, 40);
+        CVD::Image<CVD::byte> &im = lev.image;
+        cv::Mat temp_img(im.size().y, im.size().x, CV_8U, im.data(), im.row_stride());
+		cv::Rect ROI = cv::Rect(0, 400, 900, 200);
+		cv::Mat roiImg(temp_img,ROI);
+        CVD::BasicImage<CVD::byte> cvd_level_image(roiImg.ptr(), CVD::ImageRef(roiImg.cols, roiImg.rows));*/
+        
+        fast_corner_detect_9(lev.image, lev.vCorners, 20);
+        lev.nFastThresh = 20;
+        
+        //std::cout<<lev.vCorners.size()<<std::endl;
+        
+      /*  for( std::vector<CVD::ImageRef>::iterator p_it = lev.vCorners.begin(); p_it!=lev.vCorners.end(); )
+        {
+			
+				if( p_it->y<400) //throw away if outside ROI
+				{
+					lev.vCorners.erase(p_it);
+				}
+				else
+				{
+					p_it++;
+				}
+		}*/
       }
       if(i == 1)
       {
-        fast_corner_detect_10(lev.image, lev.vCorners, 15);
-        lev.nFastThresh = 15;
+        fast_corner_detect_9(lev.image, lev.vCorners, 20);
+        lev.nFastThresh = 20;
+        
+        /*for( std::vector<CVD::ImageRef>::iterator p_it = lev.vCorners.begin(); p_it!=lev.vCorners.end(); )
+        {
+			
+				if( p_it->y<400) //throw away if outside ROI
+				{
+					lev.vCorners.erase(p_it);
+				}
+				else
+				{
+					p_it++;
+				}
+		}*/
+        
       }
       if(i == 2)
       {
-        fast_corner_detect_10(lev.image, lev.vCorners, 15);
+        fast_corner_detect_9(lev.image, lev.vCorners, 15);
         lev.nFastThresh = 15;
       }
       if(i == 3)
       {
-        fast_corner_detect_10(lev.image, lev.vCorners, 10);
+        fast_corner_detect_9(lev.image, lev.vCorners, 10);
         lev.nFastThresh = 10;
       }
+      
+        //do nonmax suppression
+  
+	  std::vector<CVD::ImageRef> vMaxCornersTemp;
+      CVD::fast_nonmax(lev.image, lev.vCorners, lev.nFastThresh, vMaxCornersTemp);
+          
+      std::vector<int> vMaxScoresTemp;
+      CVD::fast_corner_score_10(lev.image, vMaxCornersTemp, lev.nFastThresh, vMaxScoresTemp);  
+      
+      ROS_ASSERT(vMaxScoresTemp.size() == vMaxCornersTemp.size());
+      
+      for(unsigned i=0; i < vMaxCornersTemp.size(); ++i)
+      {
+        if(!lev.image.in_image_with_border(vMaxCornersTemp[i], 10))
+          continue;
+          
+        lev.vScoresAndMaxCorners.push_back(std::make_pair(vMaxScoresTemp[i], vMaxCornersTemp[i]));
+      }
+      
     }
     
     dFeatureTime += (ros::WallTime::now()-startTime).toSec();
@@ -355,7 +508,40 @@ std::tuple<double,double,double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::byt
     }
     
     ROS_DEBUG_STREAM("MakeKeyFrame_Lite: level: "<<i<<" image prev size: "<<lev.imagePrev.size());
+    
+    //fill in the image size for the bins
+    mBins[i].pix_x = lev.image.size().x;
+    mBins[i].pix_y = lev.image.size().y;
+    
+    
+    //now we watnt to interate through the vmax scores and assign them to a bin
+    
+    
+	for(unsigned int j=0; j<lev.vScoresAndMaxCorners.size(); ++j) 
+	{
+	  double cScore = lev.vScoresAndMaxCorners[j].first;
+	  double px = lev.vScoresAndMaxCorners[j].second.x;
+	  double py = lev.vScoresAndMaxCorners[j].second.y;
+	  
+	  int lidx = mBins[i].pointToIndex(px,py); //get linear index;
+	  //std::cout<<"level: " <<k<<" index: " <<lidx <<std::endl;
+	  double bestBinScore = mBins[i].bins[lidx].maxScore;
+	  
+	  if(cScore>bestBinScore) //we have a new winner for that bin
+	  {
+		  mBins[i].bins[lidx].maxScore = cScore;
+		  mBins[i].bins[lidx].maxPos.x = (int)px;
+		  mBins[i].bins[lidx].maxPos.y = (int)py;
+		  mBins[i].bins[lidx].isInit = true;
+	  }
+	  
+	}
+	
+	        
+    
   }
+  
+
   
   return std::make_tuple(dDownsampleTime, dMaskTime, dFeatureTime);
 }
@@ -392,6 +578,50 @@ void KeyFrame::MakeKeyFrame_Rest()
       std::vector<CVD::ImageRef> vMaxCornersTemp;
       CVD::fast_nonmax(lev.image, lev.vCorners, lev.nFastThresh, vMaxCornersTemp);
       
+      /*if(l==0)
+      {
+		  
+		   CVD::Image<CVD::byte> &im = lev.image;
+		   cv::Mat temp_img(im.size().y, im.size().x, CV_8U, im.data(), im.row_stride());
+                        
+			//Perform hough transform to find the horizon
+			std::vector<cv::Vec2f> lines;
+			cv::HoughLines(temp_img, lines, 100, CV_PI/2, 1000, 0, 0 );	//parameters recommended by Devinder
+	
+			cv::Point pt1, pt2;
+
+			//find the first non-vertical line thorugh a point
+			for( size_t i = 0; i < lines.size(); i++ )
+			{
+			   float rho = lines[i][0], theta = lines[i][1];
+			   if (theta == 0){
+				continue;
+			   }
+			   double a = cos(theta), b = sin(theta);
+			   double x0 = a*rho, y0 = b*rho;
+			   pt1.x = cvRound(x0 + 1000*(-b));
+			   pt1.y = cvRound(y0 + 1000*(a));
+			   pt2.x = cvRound(x0 - 1000*(-b));
+			   pt2.y = cvRound(y0 - 1000*(a));
+			   break;
+			}
+		  
+		  for( std::vector<CVD::ImageRef>::iterator p_it = vMaxCornersTemp.begin(); p_it!=vMaxCornersTemp.end(); )
+			{
+				
+					if( p_it->y < (pt1.y+ 150)) //throw away if outside ROI
+					{
+						vMaxCornersTemp.erase(p_it);
+					}
+					else
+					{
+						p_it++;
+					}
+			}
+	  }*/
+      
+      
+      //vMaxCornersTemp = lev.vCorners; 
       std::vector<int> vMaxScoresTemp;
       CVD::fast_corner_score_10(lev.image, vMaxCornersTemp, lev.nFastThresh, vMaxScoresTemp);  
       
@@ -777,6 +1007,73 @@ void KeyFrame::EraseBackLinksFromPoints()
   
 }
 
+KeyFrame* KeyFrame::CopyKeyFramePartial(MultiKeyFrame* sourceMKF, std::string name)
+{
+	KeyFrame* returnKF = new KeyFrame(sourceMKF, name); //construct a new keyframe
+	//copy stuff over
+	returnKF->sdDistanceMeanDiffFraction=sdDistanceMeanDiffFraction;  ///< fraction of distance between mean scene depth points that is used in overall distance computation
+	returnKF->ssCandidateType=ssCandidateType; ///< decide scoring type ("fast, "shi")
+	returnKF->ssCandidateCriterion=ssCandidateCriterion;  ///< decide scoring criterion ("percent", "thresh")
+	returnKF->sdCandidateThresh=sdCandidateThresh; ///< when using "thresh" criterion
+	returnKF->sdCandidateTopFraction=sdCandidateTopFraction; ///< when using "percent" criterion
+	returnKF->sbAdaptiveThresh=sbAdaptiveThresh;  ///< should we use an adaptive computation of the feature detection threshold?
+	returnKF->mse3CamFromBase=mse3CamFromBase;   ///< The current pose in a base frame, which is the pose of the parent MultiKeyFrame
+	returnKF->mse3CamFromWorld=mse3CamFromWorld;  ///< The current pose in the world frame, a product of mse3CamFromBase and the parent's mse3BaseFromWorld
+    returnKF->mdSceneDepthMean=mdSceneDepthMean;  ///< The mean z-axis value of all the points visible from this keyframe
+	returnKF->mdSceneDepthSigma=mdSceneDepthSigma; ///< The variance of the z-axis values of the points visible from this keyframe
+	returnKF->mbActive=mbActive; 
+	returnKF->mBins = mBins;
+	
+	returnKF->pointHeatImg[0] = pointHeatImg[0].clone();
+	returnKF->featureHeatImg[0] = featureHeatImg[0].clone();
+    returnKF->goodHeatMap = goodHeatMap;
+	
+	//returnKF->mMeasMutex=mMeasMutex; 
+	
+	//deep copy the Levels info
+	
+	for(int i=0; i<LEVELS; i++)
+	{
+		
+		if( maLevels[i].lastMask.size() != CVD::ImageRef(0,0)) //not empty
+		{
+			returnKF->maLevels[i].lastMask.resize( maLevels[i].lastMask.size());
+			CVD::copy(maLevels[i].lastMask, returnKF->maLevels[i].lastMask);
+		}
+		
+		
+		if(maLevels[i].mask.size() != CVD::ImageRef(0,0))
+		{
+			returnKF->maLevels[i].mask.resize( maLevels[i].mask.size());
+			CVD::copy(maLevels[i].mask, returnKF->maLevels[i].mask);
+		}
+		
+		if(maLevels[i].image.size() != CVD::ImageRef(0,0))
+		{
+			returnKF->maLevels[i].image.resize( maLevels[i].image.size());
+			CVD::copy(maLevels[i].image, returnKF->maLevels[i].image);
+		}
+		
+		returnKF->maLevels[i].vCorners = maLevels[i].vCorners;  
+		returnKF->maLevels[i].vCornerRowLUT = maLevels[i].vCornerRowLUT;   
+		returnKF->maLevels[i].vCandidates = maLevels[i].vCandidates;      
+		returnKF->maLevels[i].vScoresAndMaxCorners = maLevels[i].vScoresAndMaxCorners;  
+		
+		returnKF->maLevels[i].vFastFrequency = maLevels[i].vFastFrequency;    
+		returnKF->maLevels[i].nFastThresh = maLevels[i].nFastThresh;               
+ 
+		returnKF->maLevels[i].imagePrev = maLevels[i].imagePrev;  
+		returnKF->maLevels[i].vCornersPrev = maLevels[i].vCornersPrev;  
+		
+		returnKF->maLevels[i].snNumPrev = maLevels[i].snNumPrev;  
+		            
+	}
+	
+	
+	return returnKF;
+	
+}
+
 //------------------------------------------ MultiKeyFrame  ------------------------------------------------------------------------
 
 MultiKeyFrame::MultiKeyFrame()
@@ -786,6 +1083,7 @@ MultiKeyFrame::MultiKeyFrame()
   mbBad = false;
   mbDeleted = false;
   mnUsing = 0;
+  isBufferMKF = false; //initialize to NOT a bufferkeyframe
 }
 
 MultiKeyFrame::~MultiKeyFrame()
@@ -864,6 +1162,7 @@ void MultiKeyFrame::RefreshSceneDepthRobust()
     nNum++;
   }
   
+  //ROS_INFO("nNum: %d", nNum);
   ROS_ASSERT(nNum > 0);
   mdTotalDepthMean = dSumDepth / nNum;
 }
@@ -924,6 +1223,37 @@ double MultiKeyFrame::Distance(MultiKeyFrame &other)
   }
   
   return dMinDist;
+}
+
+//partially copies MKF
+MultiKeyFrame* MultiKeyFrame::CopyMultiKeyFramePartial()
+{
+	MultiKeyFrame* returnMKF = new MultiKeyFrame();
+	
+	//copy stuff over
+	
+  returnMKF->mse3BaseFromWorld = mse3BaseFromWorld;  ///< The current pose in the world reference frame
+  returnMKF->mbFixed=mbFixed; ///< Is the pose fixed? Generally only true for the first MultiKeyFrame added to the map
+  returnMKF->mbBad=mbBad;  ///< Is it a dud? In that case it'll be moved to the trash soon.
+  returnMKF->mbDeleted=mbDeleted; ///< Similar to mbBad, but used only in client/server code to allow immediate deletion of received MKF
+  //returnMKF->mnUsing=mnUsing;  
+  
+  //returnMKF->mmpKeyFrames=mmpKeyFrames;  ///< %Map of camera names to KeyFrame pointers
+  
+  //copy each keyframe individually
+  for(KeyFramePtrMap::iterator it = mmpKeyFrames.begin(); it != mmpKeyFrames.end(); ++it)
+  {    
+	  std::string cName = (it->first);
+	  KeyFrame& kf = *(it->second); 
+	  returnMKF->mmpKeyFrames.insert(std::make_pair(cName, kf.CopyKeyFramePartial(returnMKF,cName)));
+  }
+  
+  returnMKF->mdTotalDepthMean=mdTotalDepthMean;  ///< The mean of all owned KeyFrames' mdSceneDepthMean values
+  returnMKF->mnID=mnID;      ///< Used for identifying MultiKeyFrame when writing map to file   
+  returnMKF->isBufferMKF = isBufferMKF;
+  
+  return returnMKF;     
+	
 }
 
 // ------------------------------------------- Other stuff -------------------------------------------------------------

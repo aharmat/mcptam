@@ -76,6 +76,9 @@
 #include <atomic>
 #include <boost/circular_buffer.hpp>
 #include <boost/thread/mutex.hpp>
+#include <opencv2/features2d/features2d.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/photo/photo.hpp>
 
 class MapPoint;
 class SmallBlurryImage;
@@ -85,8 +88,37 @@ class SmallBlurryImage;
 #define LEVELS 4  
 #define MAX_DEPTH 10000
 #define MAX_SIGMA 10000
-#define MIN_FAST_THRESH 5
+#define MIN_FAST_THRESH 20
 #define MAX_FAST_THRESH 30
+
+struct PredictedFeatureInfo
+{
+	CVD::ImageRef rootPos;
+	TooN::Matrix<2,6> jac;
+};
+
+struct BinInfo
+{
+	CVD::ImageRef maxPos;
+	double maxScore; 
+	bool isInit;
+};
+
+
+class LevelBinArray
+{
+	public:
+	
+	LevelBinArray(int,int);
+	int pointToIndex(double, double);
+	
+	int nx;
+	int ny;
+	double pix_x;
+	double pix_y;
+	std::vector<BinInfo> bins; //container of bins
+	
+};
 
 
 /// A feature in an image which could be made into a map point
@@ -114,6 +146,11 @@ struct Measurement
   //for testing
   CVD::ImageRef irOffset;
   bool bSelected;
+  
+  //for keeping track of bin positions
+  //TooN::Vector<2> binIndex; //bin index of measurement
+  //bool isMaxInBin; //is it the best in the bin
+    
 };
 
 /// Contains image data and corner points. Each keyframe is made of LEVELS pyramid levels, stored in struct Level.
@@ -136,6 +173,7 @@ struct Level
   std::vector<int> vCornerRowLUT;          ///< Row-index into the FAST corners, speeds up access
   std::vector<Candidate> vCandidates;      ///< Potential locations of new map points
   std::vector<std::pair<double, CVD::ImageRef> > vScoresAndMaxCorners;  ///< The best scoring points and their scores, used to generate candidates
+ 
   
   //bool bImsphereCornersCached;             ///< Have the FAST corners been projected onto the camera sphere?
   //std::vector<TooN::Vector<3> > vImsphereCorners; ///< Corner points un-projected into r=1 sphere coordinates, used to speed up epipolar search
@@ -228,7 +266,7 @@ public:
   /// Erase all measurements
   void ClearMeasurements();
   
-  void AddMeasurement(MapPoint* pPoint, Measurement* pMeas);
+  void AddMeasurement(MapPoint* pPoint, Measurement* pMeas); //if its a buffer measurement, we don't want to update the information on the points.
   
   /// Make the small blurry image
   void MakeSBI();
@@ -237,7 +275,14 @@ public:
   
   void RemoveImage();
   
+  //partially copy keyframe
+  
+  KeyFrame* CopyKeyFramePartial(MultiKeyFrame* sourceMKF, std::string name);
+  
   // Variables
+  
+  std::vector<LevelBinArray> mBins; //bin information, one for each level;
+     
   static double sdDistanceMeanDiffFraction;  ///< fraction of distance between mean scene depth points that is used in overall distance computation
 //  static double saThreshDerivs[LEVELS];  ///< derivatives that determine FAST threshold
   static std::string ssCandidateType; ///< decide scoring type ("fast, "shi")
@@ -270,6 +315,14 @@ public:
   MultiKeyFrame* mpParent;  ///< Pointer to the MultiKeyFrame that owns this keyframe
   
   bool mbActive;  ///< The tracker uses this to indicate which keyframes have been updated with new measurements, the MapMaker culls inactive keyframes when it receives a new MultiKeyFrame
+  
+  std::map<int, std::vector<CVD::ImageRef> > vPointHeatMap; //vector of heat map vectors, one for each level
+  std::map<int, std::vector<CVD::ImageRef> > vFeatureHeatMap; //vector of feature map vectors, one for each level
+  std::map<int, std::vector<PredictedFeatureInfo> > vPredictedInfo;//container of predicted feature locations for each kf.
+  std::map<int, cv::Mat> pointHeatImg;
+  std::map<int, cv::Mat> featureHeatImg;
+  bool goodHeatMap;
+  
   
 private:
 
@@ -331,7 +384,13 @@ public:
   
   void RemoveImages();
   
+  //partially copy MultiKeyFrame
+  
+  MultiKeyFrame* CopyMultiKeyFramePartial(); //returns a pointer to the partially copied MKF
+  
   // Variables
+  bool isBufferMKF;  ///am I a buffer MKF?  If so, we'll use the flag to disable things such as updating measurements to the global points list when buffering keyframe information
+  
   TooN::SE3<> mse3BaseFromWorld;  ///< The current pose in the world reference frame
   bool mbFixed; ///< Is the pose fixed? Generally only true for the first MultiKeyFrame added to the map
   bool mbBad;  ///< Is it a dud? In that case it'll be moved to the trash soon.
@@ -344,7 +403,10 @@ public:
   KeyFramePtrMap mmpKeyFrames;  ///< %Map of camera names to KeyFrame pointers
   
   double mdTotalDepthMean;  ///< The mean of all owned KeyFrames' mdSceneDepthMean values
-  int mnID;      ///< Used for identifying MultiKeyFrame when writing map to file          
+  int mnID;      ///< Used for identifying MultiKeyFrame when writing map to file       
+  
+  std::map<int, std::vector<TooN::Vector<3> > > predictedPointMap; //the predicted points given the measurements of the keyframe, one vector for each level
+     
 };
 
 
