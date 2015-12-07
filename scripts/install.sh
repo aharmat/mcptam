@@ -17,7 +17,7 @@ GVARS3_VERSION="3.0"
 GVARS3_FORMAT="gvars-$GVARS3_VERSION"
 GVARS3_URL="http://www.edwardrosten.com/cvd/$GVARS3_FORMAT.tar.gz"
 
-ROS_VERSION="jade"
+ROS_VERSION="indigo"
 ROS_BASH="/opt/ros/$ROS_VERSION/setup.bash"
 
 
@@ -29,20 +29,24 @@ install_ros()
 
 	# update apt and install ros
 	apt-get update
-	apt-get install -y ros-jade-desktop-full
+	apt-get install -y ros-$ROS_VERSION-desktop-full
 
 	# initialize rosdep
 	rosdep init
 	rosdep update
 
 	# env setup
-	echo "source /opt/ros/jade/setup.bash" >> $HOME/.bashrc
+	echo "source /opt/ros/$ROS_VERSION/setup.bash" >> $HOME/.bashrc
 
 	# install ros
 	apt-get install -y python-rosinstall
 
 	# install ros packages	
-	apt-get install -y ros-jade-libg2o
+	apt-get install -y \
+		ros-$ROS_VERSION-pcl-ros \
+		ros-$ROS_VERSION-image-transport \
+		ros-$ROS_VERSION-image-transport-plugins \
+		ros-$ROS_VERSION-libg2o
 }
 
 install_prerequisits()
