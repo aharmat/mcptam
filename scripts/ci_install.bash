@@ -1,5 +1,8 @@
 #!/bin/bash
 set -e  # exit on first error
+ROS_VERSION="indigo"
+ROS_BASH="/opt/ros/$ROS_VERSION/setup.bash"
+
 TOON_VERSION="2.2"
 TOON_FORMAT="TooN-$TOON_VERSION"
 TOON_URL="http://www.edwardrosten.com/cvd/$TOON_FORMAT.tar.gz"
