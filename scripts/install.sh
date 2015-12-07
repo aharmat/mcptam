@@ -57,7 +57,10 @@ install_prerequisits()
 		g++ \
 		make \
 		build-essential \
-		libsuitesparse-dev
+		libsuitesparse-dev \
+		freeglut3 \
+		freeglut3-dev \
+		freeglut3-dbg
 }
 
 
