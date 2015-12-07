@@ -22,29 +22,29 @@ install_ros()
 {
 	# update sources.list and add apt-keys
 	echo "deb $ROS_PACKAGES_URL $APT_TARGETS" > $SOURCES_LIST_TARGET
-	apt-key adv --keyserver $APT_KEYS_URL --recv-key 0xB01FA116
+	sh -c "apt-key adv --keyserver $APT_KEYS_URL --recv-key 0xB01FA116"
 
-	# update apt and install ros
-	apt-get update
-	apt-get install -y ros-jade-desktop-full
+	# # update apt and install ros
+	# apt-get update
+	# apt-get install -y ros-jade-desktop-full
 
-	# initialize rosdep
-	rosdep init
-	rosdep update
+	# # initialize rosdep
+	# rosdep init
+	# rosdep update
 
-	# env setup
-	echo "source /opt/ros/jade/setup.bash" >> $HOME/.bashrc
+	# # env setup
+	# echo "source /opt/ros/jade/setup.bash" >> $HOME/.bashrc
 
-	# install ros
-	apt-get install -y python-rosinstall
+	# # install ros
+	# apt-get install -y python-rosinstall
 
-	# install ros packages	
-	apt-get install -y \
-		ros-jade-image-transport \
-		ros-jade-image-plugins \
-		ros-jade-pcl-ros \
-		ros-jade-libg2o \
-		ros-jade-uvc-camera
+	# # install ros packages	
+	# apt-get install -y \
+	# 	ros-jade-image-transport \
+	# 	ros-jade-image-plugins \
+	# 	ros-jade-pcl-ros \
+	# 	ros-jade-libg2o \
+	# 	ros-jade-uvc-camera
 }
 
 install_prerequisits()
