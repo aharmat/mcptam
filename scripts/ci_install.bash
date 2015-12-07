@@ -100,12 +100,13 @@ build_mcptam()
 	cd $HOME/catkin_ws/
 	catkin_make
 	source devel/setup.bash
-	
+	cd -
+
 	# copy mcptam to catkin workspace
 	cd ..
 	cp -R mcptam $HOME/catkin_ws/src
 	cd $HOME/catkin_ws/
-	catkin_make	
+	catkin_make
 }
 
 
