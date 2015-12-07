@@ -8,8 +8,8 @@ compiler:
     - gcc
 
 before_script:
-    - sudo bash scripts/ros_install.sh
-    - sudo bash scripts/ci_install.sh
+    - sudo bash scripts/ros_install.bash
+    - sudo bash scripts/ci_install.bash
 
 script:
     - echo "done!"
