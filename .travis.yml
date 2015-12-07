@@ -8,7 +8,8 @@ compiler:
     - gcc
 
 before_script:
-    - sudo sh scripts/install.sh
+    - sudo bash scripts/ros_install.sh
+    - sudo bash scripts/ci_install.sh
 
 script:
     - echo "done!"
