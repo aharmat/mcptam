@@ -1,0 +1,22 @@
+language:
+	c++
+
+compiler:
+	- gcc
+
+before_script:
+	- sudo sh scripts/install.sh
+
+script:
+	- echo "done!"
+
+branches:
+	only:
+		- issues_6
+
+notifications:
+	recipients:
+		- chutsu@gmail.com
+	email:
+		on_success: change
+		on_failure: always
