@@ -1,5 +1,5 @@
 #!/bin/sh
-set -e
+set -e  # exit on first error
 ROS_PACKAGES_URL='http://packages.ros.org/ros/ubuntu'
 APT_KEYS_URL='hkp://pool.sks-keyservers.net:80'
 APT_TARGETS="$(lsb_release -sc) main"
@@ -101,8 +101,8 @@ install_gvars3()
 
 install_dependencies()
 {
-	# install_ros
-	# install_prerequisits
+	install_ros
+	install_prerequisits
 
 	mkdir build_deps
 	cd build_deps
