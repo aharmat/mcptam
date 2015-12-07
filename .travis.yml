@@ -12,7 +12,7 @@ script:
 
 branches:
     only:
-        - issues_6
+        - issue_6
 
 notifications:
     recipients:
