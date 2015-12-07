@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e  # exit on first error
 ROS_PACKAGES_URL='http://packages.ros.org/ros/ubuntu'
 APT_KEYS_URL='hkp://pool.sks-keyservers.net:80'
@@ -17,34 +17,32 @@ GVARS3_VERSION="3.0"
 GVARS3_FORMAT="gvars-$GVARS3_VERSION"
 GVARS3_URL="http://www.edwardrosten.com/cvd/$GVARS3_FORMAT.tar.gz"
 
+ROS_VERSION="jade"
+ROS_BASH="/opt/ros/$ROS_VERSION/setup.bash"
+
 
 install_ros()
 {
 	# update sources.list and add apt-keys
 	echo "deb $ROS_PACKAGES_URL $APT_TARGETS" > $SOURCES_LIST_TARGET
-	sh -c "apt-key adv --keyserver $APT_KEYS_URL --recv-key 0xB01FA116"
+	apt-key adv --keyserver $APT_KEYS_URL --recv-key "0xB01FA116"
 
-	# # update apt and install ros
-	# apt-get update
-	# apt-get install -y ros-jade-desktop-full
+	# update apt and install ros
+	apt-get update
+	apt-get install -y ros-jade-desktop-full
 
-	# # initialize rosdep
-	# rosdep init
-	# rosdep update
+	# initialize rosdep
+	rosdep init
+	rosdep update
 
-	# # env setup
-	# echo "source /opt/ros/jade/setup.bash" >> $HOME/.bashrc
+	# env setup
+	echo "source /opt/ros/jade/setup.bash" >> $HOME/.bashrc
 
-	# # install ros
-	# apt-get install -y python-rosinstall
+	# install ros
+	apt-get install -y python-rosinstall
 
-	# # install ros packages	
-	# apt-get install -y \
-	# 	ros-jade-image-transport \
-	# 	ros-jade-image-plugins \
-	# 	ros-jade-pcl-ros \
-	# 	ros-jade-libg2o \
-	# 	ros-jade-uvc-camera
+	# install ros packages	
+	apt-get install -y ros-jade-libg2o
 }
 
 install_prerequisits()
@@ -54,7 +52,8 @@ install_prerequisits()
 		gcc \
 		g++ \
 		make \
-		build-essential
+		build-essential \
+		libsuitesparse-dev
 }
 
 
@@ -113,6 +112,30 @@ install_dependencies()
 	cd ..
 }
 
+build_mcptam()
+{
+	# setup ros env
+	source $ROS_BASH
+
+	# create catkin workspace
+	mkdir -p $HOME/catkin_ws/src
+	cd $HOME/catkin_ws/src
+	catkin_init_workspace
+	cd -
+
+	# setup catkin workspace
+	cd $HOME/catkin_ws/
+	catkin_make
+	source devel/setup.bash
+	
+	# copy mcptam to catkin workspace
+	cd ..
+	cp -R mcptam $HOME/catkin_ws/src
+	cd $HOME/catkin_ws/
+	catkin_make	
+}
+
 
 # RUN
 install_dependencies
+build_mcptam
