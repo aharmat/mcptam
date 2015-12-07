@@ -71,7 +71,6 @@ install_gvars3()
 
 install_dependencies()
 {
-	install_ros
 	install_prerequisits
 
 	mkdir build_deps
