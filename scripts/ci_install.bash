@@ -16,9 +16,9 @@ GVARS3_FORMAT="gvars-$GVARS3_VERSION"
 GVARS3_URL="http://www.edwardrosten.com/cvd/$GVARS3_FORMAT.tar.gz"
 
 
-install_prerequisits()
+install_prerequisites()
 {
-	# install prerequisits
+	# install prerequisites
 	apt-get install -y \
 		gcc \
 		g++ \
