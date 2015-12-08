@@ -5,7 +5,7 @@ Localization and Mapping (SLAM) using Multi-Camera Clusters. It includes tools
 for calibrating both the intrinsic and extrinsic parameters of the individual
 cameras within the rigid camera rig.
 
-Visit the MCPTAM website (https://github.com/aharmat/mcptam).
+Visit the MCPTAM website (https://github.com/wavelab/mcptam).
 
 For more information, refer to the [MCPTAM Wiki][mcptam_wiki] 
 
@@ -57,6 +57,6 @@ If you use this software, please consider citing the following papers:
      *************************************************************************
 
 
-[mcptam_wiki]: https://github.com/aharmat/mcptam/wiki
+[mcptam_wiki]: https://github.com/wavelab/mcptam/wiki
 [travis_page]: https://travis-ci.org/wavelab/mcptam
 [travis_status]: https://travis-ci.org/wavelab/mcptam.svg
