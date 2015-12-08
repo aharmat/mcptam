@@ -74,7 +74,7 @@ install_gvars3()
 
 install_dependencies()
 {
-	install_prerequisits
+	install_prerequisites
 
 	mkdir build_deps
 	cd build_deps
