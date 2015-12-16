@@ -1,0 +1,26 @@
+sudo: required
+dist: trusty
+
+language:
+    c++
+
+compiler:
+    - gcc
+
+before_script:
+    - sudo bash scripts/ros_install.bash
+    - sudo bash scripts/ci_install.bash
+
+script:
+    - catkin_make run_tests_mcptam
+
+branches:
+    only:
+        - cper
+
+notifications:
+    recipients:
+        - arun.das.uwaterloo@gmail.com
+    email:
+        on_success: change
+        on_failure: always

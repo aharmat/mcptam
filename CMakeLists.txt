@@ -92,6 +92,13 @@ add_executable(pose_calibrator src/MainPoseCalibrator.cc src/GLWindow2.cc src/GL
 add_dependencies(pose_calibrator ${PROJECT_NAME}_gencpp)
 target_link_libraries(pose_calibrator ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${OpenCV_LIBS} ${GVars3_LIBRARIES}
                                      ${G2O_STUFF_LIBRARY} ${G2O_CORE_LIBRARY} ${G2O_SOLVER_CHOLMOD} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
+
+if(1)
+  find_package(rostest REQUIRED)
+  add_rostest_gtest(test_entropy test/entropy_test.test test/entropy_test.cpp)
+  target_link_libraries(test_entropy ${catkin_LIBRARIES})
+endif()
+
                                      
 install(TARGETS mcptam mcptam_client mcptam_server camera_calibrator pose_calibrator
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
@@ -108,3 +115,5 @@ install(DIRECTORY masks/
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/masks
   PATTERN ".svn" EXCLUDE
 )
+
+
