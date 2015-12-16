@@ -7,6 +7,9 @@ language:
 compiler:
     - gcc
 
+before_script:
+  - export DEBIAN_FRONTEND=noninteractive
+
 before_install:
   - sudo pip install cpplint rosdep
   - sudo rosdep init && rosdep update
