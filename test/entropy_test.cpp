@@ -5,7 +5,7 @@
 
 
 TEST(EntropyComputation, basicOperations){
-EXPECT_FLOAT_EQ(-1.4189382, compute_point_entropy_scalar(1));
+EXPECT_FLOAT_EQ(1.4189382, compute_point_entropy_scalar(1));
 }
 
 /*TEST(MathExpressions, complexOperations){
