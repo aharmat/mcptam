@@ -7,9 +7,18 @@ language:
 compiler:
     - gcc
 
-before_script:
-    - bash scripts/ros_install.bash
-    - bash scripts/ci_install.bash
+before_install:
+  - sudo pip install cpplint rosdep
+  - sudo rosdep init && rosdep update
+  - sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
+  - wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
+  - sudo apt-get update -qq
+install:
+  - rosdep install --from-paths .. --ignore-src --rosdistro indigo
+  - source /opt/ros/indigo/setup.bash
+  - mkdir -p ~/catkin_ws/src && pushd ~/catkin_ws
+  - catkin_init_workspace src
+  - bash scripts/ci_install.bash
 
 script:
     - catkin_make tests
