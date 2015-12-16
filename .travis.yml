@@ -12,7 +12,7 @@ before_script:
     - sudo bash scripts/ci_install.bash
 
 script:
-    - bash scripts/run_tests.bash
+    - sudo bash scripts/run_tests.bash
 
 branches:
     only:
