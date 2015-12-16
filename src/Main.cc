@@ -93,6 +93,7 @@ int main(int argc, char** argv)
   try
   {
     System sys;
+    
     sys.Run();
   }
   catch(CVD::Exceptions::All e)

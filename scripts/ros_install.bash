@@ -11,25 +11,25 @@ SOURCES_LIST_TARGET='/etc/apt/sources.list.d/ros-latest.list'
 install()
 {
 	# update sources.list and add apt-keys
-	echo "deb $ROS_PACKAGES_URL $APT_TARGETS" > $SOURCES_LIST_TARGET
+	sudo echo "deb $ROS_PACKAGES_URL $APT_TARGETS" > $SOURCES_LIST_TARGET
 	wget https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -O - | sudo apt-key add -
 
 	# update apt and install ros
-	apt-get update
-	apt-get install -y ros-$ROS_VERSION-desktop-full
+	sudo apt-get update
+	sudo apt-get install -y ros-$ROS_VERSION-desktop-full
 
 	# initialize rosdep
-	rosdep init
+	sudo rosdep init
 	rosdep update
 
 	# env setup
 	echo "source /opt/ros/$ROS_VERSION/setup.bash" >> $HOME/.bashrc
 
 	# install ros
-	apt-get install -y python-rosinstall
+	sudo apt-get install -y python-rosinstall
 
 	# install ros packages	
-	apt-get install -y \
+	sudo apt-get install -y \
 		ros-$ROS_VERSION-pcl-ros \
 		ros-$ROS_VERSION-image-transport \
 		ros-$ROS_VERSION-image-transport-plugins \

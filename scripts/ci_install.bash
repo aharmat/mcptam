@@ -19,7 +19,7 @@ GVARS3_URL="http://www.edwardrosten.com/cvd/$GVARS3_FORMAT.tar.gz"
 install_prerequisites()
 {
 	# install prerequisites
-	apt-get install -y \
+	sudo apt-get install -y \
 		gcc \
 		g++ \
 		make \
@@ -39,7 +39,7 @@ install_toon()
 
 	# configure, build and install
 	cd $TOON_FORMAT
-	./configure && make && make install
+	./configure && make && sudo make install
 	cd ..
 }
 
@@ -54,7 +54,7 @@ install_libcvd()
 	export CXXFLAGS=-D_REENTRANT
 	./configure --without-ffmpeg 
 	make 
-	make install
+	sudo make install
 	cd ..
 }
 
@@ -68,7 +68,7 @@ install_gvars3()
 	cd $GVARS3_FORMAT
 	./configure --disable-widgets
 	make 
-	make install
+	sudo make install
 	cd ..
 }
 

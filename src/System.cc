@@ -175,7 +175,8 @@ System::System()
   mpTracker->SetMasks(masksMap);
     
   mbDone = false;
-}
+
+ }
 
 System::~System()
 {

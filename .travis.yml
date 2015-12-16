@@ -8,11 +8,12 @@ compiler:
     - gcc
 
 before_script:
-    - sudo bash scripts/ros_install.bash
-    - sudo bash scripts/ci_install.bash
+    - bash scripts/ros_install.bash
+    - bash scripts/ci_install.bash
 
 script:
-    - sudo bash scripts/run_tests.bash
+    - catkin_make tests
+    - catkin_make run_tests_mcptam
 
 branches:
     only:
