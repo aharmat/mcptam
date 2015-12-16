@@ -12,7 +12,7 @@ before_script:
     - sudo bash scripts/ci_install.bash
 
 script:
-    - catkin_make run_tests_mcptam
+    - bash scripts/run_tests.bash
 
 branches:
     only:
