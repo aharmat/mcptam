@@ -12,7 +12,7 @@ install()
 {
 	# update sources.list and add apt-keys
 	echo "deb $ROS_PACKAGES_URL $APT_TARGETS" > $SOURCES_LIST_TARGET
-	apt-key adv --keyserver $APT_KEYS_URL --recv-key "0xB01FA116"
+	wget https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -O - | sudo apt-key add -
 
 	# update apt and install ros
 	apt-get update
