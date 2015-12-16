@@ -84,8 +84,9 @@ before_script:
 # Compile and test. If the CATKIN_OPTIONS file exists, use it as an argument to
 # catkin_make.
 script:
+  - source $HOME/catkin_ws/devel/setup.bash
   - cd ~/catkin_ws
   - catkin_make 
   # Testing: Use both run_tests (to see the output) and test (to error out).
-  - catkin_make tests  # This always returns 0, but looks pretty.
-  - catkin_make run_tests_mcptam  # This will return non-zero if a test fails.
+  - catkin_make run_tests  # This always returns 0, but looks pretty.
+  - catkin_make test # This will return non-zero if a test fails.
