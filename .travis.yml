@@ -68,11 +68,12 @@ before_install:
   - sudo sh -c "echo \"deb http://packages.ros.org/ros/ubuntu $ROS_CI_DESKTOP main\" > /etc/apt/sources.list.d/ros-latest.list"
   - wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
   - sudo apt-get update -qq
-  - sudo apt-get install -y python-catkin-pkg python-rosdep python-wstool ros-$ROS_DISTRO-catkin
-  - source /opt/ros/$ROS_DISTRO/setup.bash
-  # Prepare rosdep to install dependencies.
+  - sudo apt-get install -y python-catkin-pkg python-rosdep python-wstool ros-$ROS_DISTRO-catkin ros-$ROS_DISTRO-desktop
+    # Prepare rosdep to install dependencies.
   - sudo rosdep init
   - rosdep update
+  - source /opt/ros/$ROS_DISTRO/setup.bash
+  - sudo apt-get install python-rosinstall
 
 # Install all dependencies, using wstool and rosdep.
 # wstool looks for a ROSINSTALL_FILE defined in the environment variables.
