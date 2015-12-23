@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(mcptam)
 
+# Add cmake_modules directory to cmake module path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules")
-#set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "~/catkin_ws/src/mcptam/cmake_modules")
+# Define build type
 set(CMAKE_BUILD_TYPE None)
 # Set our own specific flags. Want something like RelWithDebInfo but without the 
 # -DNDEBUG flag that disables asserts
