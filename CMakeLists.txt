@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(mcptam)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/${PROJECT_NAME}/cmake_modules")
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules")
+#set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "~/catkin_ws/src/mcptam/cmake_modules")
 set(CMAKE_BUILD_TYPE None)
-
 # Set our own specific flags. Want something like RelWithDebInfo but without the 
 # -DNDEBUG flag that disables asserts
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x -march=core2 -msse3 -O3 -g -fopenmp")
@@ -12,12 +12,11 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x -march=core2 -msse3 -O3
 find_package(catkin REQUIRED COMPONENTS roscpp image_transport sensor_msgs cv_bridge geometry_msgs tf message_filters std_msgs
                                         std_srvs visualization_msgs dynamic_reconfigure pcl_ros message_generation)
 find_package(Boost REQUIRED COMPONENTS system thread)
-find_package(SUITESPARSE REQUIRED)
 find_package(CVD REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(GLUT REQUIRED)
-#SET (G2O_ROOT "/home/aharmat/Sources/g2o")
+find_package(SUITESPARSE REQUIRED)
 find_package(G2O REQUIRED)
 find_package(GVars3 REQUIRED)
 find_package(BLAS REQUIRED)
