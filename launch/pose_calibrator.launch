@@ -8,11 +8,11 @@
 <node name="pose_calibrator" pkg="mcptam" type="pose_calibrator" clear_params="true" output="screen" launch-prefix="$(arg debug_prefix)"> 
   <rosparam command="load" file="$(find mcptam)/groups/$(arg group_name).yaml" />
   <remap from="reset" to="pose_calibrator/reset" />
-  <param name="image_transport" type="string" value="compressed"/> 
-  <param name="pattern_width" type="int" value="4"/>
-  <param name="pattern_height" type="int" value="6"/>
-  <param name="square_size" type="double" value="0.1142"/>
-  <param name="finder_max_ssd_per_pixel" type="int" value="500" />
+  <param name="image_transport" type="string" value="raw"/> 
+  <param name="pattern_width" type="int" value="6"/>
+  <param name="pattern_height" type="int" value="8"/>
+  <param name="square_size" type="double" value="0.108"/>
+  <param name="finder_max_ssd_per_pixel" type="int" value="200" />
   <param name="kf_distance_mean_diff_fraction" type="double" value="0.0" />
   <param name="kf_adaptive_thresh" type="bool" value="false" />
   <param name="mm_large_point_test" type="bool" value="false" />
