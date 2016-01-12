@@ -178,6 +178,9 @@ public:
   /** @brief Get the last value of the LM lambda parameter */
   double GetLambda();
   
+  /** @brief Get the depth covariance of the point */
+  double GetPointDepthCovariance(int n);
+  
   // Static members
   static int snMaxIterations;   ///< Maximum number of iterations allowed before bailing
   static int snMaxTrialsAfterFailure;  ///< Maximum number of times the solver will 

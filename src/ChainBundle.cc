@@ -346,6 +346,9 @@ class VertexRelPoint : public g2o::BaseVertex<3, TooN::Vector<3> >
     
     int _nID;
     PoseChainHelper* _pPoseChainHelper;  // stores the chain of poses that defines the source pose of the point
+    
+    //variables for entropy based keyframe addition
+    double depthCovariance;
 };
 
 //debugging
@@ -1425,7 +1428,14 @@ int ChainBundle::Compute(bool *pAbortSignal, int nNumIter, double dUserLambda)
     {
       // Look at the (2,2) entry of each covariance matrix, which indicates
       // sensitivity in radial direction
-      vCov22.push_back(spinv.block(i,i)->col(2)(2));
+      //pull out the covariance matricies for each point
+      
+     double radCov = spinv.block(i,i)->col(2)(2);       
+     
+     VertexRelPoint* pPointVertex = dynamic_cast<VertexRelPoint*>(vPointVertices[i]); 
+     pPointVertex->depthCovariance = radCov; //caputre the depth covariance of the point (will be converted to entropy for comparision in Tracker)
+     
+     vCov22.push_back(spinv.block(i,i)->col(2)(2));
     }
     
     if(vCov22.size() > 0)
@@ -1484,6 +1494,12 @@ double ChainBundle::GetLambda()
 {
   ROS_ASSERT(mpOptimizer && mpOptimizer->solver()); 
   return dynamic_cast<OptimizationAlgorithmLevenberg*>(mpOptimizer->solver())->currentLambda();
+}
+
+double ChainBundle::GetPointDepthCovariance(int n)
+{
+  const VertexRelPoint* pPointVertex = dynamic_cast<const VertexRelPoint*>(mpOptimizer->vertex(n));
+  return pPointVertex->depthCovariance;
 }
 
 

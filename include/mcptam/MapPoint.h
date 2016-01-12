@@ -104,6 +104,9 @@ public:
     mnMEstimatorInlierCount = 1;
     //mtCreationTime = ros::Time::now();
     mpPatchSourceKF = NULL;
+    
+    depthCovariance = 25; ///covariance for real point should never be this high
+	lockDown = false;
   };
   
   /// Delete owned TrackerData pointers
@@ -157,6 +160,11 @@ public:
   // Random junk (e.g. for visualisation)
   //ros::Time mtCreationTime;   ///< Time of creation
   int mnID;     ///< Used when dumping map to file
+  
+  //things needed for entropy based keyframe insertion
+  double depthCovariance; ///depth covariance for the point
+  bool lockDown;		///do we lock it down?  It it well known enough to not bundle adjust?
+  
   
 };
 

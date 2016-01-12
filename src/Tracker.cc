@@ -49,6 +49,7 @@
 #include <mcptam/Map.h>
 #include <mcptam/Utility.h>
 #include <mcptam/TrackerState.h>
+#include <mcptam/EntropyComputation.h> 
 
 #include <cvd/utility.h>
 #include <cvd/gl_helpers.h>
@@ -115,6 +116,10 @@ Tracker::Tracker(Map &map, MapMakerClientBase &mapmaker, TaylorCameraMap &camera
   
   maskPub = mNodeHandlePrivate.advertise<sensor_msgs::Image>("mask", 1);
   timingPub = mNodeHandlePrivate.advertise<mcptam::TrackerTiming>("timing_tracker", 1);
+  
+  bestBufferKeyframeScore = 0;
+ 
+ 
 }
 
 Tracker::~Tracker()
@@ -1851,5 +1856,85 @@ void Tracker::CollectNearestPoints(KeyFrame& kf, std::set<MapPoint*>& spNearestP
       }
     }
   }
+}
+
+void Tracker::UpdateCamsFromWorld(MultiKeyFrame* mpTempMKF)
+{
+  for(KeyFramePtrMap::iterator kf_it = mpTempMKF->mmpKeyFrames.begin(); kf_it != mpTempMKF->mmpKeyFrames.end(); ++kf_it)
+  {
+    kf_it->second->mse3CamFromWorld = kf_it->second->mse3CamFromBase * mpTempMKF->mse3BaseFromWorld; // CHECK!! GOOD
+  }
+}
+
+void Tracker::RecordMeasurementsAndBufferKeyFrame() 
+{
+       
+  //save all the tracker measurements
+    
+  //create a temporary MKF, copy over current MKF
+  MultiKeyFrame* mpTempMKF =  mpCurrentMKF->CopyMultiKeyFramePartial();
+  UpdateCamsFromWorld(mpTempMKF);
+  mpTempMKF->isBufferMKF = true;
+  
+  //create vector for holding all the tracker meas data
+  //std::vector<TrackerMeasData> pvTrackerMeasData;
+  
+  double totalEntropyReduction = 0;
+  int totalEntropyPoints = 0;
+  double totalPreviousEntropy = 0;
+       
+  for(unsigned i=0; i < mvCurrCamNames.size(); ++i)
+  {
+    std::string camName = mvCurrCamNames[i];
+    KeyFrame& kf = *mpTempMKF->mmpKeyFrames[camName];
+                
+    for(TrackerDataPtrVector::iterator td_it = mvIterationSets[i].begin(); td_it!= mvIterationSets[i].end(); ++td_it)
+    {
+      TrackerData td = *(*td_it);
+      
+      if(!td.mbFound || td.mPoint.mbBad)
+       continue;
+            
+      Measurement* pMeas = new Measurement;
+      pMeas->eSource = Measurement::SRC_TRACKER;
+      pMeas->v2RootPos = td.mv2Found;
+      pMeas->nLevel = td.mnSearchLevel;
+      pMeas->bSubPix = td.mbDidSubPix; 
+      
+      MapPoint& point = td.mPoint;
+      kf.AddMeasurement(&point, pMeas); //add this measurement to the kf
+      
+      double priorPointCovariance = point.depthCovariance;
+      double prevPointEntropy = 0;
+    
+      if( !std::isfinite(priorPointCovariance) || priorPointCovariance < 1e-7) //todo (adas): don't hardcode these
+      priorPointCovariance = 1e-8;
+    
+      double entropyReduction = EvaluatePoint(this, point, kf, priorPointCovariance, pMeas->nLevel, prevPointEntropy);
+            
+      if(!isnan(entropyReduction) ) //if non NAN, todo (adas) need to figure out why nan, probably ill conditioned covariance
+      {
+        totalPreviousEntropy+=prevPointEntropy;
+        totalEntropyReduction +=entropyReduction;
+        totalEntropyPoints++;
+      
+      }
+    }
+  }
+  
+   mvKeyFrameBuffer.push_back(mpTempMKF); //store the MKF
+   ROS_INFO("Tracker: Buffering keyframe: %ld", mvKeyFrameBuffer.size());
+   ROS_INFO("Tracker: Total MKF Entropy Reduction is: %f", totalEntropyReduction);
+    
+  score_pair mp; mp.first = totalEntropyReduction; mp.second = mvKeyFrameBuffer.size() - 1;
+  vKeyframeScores.push_back(mp);
+  
+  if(totalEntropyReduction > bestBufferKeyframeScore) //if we have a new winner
+  {
+    bestBufferKeyframeScore = totalEntropyReduction;
+    bestBufferKeyframeIndex = mvKeyFrameBuffer.size() - 1;
+  }
+  
+ 
 }
 

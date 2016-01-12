@@ -66,6 +66,7 @@
 #define __TRACKER_H
 
 #include <mcptam/Types.h>
+#include <mcptam/MapPoint.h>
 #include <mcptam/Relocaliser.h>
 #include <mcptam/KeyFrame.h>  // needed for LEVELS define
 #include <mcptam/GLWindow2.h>
@@ -75,10 +76,14 @@
 #include <boost/intrusive_ptr.hpp>
 #include <TooN/TooN.h>
 #include <ros/ros.h>
+#include <iostream>
+#include <fstream>
 
 class TrackerData;
 class Map;
 class MapMakerClientBase;
+struct TrackerMeasurementData;
+typedef std::pair<double,int> score_pair;
 
 /// Using a boost intrusive_ptr allows claiming a MapPoint as "used", so it won't
 /// be deleted until it is released. See MapPoint.
@@ -113,6 +118,25 @@ typedef std::map<std::string, V2Levels > V2LevelsMap;
  * 
  *  Uses MultiKeyFrames and MapPoints in the Map to calculate the pose of the current MultiKeyFrame. 
  *  Communicates with a map maker to help build the Map as the environment is explored */
+ 
+ /*struct TrackerMeasData ///tracker data for a SINGLE keyframe (single camera measurement information)
+ {
+	MapPoint* measPoint;						///reference to map point of measurement
+	KeyFrame* measKF;							///keyframe from which this measurement is taken
+	Measurement measData; 						///The actual measurement. 
+	bool mbFound; 								///did the patch finder find the point?
+	
+ };*/
+  
+ 
+ /*struct TrackerMKFData //single element for buffer of MKF
+{
+	MultiKeyFrame* mMKF;		/// partial copy of the "current" MKF while tracking, copy over static variables, but NO measurement data
+	std::map<std::string,std::vector<TrackerMeasData> > mTrackerDataMap; /// map of the tracker data for the n camearas in the group
+	
+};*/
+
+ 
 class Tracker
 {
 public:
@@ -195,6 +219,9 @@ public:
   /// Set the addnext flag to true if map is good and we are not lost, will add subsequent MKF to map
   /// regardless of other metrics
   void AddNext();
+
+  TaylorCameraMap mmCameraModels;             ///< Camera projection models
+  TooN::Matrix<6> mm6PoseCovariance;    ///< covariance of current converged pose estimate
   
   // Static members
   static double sdRotationEstimatorBlur; ///< Amount of blur when constructing SmallBlurryImage
@@ -323,7 +350,18 @@ protected:
   int CountMeasurements();
   
   /// Gives the current MultiKeyFrame to the map maker. The current MultiKeyFrame needs to be regenerated.
-  void AddNewKeyFrame();       
+  void AddNewKeyFrame();  
+  
+   /// Gives a buffered MultiKeyFrame to the map maker. The current MultiKeyFrame needs to be regenerated.
+  void AddNewKeyFrameFromBuffer(int bufferPosition);         
+  
+  /// Records the measurements and Buffers Keyframes while tracking.  We can later select a keyframe from the buffer to add to the map
+  void RecordMeasurementsAndBufferKeyFrame();  
+  
+  /// Clear the keyframe buffer
+  void ClearKeyFrameBuffer();  
+  
+  double CalculatePFPScore(cv::Mat& EPFP, cv::Mat& PPFP);
   
   /// Clears mvIterationSets, which causes the "using" count of MapPoints to decrement as the boost intrusive pointers destruct   
   void ReleasePointLock();
@@ -334,7 +372,8 @@ protected:
   /// Copy the scene depth from the given MKF, used when the map maker take our MKF and we want to regenerate our scene depths
   void CopySceneDepths(MultiKeyFrame& mkf);
   
-  
+  /// Computes the point jacobian (needed for entropy calculations)	
+  TooN::Matrix<2,6> computePointJacobian(TooN::SE3<>& se3BaseFromWorld, TooN::SE3<>& se3CamFromBase, TooN::Vector<3> pointWorldPos);
   // Functions called by TrackFrame
   /** @brief If tracking is lost, try to find the current pose through another means
    * 
@@ -364,6 +403,9 @@ protected:
   
   /// Update the camera-from-world poses of the current KeyFrames, based on the current MultiKeyFrame's pose and the fixed relative transforms
   void UpdateCamsFromWorld();
+
+  /// Update the camera-from-world poses of the current KeyFrames, based on the current MultiKeyFrame's pose and the fixed relative transforms (overloaded so we can do this for each buffered MKF) 
+  void UpdateCamsFromWorld(MultiKeyFrame* mpTempMKF);
   
   /// Calculate the difference between the last pose and the current pose by comparing SmallBlurryImages
   /** @return The pose difference as a 6-vector */
@@ -384,7 +426,6 @@ protected:
   // The major components to which the tracker needs access:
   Map &mMap;                                ///< The Map, consisting of points, multikeyframes and keyframes
   MapMakerClientBase &mMapMaker;              ///< The class which maintains the map
-  TaylorCameraMap mmCameraModels;             ///< Camera projection models
   TaylorCameraMap mmCameraModelsSBI;          ///< Camera projection models again, their image sizes will be resized by SmallBlurryImage
   Relocaliser mRelocaliser;                   ///< Relocalisation module
   
@@ -420,8 +461,7 @@ protected:
   
   ros::Time mLastProcessTime;           ///< Time that the previous image processing step began
   ros::Duration mLastProcessDur;        ///< Time since the previous image processing step start
-  TooN::Matrix<6>	mm6PoseCovariance;		///< covariance of current converged pose estimate
-  //TooN::Matrix<6>	mm6PoseCovarianceNoOutliers;  ///< covariance of current pose estimate with outliers removed
+    //TooN::Matrix<6>	mm6PoseCovarianceNoOutliers;  ///< covariance of current pose estimate with outliers removed
   int mnTotalFound;                 ///< Number of features found by the tracker in the current frame
   int mnTotalAttempted;             ///< Number of features attempted to find by the tracker
   int mnNumInliers;                 ///< Number of measurement inliers for the tracking
@@ -443,6 +483,13 @@ protected:
   ros::Publisher maskPub;   ///< Publisher for the camera image masks
   ros::Publisher timingPub;     ///< Publisher for the Tracker timing messages
   mcptam::TrackerTiming timingMsg;  ///< Message for the various timing sections of the Tracker
+
+  //for keyframe buffering
+  //MultiKeyFramePtrList mvKeyFrameBuffer;
+  std::vector< MultiKeyFrame* > mvKeyFrameBuffer; ///< vector that holds a buffer of MKFs
+  int bestBufferKeyframeIndex; ///< index in the buffer for the keyframe with the best entropy reduction score
+  double bestBufferKeyframeScore; ///< best entropy reduction score so far in the buffer
+  std::vector<score_pair> vKeyframeScores; //vector of pairs which keeps track of 
   
   //testing
   bool mbAddNext;   ///< Add the next MKF now
