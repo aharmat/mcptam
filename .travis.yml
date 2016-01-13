@@ -76,7 +76,8 @@ script:
   - cd ~/catkin_ws
   - catkin_make 
   #testing
-  - bash test/run_catkin_tests.bash
+  - cd ~/catkin_ws
+  - bash src/mcptam/test/run_catkin_tests.bash
   
 
 branches:
