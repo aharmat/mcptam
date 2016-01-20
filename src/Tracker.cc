@@ -84,6 +84,9 @@ double Tracker::sdTrackingQualityBad = 0.13;
 int Tracker::snLostFrameThresh = 3;
 bool Tracker::sbCollectAllPoints = true;
 
+bool kfComparitor ( const score_pair& l, const score_pair& r)
+   { return l.first > r.first; }
+
 // The constructor mostly sets up interal reference variables
 // to the other classes..
 Tracker::Tracker(Map &map, MapMakerClientBase &mapmaker, TaylorCameraMap &cameras, SE3Map poses, ImageRefMap offsets, GLWindow2* pWindow) 
@@ -471,8 +474,55 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
       ROS_DEBUG_STREAM("About to test neednew, mkf depth: "<<mpCurrentMKF->mdTotalDepthMean);
       
       static gvar3<int> gvnAddingMKFs("AddingMKFs", 1, HIDDEN|SILENT);
-      // Heuristics to check if a key-frame should be added to the map:
-      if(mbAddNext || //mMapMaker.Initializing() ||
+      
+      bool use_entropy_keyframe = true;	
+	  if(use_entropy_keyframe) // use the entropy based keyframe method (CPER)
+	  {
+		TooN::Vector<3> trackerEntropy = EvaluateTracker(this);
+      	std::cout<<"tracker entropy: " << trackerEntropy <<std::endl;
+      	double entropyThresh = -4.0;
+		bool addEntropyMKF = false;
+		RecordMeasurementsAndBufferKeyFrame(); //todo (adas) turn into circular buffer
+		
+		MultiKeyFrame* closest_mkf = mMapMaker.ClosestMultiKeyFrame(*mpCurrentMKF);
+		double distance_to_closest_mkf = closest_mkf->Distance(*mpCurrentMKF);
+		ROS_INFO_STREAM("distance to closest mkf is: " << distance_to_closest_mkf);
+		
+		if( (trackerEntropy[0] > entropyThresh ) || (trackerEntropy[1] > entropyThresh ) || (trackerEntropy[2] > entropyThresh ) )
+      	{
+
+			addEntropyMKF = true;
+		}
+
+		if(addEntropyMKF && distance_to_closest_mkf > 0.5) //add new keyframe //todo (adas) figure how to to limit the number of mkf we add at once.  Problem is that we can't tell how long it will take for the mkf to get into the map.  Need a smart way of adding a "delay" between additions
+		{
+			mMessageForUser << " SHOULD BE Adding MultiKeyFrame to Map";
+			//sort keyframe vec
+        	std::sort (vKeyframeScores.begin(), vKeyframeScores.end(), kfComparitor);
+        
+        	if(vKeyframeScores.size()>0)
+        	{
+				double bestSortIndex = vKeyframeScores[0].second;
+				int k_itr = 1;
+				while( bestSortIndex < vKeyframeScores.size()/2)
+				{
+					bestSortIndex = vKeyframeScores[k_itr].second;
+					k_itr++;
+				}
+			
+			//double bestMKFScore = vKeyframeScores[k_itr].first;
+			AddNewKeyFrameFromBuffer(bestSortIndex); 
+			std::cout<<"adding MKF: " << bestSortIndex << "with score: " << bestBufferKeyframeScore<< "Entropy Tracker" << trackerEntropy<< std::endl;
+			bestBufferKeyframeIndex = 0;
+			bestBufferKeyframeScore = 0;
+			//clear score buffer
+			vKeyframeScores.clear();
+		}
+        
+		}
+	  }	
+	// Heuristics to check if a key-frame should be added to the map:
+     else if(mbAddNext || //mMapMaker.Initializing() ||
          (*gvnAddingMKFs &&
           mOverallTrackingQuality == GOOD &&
           mnLostFrames == 0 &&
@@ -1937,4 +1987,96 @@ void Tracker::RecordMeasurementsAndBufferKeyFrame()
   
  
 }
+
+void Tracker::AddNewKeyFrameFromBuffer(int bufferPosition)
+{
+	
+	if( (int)mvKeyFrameBuffer.size() < bufferPosition) //exceeding index
+		return;
+	
+	static gvar3<int> gvnCrossCamera("CrossCamera", 1, HIDDEN|SILENT);
+	//note: should check to make sure index doesnt exceed buffer size
+	
+	//pull out the keyframe from the buffer
+	MultiKeyFrame* mpTempMKF =  mvKeyFrameBuffer[bufferPosition];
+	
+	//set it's status to NOT a bufferkeyframe (it's getting inserted into the map!
+	mpTempMKF->isBufferMKF = false;
+	
+	
+	//iterate through all the measurements in the chosen MKF and all all the measurements to the map points
+	
+	//boost::mutex::scoped_lock lock(mMap.mMutex);
+	
+	for(KeyFramePtrMap::iterator it = mpTempMKF->mmpKeyFrames.begin(); it != mpTempMKF->mmpKeyFrames.end(); ++it)
+	{    
+	  std::string cName = (it->first);
+	  KeyFrame* kf = (it->second); 
+	  
+	  //std::cout<<"At Keyframe %x " << &kf <<std::endl;
+	  
+	  //iterate through each measurement map in the keyframe
+	  
+	  std::vector<MapPoint*> ptsToDelete;
+	  
+		for(MeasPtrMap::iterator it_mp = kf->mmpMeasurements.begin(); it_mp != kf->mmpMeasurements.end(); ++it_mp)
+		{ 
+			MapPoint& kf_point = *(it_mp->first);
+			
+			//IMPORTANT: check to see if the pointer is still in the map! It may have been trashed by the map maker
+			
+			if(std::count(mMap.mlpPoints.begin(), mMap.mlpPoints.end(), &kf_point)) //is the point still in the map??
+			{
+			
+							
+				//if(kf_point.mMMData.spMeasurementKFs.count(kf)) //if its not in there already, or is bad (bad points taken car of when handed to map maker)
+					//continue;
+				
+					//std::cout<<"inserting keyframe " << kf.mCamName << " at point %x " <<  &kf_point <<std::endl;
+				//boost::mutex::scoped_lock lock(kf->mMeasMutex);
+				
+				kf_point.mMMData.spMeasurementKFs.insert(kf); //add measurements of the keyframe to the point
+			}
+			else //want to erase measurement to the point
+			{
+				//std::cout<<"erasing meas of nonexisting point..."<<std::endl;
+				//kf->EraseMeasurementOfPoint(&kf_point); 
+				//kf_point.mMMData.spMeasurementKFs.erase(kf);
+				
+				ptsToDelete.push_back(&kf_point);
+			}
+				
+		}
+		
+		for(int i=0; i<(int)ptsToDelete.size(); i++)
+		{
+			kf->EraseMeasurementOfPoint(ptsToDelete[i]);
+		}
+	
+				
+	}
+	
+	mMapMaker.AddMultiKeyFrame(mpTempMKF);  // map maker takes ownership
+	
+	//now we can delete the buffer
+	
+	int bufferSize = (int)mvKeyFrameBuffer.size();
+	
+	for(int i=0; i<bufferSize; i++) // for the whole buffer
+	{
+		
+		if(i==bufferPosition)
+				continue; //skip this, otherwise we'll delete the data for our selected keyframe!
+		
+		MultiKeyFrame *pMKF = mvKeyFrameBuffer[i];
+		delete pMKF;
+		pMKF = NULL;
+		
+	}
+	
+	mvKeyFrameBuffer.clear(); //clear the buffer.  Note: this clears the pointers in the buffer, but doesn't call delete on each item, so we retain the data for the selected insterted keyframe
+	
+		
+	
+}    
 

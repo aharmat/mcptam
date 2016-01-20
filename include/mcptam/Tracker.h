@@ -83,7 +83,7 @@ class TrackerData;
 class Map;
 class MapMakerClientBase;
 struct TrackerMeasurementData;
-typedef std::pair<double,int> score_pair;
+typedef std::pair<double,int> score_pair; // pair to keep track of keyframe score (double is score, int is index)
 
 /// Using a boost intrusive_ptr allows claiming a MapPoint as "used", so it won't
 /// be deleted until it is released. See MapPoint.
