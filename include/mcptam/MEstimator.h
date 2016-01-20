@@ -1,13 +1,13 @@
 /*************************************************************************
- *  
- *  
- *  Copyright 2014  Adam Harmat (McGill University) 
+ *
+ *
+ *  Copyright 2014  Adam Harmat (McGill University)
  *                      [adam.harmat@mail.mcgill.ca]
  *                  Michael Tribou (University of Waterloo)
  *                      [mjtribou@uwaterloo.ca]
  *
  *  Multi-Camera Parallel Tracking and Mapping (MCPTAM) is free software:
- *  you can redistribute it and/or modify it under the terms of the GNU 
+ *  you can redistribute it and/or modify it under the terms of the GNU
  *  General Public License as published by the Free Software Foundation,
  *  either version 3 of the License, or (at your option) any later
  *  version.
@@ -19,13 +19,12 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *  
+ *
  *  MCPTAM is based on the Parallel Tracking and Mapping (PTAM) software.
  *  Copyright 2008 Isis Innovation Limited
- *  
- *  
+ *
+ *
  ************************************************************************/
-
 
 /****************************************************************************************
  *
@@ -41,8 +40,8 @@
  *
  ****************************************************************************************/
 
-#ifndef __M_ESTIMATOR_H
-#define __M_ESTIMATOR_H
+#ifndef MCPTAM_MESTIMATOR_H
+#define MCPTAM_MESTIMATOR_H
 
 #include <vector>
 #include <algorithm>
@@ -50,7 +49,7 @@
 
 struct Tukey
 {
-  inline static double FindSigmaSquared(std::vector<double> &vErrorSquared, bool bPrint=false);
+  inline static double FindSigmaSquared(std::vector<double> &vErrorSquared, bool bPrint = false);
   inline static double SquareRootWeight(double dErrorSquared, double dSigmaSquared);
   inline static double Weight(double dErrorSquared, double dSigmaSquared);
   inline static double ObjectiveScore(double dErrorSquared, double dSigmaSquared);
@@ -80,7 +79,6 @@ struct LeastSquares
   inline static double ObjectiveScore(double dErrorSquared, double dSigmaSquared);
 };
 
-
 inline double Tukey::Weight(double dErrorSquared, double dSigmaSquared)
 {
   double dSqrt = SquareRootWeight(dErrorSquared, dSigmaSquared);
@@ -89,7 +87,7 @@ inline double Tukey::Weight(double dErrorSquared, double dSigmaSquared)
 
 inline double Tukey::SquareRootWeight(double dErrorSquared, double dSigmaSquared)
 {
-  if(dErrorSquared > dSigmaSquared)
+  if (dErrorSquared > dSigmaSquared)
     return 0.0;
   else
     return 1.0 - (dErrorSquared / dSigmaSquared);
@@ -99,32 +97,30 @@ inline double Tukey::ObjectiveScore(double dErrorSquared, const double dSigmaSqu
 {
   // NB All returned are scaled because
   // I'm not multiplying by sigmasquared/6.0
-  if(dErrorSquared > dSigmaSquared)
+  if (dErrorSquared > dSigmaSquared)
     return 1.0;
   double d = 1.0 - dErrorSquared / dSigmaSquared;
-  return (1.0 - d*d*d);
+  return (1.0 - d * d * d);
 }
 
-
 inline double Tukey::FindSigmaSquared(std::vector<double> &vErrorSquared, bool bPrint)
-{ 
-  double dSigmaSquared; 
+{
+  double dSigmaSquared;
   assert(vErrorSquared.size() > 0);
   std::sort(vErrorSquared.begin(), vErrorSquared.end());
   double dMedianSquared = vErrorSquared[vErrorSquared.size() / 2];
-  if(bPrint)
+  if (bPrint)
   {
-    ROS_INFO_STREAM("Median Squared: "<<dMedianSquared<<" sqrt: "<<sqrt(dMedianSquared));
+    ROS_INFO_STREAM("Median Squared: " << dMedianSquared << " sqrt: " << sqrt(dMedianSquared));
     ROS_INFO_STREAM("Errors:");
-    for(unsigned i=0; i < vErrorSquared.size(); ++i)
+    for (unsigned i = 0; i < vErrorSquared.size(); ++i)
       ROS_INFO_STREAM(vErrorSquared[i]);
   }
   double dSigma = 1.4826 * (1 + 5.0 / (vErrorSquared.size() * 2 - 6)) * sqrt(dMedianSquared);
-  dSigma =  4.6851 * dSigma;
+  dSigma = 4.6851 * dSigma;
   dSigmaSquared = dSigma * dSigma;
   return dSigmaSquared;
 }
-
 
 ///////////////////////////////////////
 ///////////////////////////////////////
@@ -146,19 +142,17 @@ inline double Cauchy::ObjectiveScore(double dErrorSquared, const double dSigmaSq
   return log(1.0 + dErrorSquared / dSigmaSquared);
 }
 
-
 inline double Cauchy::FindSigmaSquared(std::vector<double> &vErrorSquared)
-{ 
-  double dSigmaSquared; 
+{
+  double dSigmaSquared;
   assert(vErrorSquared.size() > 0);
   std::sort(vErrorSquared.begin(), vErrorSquared.end());
   double dMedianSquared = vErrorSquared[vErrorSquared.size() / 2];
   double dSigma = 1.4826 * (1 + 5.0 / (vErrorSquared.size() * 2 - 6)) * sqrt(dMedianSquared);
-  dSigma =  4.6851 * dSigma;
+  dSigma = 4.6851 * dSigma;
   dSigmaSquared = dSigma * dSigma;
   return dSigmaSquared;
 }
-
 
 ///////////////////////////////////////
 ///////////////////////////////////////
@@ -167,7 +161,7 @@ inline double Cauchy::FindSigmaSquared(std::vector<double> &vErrorSquared)
 
 inline double Huber::Weight(double dErrorSquared, double dSigmaSquared)
 {
-  if(dErrorSquared < dSigmaSquared)
+  if (dErrorSquared < dSigmaSquared)
     return 1;
   else
     return sqrt(dSigmaSquared / dErrorSquared);
@@ -180,25 +174,24 @@ inline double Huber::SquareRootWeight(double dErrorSquared, double dSigmaSquared
 
 inline double Huber::ObjectiveScore(double dErrorSquared, const double dSigmaSquared)
 {
-  if(dErrorSquared< dSigmaSquared)
+  if (dErrorSquared < dSigmaSquared)
     return 0.5 * dErrorSquared;
   else
-    {
-      double dSigma = sqrt(dSigmaSquared);
-      double dError = sqrt(dErrorSquared);
-      return dSigma * ( dError - 0.5 * dSigma);
-    }
+  {
+    double dSigma = sqrt(dSigmaSquared);
+    double dError = sqrt(dErrorSquared);
+    return dSigma * (dError - 0.5 * dSigma);
+  }
 }
 
-
 inline double Huber::FindSigmaSquared(std::vector<double> &vErrorSquared)
-{ 
-  double dSigmaSquared; 
+{
+  double dSigmaSquared;
   assert(vErrorSquared.size() > 0);
   std::sort(vErrorSquared.begin(), vErrorSquared.end());
   double dMedianSquared = vErrorSquared[vErrorSquared.size() / 2];
   double dSigma = 1.4826 * (1 + 5.0 / (vErrorSquared.size() * 2 - 6)) * sqrt(dMedianSquared);
-  dSigma =  1.345 * dSigma;
+  dSigma = 1.345 * dSigma;
   dSigmaSquared = dSigma * dSigma;
   return dSigmaSquared;
 }
@@ -223,16 +216,14 @@ inline double LeastSquares::ObjectiveScore(double dErrorSquared, const double dS
   return dErrorSquared;
 }
 
-
 inline double LeastSquares::FindSigmaSquared(std::vector<double> &vErrorSquared)
-{ 
-  if(vErrorSquared.size() == 0)
+{
+  if (vErrorSquared.size() == 0)
     return 0.0;
   double dSum = 0.0;
-  for(unsigned int i=0; i<vErrorSquared.size(); i++)
-    dSum+=vErrorSquared[i];
+  for (unsigned int i = 0; i < vErrorSquared.size(); i++)
+    dSum += vErrorSquared[i];
   return dSum / vErrorSquared.size();
 }
 
-#endif
-
+#endif  // MCPTAM_MESTIMATOR_H

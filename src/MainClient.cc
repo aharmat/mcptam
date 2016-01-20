@@ -1,13 +1,13 @@
 /*************************************************************************
- *  
- *  
- *  Copyright 2014  Adam Harmat (McGill University) 
+ *
+ *
+ *  Copyright 2014  Adam Harmat (McGill University)
  *                      [adam.harmat@mail.mcgill.ca]
  *                  Michael Tribou (University of Waterloo)
  *                      [mjtribou@uwaterloo.ca]
  *
  *  Multi-Camera Parallel Tracking and Mapping (MCPTAM) is free software:
- *  you can redistribute it and/or modify it under the terms of the GNU 
+ *  you can redistribute it and/or modify it under the terms of the GNU
  *  General Public License as published by the Free Software Foundation,
  *  either version 3 of the License, or (at your option) any later
  *  version.
@@ -19,13 +19,12 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *  
+ *
  *  MCPTAM is based on the Parallel Tracking and Mapping (PTAM) software.
  *  Copyright 2008 Isis Innovation Limited
- *  
- *  
+ *
+ *
  ************************************************************************/
-
 
 /****************************************************************************************
  *
@@ -50,7 +49,7 @@ int main(int argc, char** argv)
 {
   ros::init(argc, argv, "mcptam_client");
   ros::NodeHandle nh;
-  
+
   ROS_INFO("  Welcome to mcptam_client ");
   ROS_INFO("  ------------------------ ");
   ROS_INFO("  Multiple Camera Parallel Tracking and Mapping (MCPTAM");
@@ -74,29 +73,19 @@ int main(int argc, char** argv)
   ROS_INFO("  Based on Parallel Tracking and Mapping (PTAM) software");
   ROS_INFO("  Copyright 2008 Isis Innovation Limited");
   ROS_INFO("  ");
-  
+
   LoadStaticParamsGeneral();
   LoadStaticParamsClient();
-  
+
   try
   {
     SystemClient sys;
     sys.Run();
   }
-  catch(CVD::Exceptions::All e)
+  catch (CVD::Exceptions::All e)
   {
     ROS_ERROR("Failed to run mcptam_client; got exception. ");
     ROS_ERROR("   Exception was: ");
     ROS_ERROR_STREAM(e.what);
   }
 }
-
-
-
-
-
-
-
-
-
-

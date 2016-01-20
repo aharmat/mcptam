@@ -1,13 +1,13 @@
 /*************************************************************************
- *  
- *  
- *  Copyright 2014  Adam Harmat (McGill University) 
+ *
+ *
+ *  Copyright 2014  Adam Harmat (McGill University)
  *                      [adam.harmat@mail.mcgill.ca]
  *                  Michael Tribou (University of Waterloo)
  *                      [mjtribou@uwaterloo.ca]
  *
  *  Multi-Camera Parallel Tracking and Mapping (MCPTAM) is free software:
- *  you can redistribute it and/or modify it under the terms of the GNU 
+ *  you can redistribute it and/or modify it under the terms of the GNU
  *  General Public License as published by the Free Software Foundation,
  *  either version 3 of the License, or (at your option) any later
  *  version.
@@ -19,13 +19,12 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *  
+ *
  *  MCPTAM is based on the Parallel Tracking and Mapping (PTAM) software.
  *  Copyright 2008 Isis Innovation Limited
- *  
- *  
+ *
+ *
  ************************************************************************/
-
 
 //=========================================================================================
 //
@@ -53,10 +52,8 @@
 using namespace GVars3;
 using namespace TooN;
 
-SystemServer::SystemServer()
-: SystemBase("mcptam_server", true, true)
-, mImageTransport(mNodeHandle)
-{ 
+SystemServer::SystemServer() : SystemBase("mcptam_server", true, true), mImageTransport(mNodeHandle)
+{
   // Register some commands with GVars, these commands will be triggered
   // by button presses and will result in GUICommandCallBack being called
   GUI.RegisterCommand("exit", GUICommandCallBack, this);
@@ -66,7 +63,7 @@ SystemServer::SystemServer()
   GUI.RegisterCommand("ShowPrevKeyFrame", GUICommandCallBack, this);
   GUI.RegisterCommand("KeyPress", GUICommandCallBack, this);
   GUI.RegisterCommand("InitTracker", GUICommandCallBack, this);
-  
+
   // Add menu groupings and buttons to the GL window
   /* Menu
   Root
@@ -81,21 +78,21 @@ SystemServer::SystemServer()
     | +-> Show Prev
     | +-> Level
   */
-  
+
   GUI.ParseLine("GLWindow.AddMenu Menu Menu");
   GUI.ParseLine("Menu.ShowMenu Root");
-  
+
   GUI.ParseLine("DrawTrackerMeas=1");
   GUI.ParseLine("DrawCandidates=0");
   GUI.ParseLine("DrawLevel=0");
   GUI.ParseLine("LevelZeroPoints=1");
-  
+
   bool bLevelZeroPoints;
   mNodeHandlePriv.param<bool>("level_zero_points", bLevelZeroPoints, true);
-  
-  static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN|SILENT);
+
+  static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN | SILENT);
   *gvnLevelZeroPoints = bLevelZeroPoints;
-  
+
   // Main Menu
   GUI.ParseLine("Menu.AddMenuButton Root Reset Reset Root");
   GUI.ParseLine("Menu.AddMenuButton Root Init InitTracker Root");
@@ -109,34 +106,36 @@ SystemServer::SystemServer()
   GUI.ParseLine("Menu.AddMenuButton View \"Show Next\" ShowNextKeyFrame View");
   GUI.ParseLine("Menu.AddMenuButton View \"Show Prev\" ShowPrevKeyFrame View");
   GUI.ParseLine("Menu.AddMenuSlider View \"Level\" DrawLevel 0 3 View");
-  
+
   // All of these will need to be remapped so advertise it in global namespace for ease of remapping
   mInitSystemClient = mNodeHandle.serviceClient<std_srvs::Empty>("init");
-  while(!mInitSystemClient.waitForExistence(ros::Duration(5)) && ros::ok())
-		ROS_WARN_STREAM("SystemServer: Waiting for init service to be advertised by SystemClient...");
-    
+  while (!mInitSystemClient.waitForExistence(ros::Duration(5)) && ros::ok())
+    ROS_WARN_STREAM("SystemServer: Waiting for init service to be advertised by SystemClient...");
+
   mResetSystemClient = mNodeHandle.serviceClient<mcptam::Reset>("reset");
-  while(!mResetSystemClient.waitForExistence(ros::Duration(5)) && ros::ok())
-		ROS_WARN_STREAM("SystemServer: Waiting for reset service to be advertised by SystemClient...");
-  
+  while (!mResetSystemClient.waitForExistence(ros::Duration(5)) && ros::ok())
+    ROS_WARN_STREAM("SystemServer: Waiting for reset service to be advertised by SystemClient...");
+
   mSystemInfoSub = mNodeHandle.subscribe("system_info", 1, &SystemServer::SystemInfoCallback, this);
   mTrackerStateSub = mNodeHandle.subscribe("tracker_state", 1, &SystemServer::TrackerStateCallback, this);
-  //mTrackerSmallImageSub = mImageTransport.subscribe("tracker_small_image", 1, &SystemServer::TrackerSmallImageCallback, this);
-  
-  mSmallImageSub = mImageTransport.subscribe("tracker_small_image", 1, &SystemServer::TrackerSmallImageCallback, this); 
-  mSmallImagePointsSub = mNodeHandle.subscribe("tracker_small_image_points", 1, &SystemServer::TrackerSmallImagePointsCallback, this);
-  
+  // mTrackerSmallImageSub = mImageTransport.subscribe("tracker_small_image", 1,
+  // &SystemServer::TrackerSmallImageCallback, this);
+
+  mSmallImageSub = mImageTransport.subscribe("tracker_small_image", 1, &SystemServer::TrackerSmallImageCallback, this);
+  mSmallImagePointsSub =
+      mNodeHandle.subscribe("tracker_small_image_points", 1, &SystemServer::TrackerSmallImagePointsCallback, this);
+
   mpBundleAdjuster = new BundleAdjusterMulti(*mpMap, mmCameraModels);
   mpMapMakerServer = new MapMakerServer(*mpMap, mmCameraModels, *mpBundleAdjuster);
   mpKeyFrameViewer = new KeyFrameViewer(*mpMap, *mpGLWindow, mmDrawOffsets, mpVideoSourceMulti->GetSizes());
-  
+
   // VideoSourceMulti was only needed to build mmCameraModels, delete it so that
   // subscribers shut down
   delete mpVideoSourceMulti;
   mpVideoSourceMulti = NULL;
 
   mbDone = false;
-  
+
   // Data that we'll receive from client side
   mTrackingQuality = Tracker::NONE;
   mbTrackerLost = false;
@@ -155,69 +154,68 @@ SystemServer::~SystemServer()
 
 void SystemServer::Run()
 {
-  while(!mbDone && ros::ok())
+  while (!mbDone && ros::ok())
   {
     mCallbackQueueROS.callAvailable();
-    
+
     mpGLWindow->SetupViewport();
     mpGLWindow->SetupVideoOrtho();
     mpGLWindow->SetupVideoRasterPosAndZoom();
-    
-    glClearColor(0,0,0,1);
+
+    glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
-    
-    static gvar3<std::string> gvsCurrentSubMenu("Menu.CurrentSubMenu", "", HIDDEN|SILENT);
+
+    static gvar3<std::string> gvsCurrentSubMenu("Menu.CurrentSubMenu", "", HIDDEN | SILENT);
     bool bDrawKeyFrames = *gvsCurrentSubMenu == "View";
-    
-    static gvar3<int> gvnDrawTrackerMeas("DrawTrackerMeas", 1, HIDDEN|SILENT);
-    
+
+    static gvar3<int> gvnDrawTrackerMeas("DrawTrackerMeas", 1, HIDDEN | SILENT);
+
     std::stringstream captionStream;
-    
-    if(!bDrawKeyFrames)
+
+    if (!bDrawKeyFrames)
     {
       CVD::ImageRef irWindowSize = mpGLWindow->GetWindowSize();
       CVD::ImageRef irOffset = (irWindowSize - mTrackerSmallImage.size()) * 0.5;
-      CVD::ImageRef irZero(0,0);
-      if(irOffset < irZero)
+      CVD::ImageRef irZero(0, 0);
+      if (irOffset < irZero)
         irOffset = irZero;
-        
+
       glRasterPos(irOffset);  // Top left corner
       glDrawPixels(mTrackerSmallImage);
-      
-      if(*gvnDrawTrackerMeas)
+
+      if (*gvnDrawTrackerMeas)
       {
         glPointSize(4);
         glEnable(GL_BLEND);
         glEnable(GL_POINT_SMOOTH);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glBegin(GL_POINTS);
-        
-        for(unsigned i=0; i < mTrackerSmallImagePoints.points.size(); ++i)
+
+        for (unsigned i = 0; i < mTrackerSmallImagePoints.points.size(); ++i)
         {
           pcl::PointXYZ& point = mTrackerSmallImagePoints.points[i];
           CVD::glColor(gavLevelColors[(int)point.z]);
           CVD::glVertex(CVD::vec(irOffset) + TooN::makeVector(point.x, point.y));
         }
-        
+
         glEnd();
       }
-      
+
       double dMaxPointCov = mpMapMakerServer->GetMaxCov();
-      
-      if(dMaxPointCov > 0)
+
+      if (dMaxPointCov > 0)
       {
-        double dRedFrac = dMaxPointCov/10;
-        if(dRedFrac > 1)
+        double dRedFrac = dMaxPointCov / 10;
+        if (dRedFrac > 1)
           dRedFrac = 1.0;
-        double dGreenFac = 1-dRedFrac;
+        double dGreenFac = 1 - dRedFrac;
         std::stringstream sscov;
-        sscov<<"Max cov: "<<dMaxPointCov;
+        sscov << "Max cov: " << dMaxPointCov;
         std::string covstring = sscov.str();
-      
-        glColor3f(dRedFrac,dGreenFac,0);
-        mpGLWindow->PrintString(CVD::ImageRef(10,80), covstring, 15);
+
+        glColor3f(dRedFrac, dGreenFac, 0);
+        mpGLWindow->PrintString(CVD::ImageRef(10, 80), covstring, 15);
       }
-      
     }
     else
     {
@@ -225,16 +223,19 @@ void SystemServer::Run()
       captionStream << mpKeyFrameViewer->GetMessageForUser();
       captionStream << std::endl;
     }
-    
-    if(mTrackingQuality != Tracker::NONE)
+
+    if (mTrackingQuality != Tracker::NONE)
     {
-      if(!mbTrackerLost)
+      if (!mbTrackerLost)
       {
         captionStream << "Tracking Map, quality ";
-        if(mTrackingQuality == Tracker::GOOD)  captionStream << "good.";
-        if(mTrackingQuality == Tracker::DODGY) captionStream << "poor.";
-        if(mTrackingQuality == Tracker::BAD)   captionStream << "bad.";
-        
+        if (mTrackingQuality == Tracker::GOOD)
+          captionStream << "good.";
+        if (mTrackingQuality == Tracker::DODGY)
+          captionStream << "poor.";
+        if (mTrackingQuality == Tracker::BAD)
+          captionStream << "bad.";
+
         captionStream << std::endl;
       }
       else
@@ -244,25 +245,25 @@ void SystemServer::Run()
     }
     else
     {
-      captionStream << "Waiting to initialize tracker"<<std::endl;
+      captionStream << "Waiting to initialize tracker" << std::endl;
     }
-    
-    captionStream<<"Frame Grab Success Ratio: "<<mdGrabSuccessRatio<<std::endl;
-    captionStream<<"Frame Grab Dur: "<<mdFrameGrabDuration<<std::endl;
-    captionStream<<"Frame Delay Dur: "<<mdFrameDelayDuration<<std::endl;
-    captionStream<<"Tracking Dur: "<<mdTrackingDuration<<std::endl;
-    captionStream<<"FPS: "<<mdFPS<<std::endl;
-    
+
+    captionStream << "Frame Grab Success Ratio: " << mdGrabSuccessRatio << std::endl;
+    captionStream << "Frame Grab Dur: " << mdFrameGrabDuration << std::endl;
+    captionStream << "Frame Delay Dur: " << mdFrameDelayDuration << std::endl;
+    captionStream << "Tracking Dur: " << mdTrackingDuration << std::endl;
+    captionStream << "FPS: " << mdFPS << std::endl;
+
     // Add current time to have some indication of being alive
-    captionStream << "Time: "<<ros::Time::now();
+    captionStream << "Time: " << ros::Time::now();
 
     mpGLWindow->DrawCaption(captionStream.str());
     mpGLWindow->DrawMenus();
     mpGLWindow->swap_buffers();
     mpGLWindow->HandlePendingEvents();
-    
+
     // GUI interface
-    while(!mqCommands.empty())
+    while (!mqCommands.empty())
     {
       GUICommandHandler(mqCommands.front().command, mqCommands.front().params);
       mqCommands.pop();
@@ -273,18 +274,18 @@ void SystemServer::Run()
 // Deals with user interface commands
 void SystemServer::GUICommandHandler(std::string command, std::string params)
 {
-  if(command=="quit" || command == "exit")
+  if (command == "quit" || command == "exit")
   {
     mbDone = true;
     return;
   }
-  
-  if(command=="Reset")
+
+  if (command == "Reset")
   {
     mcptam::Reset reset_srv;
     reset_srv.request.bReInit = false;
     reset_srv.request.bSavePose = false;
-    while(!mResetSystemClient.call(reset_srv) && ros::ok())
+    while (!mResetSystemClient.call(reset_srv) && ros::ok())
     {
       ROS_INFO("SystemServer: Trying to reset system...");
       ros::Duration(0.5).sleep();
@@ -292,61 +293,61 @@ void SystemServer::GUICommandHandler(std::string command, std::string params)
 
     return;
   }
-  
-  if(command=="ShowNextKeyFrame")
+
+  if (command == "ShowNextKeyFrame")
   {
     mpKeyFrameViewer->Next();
     return;
   }
-  
-  if(command=="ShowPrevKeyFrame")
+
+  if (command == "ShowPrevKeyFrame")
   {
     mpKeyFrameViewer->Prev();
     return;
   }
-  
+
   // KeyPress commands are issued by GLWindow
-  if(command=="KeyPress")
+  if (command == "KeyPress")
   {
-    if(params == "Space")  // send start signal to tracker
+    if (params == "Space")  // send start signal to tracker
     {
       std_srvs::Empty srv;
-      while(!mInitSystemClient.call(srv) && ros::ok())
+      while (!mInitSystemClient.call(srv) && ros::ok())
       {
         ROS_INFO("SystemServer: Trying to initialize system...");
         ros::Duration(0.5).sleep();
       }
     }
-    else if(params == "r")  // reset
+    else if (params == "r")  // reset
     {
       mcptam::Reset reset_srv;
       reset_srv.request.bReInit = false;
       reset_srv.request.bSavePose = false;
-      while(!mResetSystemClient.call(reset_srv) && ros::ok())
+      while (!mResetSystemClient.call(reset_srv) && ros::ok())
       {
         ROS_INFO("SystemServer: Trying to reset system...");
         ros::Duration(0.5).sleep();
       }
     }
-    else if(params == "q" || params == "Escape")
+    else if (params == "q" || params == "Escape")
     {
       mbDone = true;
     }
     return;
   }
-  
-  if(command=="InitTracker")  // send start signal to tracker
+
+  if (command == "InitTracker")  // send start signal to tracker
   {
     std_srvs::Empty srv;
-    while(!mInitSystemClient.call(srv) && ros::ok())
+    while (!mInitSystemClient.call(srv) && ros::ok())
     {
       ROS_INFO("SystemServer: Trying to initialize system...");
       ros::Duration(0.5).sleep();
     }
-    
+
     return;
   }
-  
+
   ROS_FATAL_STREAM("SystemServer: Unhandled command in GUICommandHandler: " << command);
   ros::shutdown();
 }
@@ -359,7 +360,7 @@ void SystemServer::SystemInfoCallback(const mcptam::SystemInfoConstPtr& infoMsg)
   mdTrackingDuration = infoMsg->dTrackingDuration;
   mdFPS = infoMsg->dFPS;
   mdGrabSuccessRatio = infoMsg->dGrabSuccessRatio;
-  //std::cout<<infoMsg->message<<std::endl;
+  // std::cout<<infoMsg->message<<std::endl;
 }
 
 // Callback called when a new tracker state message received
@@ -376,9 +377,9 @@ void SystemServer::TrackerStateCallback(const mcptam::TrackerStateConstPtr& stat
 void SystemServer::TrackerSmallImageCallback(const sensor_msgs::ImageConstPtr& imageMsg)
 {
   ROS_DEBUG("In TrackerSmallImageCallback!");
-  
+
   cv_bridge::CvImageConstPtr cvPtr;
-  
+
   try
   {
     // Try a conversion
@@ -389,8 +390,8 @@ void SystemServer::TrackerSmallImageCallback(const sensor_msgs::ImageConstPtr& i
     ROS_ERROR("TrackerSmallImageCallback: cv_bridge exception: %s", e.what());
     return;
   }
-  
-  util::ConversionRGB(cvPtr->image, mTrackerSmallImage);  
+
+  util::ConversionRGB(cvPtr->image, mTrackerSmallImage);
 }
 
 // Callback called when a new small preview image point set is received

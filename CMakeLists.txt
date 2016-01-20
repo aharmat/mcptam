@@ -10,8 +10,8 @@ set(CMAKE_BUILD_TYPE None)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x -march=core2 -msse3 -O3 -g -fopenmp")
 
 # Find various packages in order to set up environment variables
-find_package(catkin REQUIRED COMPONENTS roscpp image_transport sensor_msgs cv_bridge geometry_msgs tf message_filters std_msgs
-                                        std_srvs visualization_msgs dynamic_reconfigure pcl_ros message_generation)
+find_package(catkin REQUIRED COMPONENTS roscpp image_transport sensor_msgs cv_bridge geometry_msgs tf message_filters std_msgs std_srvs visualization_msgs dynamic_reconfigure pcl_ros message_generation roslint)
+
 find_package(Boost REQUIRED COMPONENTS system thread)
 find_package(CVD REQUIRED)
 find_package(OpenGL REQUIRED)
@@ -46,9 +46,11 @@ generate_messages(DEPENDENCIES std_msgs sensor_msgs)
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}
-  CATKIN_DEPENDS roscpp image_transport sensor_msgs cv_bridge geometry_msgs tf message_filters std_msgs std_srvs 
-                 visualization_msgs dynamic_reconfigure pcl_ros message_runtime
+  CATKIN_DEPENDS roscpp image_transport sensor_msgs cv_bridge geometry_msgs tf message_filters std_msgs std_srvs visualization_msgs dynamic_reconfigure pcl_ros message_runtime
   DEPENDS SuiteSparse CVD OpenGL GVars3)
+
+# Check source for formatting
+roslint_cpp()
 
 add_executable(mcptam src/Main.cc src/GLWindow2.cc src/GLWindowMenu.cc src/VideoSourceMulti.cc src/CameraGroupSubscriber.cc 
                       src/SystemBase.cc src/SystemFrontendBase.cc src/System.cc src/TaylorCamera.cc src/KeyFrame.cc src/MapPoint.cc src/Map.cc 
