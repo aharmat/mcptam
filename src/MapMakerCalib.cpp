@@ -115,9 +115,9 @@ bool MapMakerCalib::InitFromCalibImage(CalibImageTaylor& calibImage, double dSqu
       pNewPoint->mirCenter = CVD::ir_rounded(LevelNPos(v2RootPos, l));
       pNewPoint->mv3Center_NC = mmCameraModels[cameraName].UnProject(v2RootPos);
       pNewPoint->mv3OneRightFromCenter_NC =
-          mmCameraModels[cameraName].UnProject(v2RootPos + CVD::vec(CVD::ImageRef(nLevelScale, 0)));
+        mmCameraModels[cameraName].UnProject(v2RootPos + CVD::vec(CVD::ImageRef(nLevelScale, 0)));
       pNewPoint->mv3OneDownFromCenter_NC =
-          mmCameraModels[cameraName].UnProject(v2RootPos + CVD::vec(CVD::ImageRef(0, nLevelScale)));
+        mmCameraModels[cameraName].UnProject(v2RootPos + CVD::vec(CVD::ImageRef(0, nLevelScale)));
 
       normalize(pNewPoint->mv3Center_NC);
       normalize(pNewPoint->mv3OneDownFromCenter_NC);
@@ -306,7 +306,7 @@ SE3Map MapMakerCalib::FindAverageRelativePoses()
         {
           n++;
           r += (R.inverse() * mkf.mmpKeyFrames[camName]->mse3CamFromBase.get_rotation())
-                   .ln();  // incorporate KeyFrame's pose
+               .ln();  // incorporate KeyFrame's pose
         }
       }
 
@@ -377,11 +377,11 @@ bool MapMakerCalib::CalibInit()
   ROS_INFO("****************************************************************");
 
   ROS_INFO_STREAM("BEFORE RemoveMultiKeyFrames there are " << mMap.mlpMultiKeyFrames.size() << " MKFs and "
-                                                           << mMap.mlpPoints.size() << " points");
+                  << mMap.mlpPoints.size() << " points");
   std::string firstCamName = mmCameraModels.begin()->first;
   RemoveMultiKeyFrames(firstCamName, true);
   ROS_INFO_STREAM("AFTER RemoveMultiKeyFrames there are " << mMap.mlpMultiKeyFrames.size() << " MKFs and "
-                                                          << mMap.mlpPoints.size() << " points");
+                  << mMap.mlpPoints.size() << " points");
 
   SE3Map mRelativePoses = FindAverageRelativePoses();
 

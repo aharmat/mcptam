@@ -64,7 +64,7 @@ int BundleAdjusterSingle::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std
   if ((int)spMapPoints.size() < BundleAdjusterBase::snMinMapPoints)
   {
     ROS_INFO_STREAM("BundleAdjusterSingle: Not enough good map points, got " << spMapPoints.size() << ", need "
-                                                                             << BundleAdjusterBase::snMinMapPoints);
+                    << BundleAdjusterBase::snMinMapPoints);
     ROS_INFO("BundleAdjusterSingle: Returning 0");
     return 0;
   }

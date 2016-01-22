@@ -65,13 +65,13 @@ int BundleAdjusterMulti::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std:
   if ((int)spMapPoints.size() < BundleAdjusterBase::snMinMapPoints)
   {
     ROS_INFO_STREAM("BundleAdjusterMulti: Not enough good map points, got " << spMapPoints.size() << ", need "
-                                                                            << BundleAdjusterBase::snMinMapPoints);
+                    << BundleAdjusterBase::snMinMapPoints);
     ROS_INFO("BundleAdjusterMulti: Returning 0");
     return 0;
   }
 
   ROS_DEBUG_STREAM("BundleAdjusterMulti received: " << spAdjustSet.size() << " movable MKFs, " << spFixedSet.size()
-                                                    << " fixed MKFs, " << spMapPoints.size() << " points");
+                   << " fixed MKFs, " << spMapPoints.size() << " points");
 
   ChainBundle multiBundle(mmCameraModels, mbUseRobust, mbUseTukey, mbVerbose);
   mbBundleRunning = true;
@@ -207,7 +207,7 @@ int BundleAdjusterMulti::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std:
 
   ROS_DEBUG_STREAM("Took " << ros::WallTime::now() - start << " seconds to add data to adjuster");
   ROS_DEBUG_STREAM("Ended up adding " << nNumPoses << " poses, " << nNumPoints << " points, " << nNumMeas << " measurem"
-                                                                                                             "ents");
+                   "ents");
 
   // Do only a couple of iterations to the get map approximately right, this way new points can be used
   // by the tracker sooner than if we waited for a lengthy adjustment
@@ -272,7 +272,7 @@ int BundleAdjusterMulti::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std:
 
 // Run the Bundle Adjustment and update the map with the result
 int BundleAdjusterMulti::AdjustAndUpdate(ChainBundle& multiBundle, std::set<MultiKeyFrame*> spAdjustSet,
-                                         std::set<MapPoint*> spMapPoints, int nIterations)
+    std::set<MapPoint*> spMapPoints, int nIterations)
 {
   int nAccepted = 0;
   // Run the bundle adjuster. This returns the number of successful iterations
@@ -309,7 +309,7 @@ int BundleAdjusterMulti::AdjustAndUpdate(ChainBundle& multiBundle, std::set<Mult
       {
         KeyFrame& kf = *(kf_it->second);
         kf.mse3CamFromWorld =
-            kf.mse3CamFromBase * mkf.mse3BaseFromWorld;  // Update keyframe mse3CamFromWorld only here!! CHECK!! GOOD
+          kf.mse3CamFromBase * mkf.mse3BaseFromWorld;  // Update keyframe mse3CamFromWorld only here!! CHECK!! GOOD
       }
     }
 

@@ -60,26 +60,23 @@
 #include <TooN/wls.h>
 #include <TooN/SVD.h>
 
-using namespace TooN;
-using namespace GVars3;
-
 TrackerCalib::TrackerCalib(Map& map, MapMakerClientBase& mapMaker, TaylorCameraMap cameras, std::string cameraName,
                            CVD::ImageRef irOffset, CVD::ImageRef irPatternSize, double dSquareSize, GLWindow2* pWindow)
-    // Tracker wants pose and draw offset maps, but we only have one camera so those don't really make sense. Generate
-    // some default values for it.
-    : Tracker(map, mapMaker, cameras, GetInitPoseMap(cameraName), GetInitOffsetMap(cameraName, irOffset), pWindow),
-      mirPatternSize(irPatternSize),
-      mdSquareSize(dSquareSize),
-      mCamName(cameraName)
+// Tracker wants pose and draw offset maps, but we only have one camera so those don't really make sense. Generate
+// some default values for it.
+  : Tracker(map, mapMaker, cameras, GetInitPoseMap(cameraName), GetInitOffsetMap(cameraName, irOffset), pWindow),
+    mirPatternSize(irPatternSize),
+    mdSquareSize(dSquareSize),
+    mCamName(cameraName)
 {
   mpCalibImage = new CalibImageTaylor(irOffset, mpGLWindow);
   Reset(false);
 
-  v4FirstStageColor = makeVector(0, 0, 1, 1);      // blue
-  v4SecondStageColor = makeVector(0, 0.75, 1, 1);  // light blue
-  v4RunningColor = makeVector(0, 1, 0, 1);         // green
-  v4LostColor = makeVector(1, 0, 0, 1);            // red
-  v4InactiveColor = makeVector(0, 0, 0.5, 1);      // dark blue
+  v4FirstStageColor = TooN::makeVector(0, 0, 1, 1);      // blue
+  v4SecondStageColor = TooN::makeVector(0, 0.75, 1, 1);  // light blue
+  v4RunningColor = TooN::makeVector(0, 1, 0, 1);         // green
+  v4LostColor = TooN::makeVector(1, 0, 0, 1);            // red
+  v4InactiveColor = TooN::makeVector(0, 0, 0.5, 1);      // dark blue
 }
 
 // Calls parent's Reset and resets some internal variables
@@ -87,7 +84,7 @@ void TrackerCalib::Reset(bool bResetMap)
 {
   ROS_INFO("TrackerCalib: Calling reset on underlying tracker");
   Tracker::Reset(false, bResetMap);  // the map will be reset multiple times if there are multiple CalibratorTrackers,
-                                     // but we'll live with it
+  // but we'll live with it
 
   // Get a pointer to the only KF in the underlying Tracker's MKF to make it easier to work with
   mpCurrentKF = mpCurrentMKF->mmpKeyFrames[mCamName];
@@ -97,7 +94,7 @@ void TrackerCalib::Reset(bool bResetMap)
 }
 
 // Draw a border of given thickness and color
-void TrackerCalib::DrawBorder(CVD::ImageRef irOffset, int nThickness, const TooN::Vector<-1>& vColor)
+void TrackerCalib::DrawBorder(CVD::ImageRef irOffset, int nThickness, const TooN::Vector < -1 > & vColor)
 {
   if (nThickness < 1)
     nThickness = 1;
@@ -165,7 +162,7 @@ void TrackerCalib::OptimizeCalibImagePose()
   ChainBundle tempBundle(mmCameraModels, false, false, false);
 
   int nWorldID =
-      tempBundle.AddPose(TooN::SE3<>(), true);  // dummy pose so we can insert points fixed in the world frame
+    tempBundle.AddPose(TooN::SE3<>(), true);  // dummy pose so we can insert points fixed in the world frame
   int nCamID = tempBundle.AddPose(mpCalibImage->mse3CamFromWorld, false);
 
   for (unsigned i = 0; i < mpCalibImage->mvGridCorners.size(); ++i)
@@ -197,7 +194,7 @@ void TrackerCalib::FinishCalibImagePose()
   TooN::Vector<2> v2Center = camera.GetCenter();
 
   mpCalibImage->GuessInitialPose(
-      v2Center);  // Update internal pose, make sure this is called before building big matrix!
+    v2Center);  // Update internal pose, make sure this is called before building big matrix!
 
   int nPoints = mpCalibImage->mvGridCorners.size();
   int nViews = 1;
@@ -316,7 +313,7 @@ void TrackerCalib::TrackFrame(CVD::Image<CVD::byte>& imFrame, ros::Time timestam
                         << mMap.mlpPointsTrash.size() << "P in Trash";
       }
 
-      static gvar3<int> gvnAddingMKFs("AddingMKFs", 1, HIDDEN | SILENT);
+      static GVars3::gvar3<int> gvnAddingMKFs("AddingMKFs", 1, GVars3::HIDDEN | GVars3::SILENT);
       // Heuristics to check if a key-frame should be added to the map:
       if (*gvnAddingMKFs && mOverallTrackingQuality == GOOD && mnLostFrames == 0 &&
           ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(1.0) &&
@@ -424,7 +421,7 @@ void TrackerCalib::MarkKeyFrameAdded(KeyFrame& kfSrc)
   mbNeedToDrop = false;
 
   InitCurrentMKF(kfSrc.mse3CamFromWorld);  // When PoseCalibrator took the KeyFrame to add it to map, it destroyed
-                                           // currentMKF so regenerate it
+  // currentMKF so regenerate it
   mpCurrentKF = mpCurrentMKF->mmpKeyFrames[mCamName];  // re-link pointer
 
   // Copy masks

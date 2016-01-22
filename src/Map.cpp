@@ -66,7 +66,7 @@ void Map::Reset()
       ros::Duration(0.1).sleep();
     }
 
-    delete (*point_it);
+    delete(*point_it);
   }
 
   mlpPoints.clear();
@@ -80,7 +80,7 @@ void Map::Reset()
       ros::Duration(0.1).sleep();
     }
 
-    delete (*mkf_it);
+    delete(*mkf_it);
   }
 
   mlpMultiKeyFrames.clear();
@@ -189,7 +189,7 @@ void Map::EmptyTrash()
     // my logic was off
     if (point.mnUsing == 0 && point.mMMData.spMeasurementKFs.size() == 0)
     {
-      delete (&point);
+      delete(&point);
       mlpPointsTrash.erase(point_it++);
     }
     else
@@ -204,7 +204,7 @@ void Map::EmptyTrash()
     // in case my logic was off
     if (mkf.mnUsing == 0 && mkf.NumMeasurements() == 0)
     {
-      delete (&mkf);
+      delete(&mkf);
       mlpMultiKeyFramesTrash.erase(mkf_it++);
     }
     else

@@ -140,7 +140,7 @@ void KeyFrame::RemoveImage()
 // Takes an image and calculates pyramid levels etc to fill the keyframe data structures with everything that's needed
 // by the tracker.
 std::tuple<double, double, double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::byte>& im, bool bDeepCopy,
-                                                               bool bGlareMasking)
+    bool bGlareMasking)
 {
   // Perpares a Keyframe from an image. Generates pyramid levels, does FAST detection, etc.
   // Does not fully populate the keyframe struct, but only does the bits needed for the tracker;
@@ -222,7 +222,7 @@ std::tuple<double, double, double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::b
     if (lev.mask.totalsize() > 0)  // assume internal mask is set if this is true
     {
       cv::Mat internalMask =
-          cv::Mat(lev.mask.size().y, lev.mask.size().x, CV_8U, lev.mask.data(), lev.mask.row_stride());
+        cv::Mat(lev.mask.size().y, lev.mask.size().x, CV_8U, lev.mask.data(), lev.mask.row_stride());
 
       if (bGlareMasking)  // Combine the two masks
         cv::bitwise_and(internalMask, glareMask, finalMask);
@@ -576,7 +576,7 @@ void KeyFrame::GetPointDepthsAndWeights(std::vector<std::pair<double, double>>& 
 
     // The weight is simply the ratio of inlier to all observations
     double weight =
-        point.mnMEstimatorInlierCount / (double)(point.mnMEstimatorInlierCount + point.mnMEstimatorOutlierCount);
+      point.mnMEstimatorInlierCount / (double)(point.mnMEstimatorInlierCount + point.mnMEstimatorOutlierCount);
     vDepthsAndWeights.push_back(std::make_pair(norm(v3CamPos), weight));
   }
 }

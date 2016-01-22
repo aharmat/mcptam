@@ -32,8 +32,13 @@
 #include <gvars3/instances.h>
 #include <gvars3/GStringUtil.h>
 #include <sstream>
+#include <string>
+#include <vector>
 
-using namespace GVars3;
+using GVars3::GUI;
+using GVars3::GV2;
+using GVars3::HIDDEN;
+using GVars3::SILENT;
 
 GLWindowMenu::GLWindowMenu(std::string sName, std::string sTitle)
 {
@@ -65,12 +70,12 @@ GLWindowMenu::~GLWindowMenu()
 
 void GLWindowMenu::GUICommandCallBack(void *ptr, std::string sCommand, std::string sParams)
 {
-  ((GLWindowMenu *)ptr)->GUICommandHandler(sCommand, sParams);
+  (reinterpret_cast<GLWindowMenu *>(ptr))->GUICommandHandler(sCommand, sParams);
 }
 
 void GLWindowMenu::GUICommandHandler(std::string sCommand, std::string sParams)
 {
-  std::vector<std::string> vs = ChopAndUnquoteString(sParams);
+  std::vector<std::string> vs = GVars3::ChopAndUnquoteString(sParams);
 
   if (sCommand == msName + ".AddMenuButton")
   {
@@ -83,7 +88,7 @@ void GLWindowMenu::GUICommandHandler(std::string sCommand, std::string sParams)
     MenuItem m;
     m.type = Button;
     m.sName = vs[1];
-    m.sParam = UncommentString(vs[2]);
+    m.sParam = GVars3::UncommentString(vs[2]);
     m.sNextMenu = (vs.size() > 3) ? (vs[3]) : ("");
     mmSubMenus[vs[0]].mvItems.push_back(m);
     return;
@@ -128,7 +133,7 @@ void GLWindowMenu::GUICommandHandler(std::string sCommand, std::string sParams)
     if (vs.size() < 5)
     {
       std::cout << "? GLWindowMenu.AddMenuSlider: Need 5/6 params: Target Menu, Name, gvar_int name, min, max, "
-                   "NextMenu=\"\"" << std::endl;
+                "NextMenu=\"\"" << std::endl;
       return;
     }
     MenuItem m;
@@ -136,13 +141,13 @@ void GLWindowMenu::GUICommandHandler(std::string sCommand, std::string sParams)
     m.sName = vs[1];
     GV2.Register(m.gvnIntValue, vs[2]);
     int *a;
-    a = ParseAndAllocate<int>(vs[3]);
+    a = GVars3::ParseAndAllocate<int>(vs[3]);
     if (a)
     {
       m.min = *a;
       delete a;
     }
-    a = ParseAndAllocate<int>(vs[4]);
+    a = GVars3::ParseAndAllocate<int>(vs[4]);
     if (a)
     {
       m.max = *a;
@@ -205,62 +210,62 @@ void GLWindowMenu::Render(int nTop, int nHeight, int nWidth, GLWindow2 &glw)
 
   SubMenu &m = mmSubMenus[*mgvsCurrentSubMenu];
 
-  mnLeftMostCoord = mnWidth - (1 + m.mvItems.size()) * *mgvnMenuItemWidth;
+  mnLeftMostCoord = mnWidth - (1 + m.mvItems.size()) **mgvnMenuItemWidth;
   int nBase = mnLeftMostCoord;
   for (std::vector<MenuItem>::reverse_iterator i = m.mvItems.rbegin(); i != m.mvItems.rend(); i++)
   {
     switch (i->type)
     {
-      case Button:
-        glColor4d(0, 0.5, 0, dAlpha);
-        FillBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
-        glColor4d(0, 1, 0, dAlpha);
-        LineBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
-        glw.PrintString(CVD::ImageRef(nBase + 3, mnMenuTop + *mgvnMenuTextOffset), i->sName);
-        break;
-
-      case Toggle:
-        if (*(i->gvnIntValue))
-          glColor4d(0, 0.5, 0.5, dAlpha);
-        else
-          glColor4d(0.5, 0, 0, dAlpha);
-        FillBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
-        if (*(i->gvnIntValue))
-          glColor4d(0, 1, 0.5, dAlpha);
-        else
-          glColor4d(1, 0, 0, dAlpha);
-        LineBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
-        glw.PrintString(CVD::ImageRef(nBase + 3, mnMenuTop + *mgvnMenuTextOffset),
-                        i->sName + " " + ((*(i->gvnIntValue)) ? ("On") : ("Off")));
-        break;
-
-      case Monitor:
-        glColor4d(0, 0.5, 0.5, dAlpha);
-        FillBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
-        glColor4d(0, 1, 1, dAlpha);
-        LineBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
-        glw.PrintString(CVD::ImageRef(nBase + 3, mnMenuTop + *mgvnMenuTextOffset),
-                        i->sName + " " + GV2.StringValue(i->sParam, true));
-        break;
-
-      case Slider:
-      {
-        glColor4d(0.0, 0.0, 0.5, dAlpha);
-        FillBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
-        glColor4d(0.5, 0.0, 0.5, dAlpha);
-        double dFrac = (double)(*(i->gvnIntValue) - i->min) / (i->max - i->min);
-        if (dFrac < 0.0)
-          dFrac = 0.0;
-        if (dFrac > 1.0)
-          dFrac = 1.0;
-        FillBox(nBase, (int)(nBase + dFrac * (*mgvnMenuItemWidth + 1)), mnMenuTop, mnMenuTop + mnMenuHeight);
-        glColor4d(0, 1, 1, dAlpha);
-        LineBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
-        std::ostringstream ost;
-        ost << i->sName << " " << *(i->gvnIntValue);
-        glw.PrintString(CVD::ImageRef(nBase + 3, mnMenuTop + *mgvnMenuTextOffset), ost.str());
-      }
+    case Button:
+      glColor4d(0, 0.5, 0, dAlpha);
+      FillBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
+      glColor4d(0, 1, 0, dAlpha);
+      LineBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
+      glw.PrintString(CVD::ImageRef(nBase + 3, mnMenuTop + *mgvnMenuTextOffset), i->sName);
       break;
+
+    case Toggle:
+      if (*(i->gvnIntValue))
+        glColor4d(0, 0.5, 0.5, dAlpha);
+      else
+        glColor4d(0.5, 0, 0, dAlpha);
+      FillBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
+      if (*(i->gvnIntValue))
+        glColor4d(0, 1, 0.5, dAlpha);
+      else
+        glColor4d(1, 0, 0, dAlpha);
+      LineBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
+      glw.PrintString(CVD::ImageRef(nBase + 3, mnMenuTop + *mgvnMenuTextOffset),
+                      i->sName + " " + ((*(i->gvnIntValue)) ? ("On") : ("Off")));
+      break;
+
+    case Monitor:
+      glColor4d(0, 0.5, 0.5, dAlpha);
+      FillBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
+      glColor4d(0, 1, 1, dAlpha);
+      LineBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
+      glw.PrintString(CVD::ImageRef(nBase + 3, mnMenuTop + *mgvnMenuTextOffset),
+                      i->sName + " " + GV2.StringValue(i->sParam, true));
+      break;
+
+    case Slider:
+    {
+      glColor4d(0.0, 0.0, 0.5, dAlpha);
+      FillBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
+      glColor4d(0.5, 0.0, 0.5, dAlpha);
+      double dFrac = static_cast<double>((*(i->gvnIntValue) - i->min)) / (i->max - i->min);
+      if (dFrac < 0.0)
+        dFrac = 0.0;
+      if (dFrac > 1.0)
+        dFrac = 1.0;
+      FillBox(nBase, static_cast<int>(nBase + dFrac * (*mgvnMenuItemWidth + 1)), mnMenuTop, mnMenuTop + mnMenuHeight);
+      glColor4d(0, 1, 1, dAlpha);
+      LineBox(nBase, nBase + *mgvnMenuItemWidth + 1, mnMenuTop, mnMenuTop + mnMenuHeight);
+      std::ostringstream ost;
+      ost << i->sName << " " << *(i->gvnIntValue);
+      glw.PrintString(CVD::ImageRef(nBase + 3, mnMenuTop + *mgvnMenuTextOffset), ost.str());
+    }
+    break;
     }
     nBase += *mgvnMenuItemWidth;
   }
@@ -294,7 +299,7 @@ bool GLWindowMenu::HandleClick(int nMouseButton, int state, int x, int y)
 
   // Figure out which button was pressed:
   int nButtonNumber = (mnWidth - x) / *mgvnMenuItemWidth;
-  if (nButtonNumber > (int)(mmSubMenus[*mgvsCurrentSubMenu].mvItems.size()))
+  if (nButtonNumber > static_cast<int>(mmSubMenus[*mgvsCurrentSubMenu].mvItems.size()))
     nButtonNumber = 0;
 
   if (nButtonNumber == 0)  // Clicked on menu name .. . go to root.
@@ -310,36 +315,37 @@ bool GLWindowMenu::HandleClick(int nMouseButton, int state, int x, int y)
   *mgvsCurrentSubMenu = SelectedItem.sNextMenu;
   switch (SelectedItem.type)
   {
-    case Button:
-      GUI.ParseLine(SelectedItem.sParam);
-      break;
-    case Toggle:
-      *(SelectedItem.gvnIntValue) ^= 1;
-      break;
-    case Slider:
+  case Button:
+    GUI.ParseLine(SelectedItem.sParam);
+    break;
+  case Toggle:
+    *(SelectedItem.gvnIntValue) ^= 1;
+    break;
+  case Slider:
+  {
+    if (nMouseButton == CVD::GLWindow::BUTTON_WHEEL_UP)
     {
-      if (nMouseButton == CVD::GLWindow::BUTTON_WHEEL_UP)
-      {
-        *(SelectedItem.gvnIntValue) += 1;
-        if (*(SelectedItem.gvnIntValue) > SelectedItem.max)
-          *(SelectedItem.gvnIntValue) = SelectedItem.max;
-      }
-      else if (nMouseButton == CVD::GLWindow::BUTTON_WHEEL_DOWN)
-      {
-        *(SelectedItem.gvnIntValue) -= 1;
-        if (*(SelectedItem.gvnIntValue) < SelectedItem.min)
-          *(SelectedItem.gvnIntValue) = SelectedItem.min;
-      }
-      else
-      {
-        int nPos = *mgvnMenuItemWidth - ((mnWidth - x) % *mgvnMenuItemWidth);
-        double dFrac = (double)nPos / *mgvnMenuItemWidth;
-        *(SelectedItem.gvnIntValue) = (int)(dFrac * (1.0 + SelectedItem.max - SelectedItem.min)) + SelectedItem.min;
-      }
-      break;
+      *(SelectedItem.gvnIntValue) += 1;
+      if (*(SelectedItem.gvnIntValue) > SelectedItem.max)
+        *(SelectedItem.gvnIntValue) = SelectedItem.max;
     }
-    case Monitor:
-      break;
+    else if (nMouseButton == CVD::GLWindow::BUTTON_WHEEL_DOWN)
+    {
+      *(SelectedItem.gvnIntValue) -= 1;
+      if (*(SelectedItem.gvnIntValue) < SelectedItem.min)
+        *(SelectedItem.gvnIntValue) = SelectedItem.min;
+    }
+    else
+    {
+      int nPos = *mgvnMenuItemWidth - ((mnWidth - x) % *mgvnMenuItemWidth);
+      double dFrac = static_cast<double>(nPos) / *mgvnMenuItemWidth;
+      *(SelectedItem.gvnIntValue) =
+        static_cast<int>(dFrac * (1.0 + SelectedItem.max - SelectedItem.min)) + SelectedItem.min;
+    }
+    break;
+  }
+  case Monitor:
+    break;
   }
   return true;
 }

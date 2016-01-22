@@ -46,9 +46,10 @@ Relocaliser::Relocaliser(Map &map, TaylorCamera camera, std::string camName) : m
 
 Relocaliser::Relocaliser(Map &map, TaylorCameraMap cameras)
   : mMap(map)
-  , mmCameraModels(cameras){
+  , mmCameraModels(cameras)
+{
 
-    };
+};
 
 SE3<> Relocaliser::BestPose()
 {
@@ -77,8 +78,8 @@ bool Relocaliser::AttemptRecovery(KeyFrame &kfCurrent)
   SE3<> se3KeyFramePos = mpBestKF->mse3CamFromWorld;
 
   mse3Best =
-      SmallBlurryImage::SE3fromSE2(mse2, mmCameraModels[kfCurrent.mCamName], mmCameraModels[mpBestKF->mCamName]) *
-      se3KeyFramePos;
+    SmallBlurryImage::SE3fromSE2(mse2, mmCameraModels[kfCurrent.mCamName], mmCameraModels[mpBestKF->mCamName]) *
+    se3KeyFramePos;
 
   if (dScore < Relocaliser::sdRecoveryMaxScore)
     return true;

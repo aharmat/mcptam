@@ -193,7 +193,7 @@ bool MapMakerServerBase::InitFromMultiKeyFrame(MultiKeyFrame* pMKF, bool bPutPla
     nLevelPoints = mMap.mlpPoints.size() - nNumPointsBefore;
     nLevelPointsLeft = (nLevelLimit * nNumCams - nLevelPoints) / nNumCams;
     ROS_INFO_STREAM("Level " << l << " made " << nLevelPoints << " with stereo, " << nLevelPointsLeft
-                             << " points left to make with each cam");
+                    << " points left to make with each cam");
 
     if (nLevelPointsLeft < 1)
     {
@@ -252,14 +252,14 @@ bool MapMakerServerBase::InitFromMultiKeyFrame(MultiKeyFrame* pMKF, bool bPutPla
 
   ROS_INFO_STREAM("MapMakerServerBase: Made initial map with " << mMap.mlpPoints.size());
   ROS_INFO_STREAM("MapMakerServerBase: Initial MKF pose: " << std::endl
-                                                           << pMKF->mse3BaseFromWorld);
+                  << pMKF->mse3BaseFromWorld);
   ROS_INFO_STREAM("MapMakerServerBase: Initial MKF scene depth: " << pMKF->mdTotalDepthMean);
 
   for (KeyFramePtrMap::iterator kf_it = pMKF->mmpKeyFrames.begin(); kf_it != pMKF->mmpKeyFrames.end(); ++kf_it)
   {
     std::string camName = kf_it->first;
     ROS_INFO_STREAM("MapMakerServerBase: Initial " << camName << " scene depth: " << kf_it->second->mdSceneDepthMean
-                                                   << " sigma: " << kf_it->second->mdSceneDepthSigma);
+                    << " sigma: " << kf_it->second->mdSceneDepthSigma);
   }
 
   mMap.mbGood = true;
@@ -460,7 +460,7 @@ void MapMakerServerBase::ThinCandidates(KeyFrame& kf, int nLevel)
 // specified pyramid level. Does epipolar search in the target KeyFrames as closest by
 // the ClosestKeyFramesWithinDist function.
 void MapMakerServerBase::AddStereoMapPoints(MultiKeyFrame& mkfSrc, int nLevel, int nLimit, double dDistThresh,
-                                            KeyFrameRegion region)
+    KeyFrameRegion region)
 {
   for (KeyFramePtrMap::iterator it = mkfSrc.mmpKeyFrames.begin(); it != mkfSrc.mmpKeyFrames.end(); it++)
   {
@@ -479,7 +479,7 @@ void MapMakerServerBase::AddStereoMapPoints(MultiKeyFrame& mkfSrc, int nLevel, i
     }
 
     std::vector<KeyFrame*> vpTargets =
-        ClosestKeyFramesWithinDist(kfSrc, dDistThreshUsed, MapMakerServerBase::snMaxTriangulationKFs, region);
+      ClosestKeyFramesWithinDist(kfSrc, dDistThreshUsed, MapMakerServerBase::snMaxTriangulationKFs, region);
 
     ROS_DEBUG_STREAM("Adding epipolar points, source kf: " << kfSrc.mCamName << "  num targets: " << vpTargets.size());
 
@@ -633,16 +633,16 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
   Vector<2> v2RootPos = LevelZeroPos(irLevelPos, nLevel);  // The pixel coords of the candidate at level zero
 
   Vector<3> v3Ray_SC =
-      cameraSrc.UnProject(v2RootPos);  // The pixel coords unprojected into a 3d half-line in the source kf frame
+    cameraSrc.UnProject(v2RootPos);  // The pixel coords unprojected into a 3d half-line in the source kf frame
   Vector<3> v3LineDirn_TC =
-      kfTarget.mse3CamFromWorld.get_rotation() * (kfSrc.mse3CamFromWorld.get_rotation().inverse() *
-                                                  v3Ray_SC);  // The direction of that line in the target kf frame
+    kfTarget.mse3CamFromWorld.get_rotation() * (kfSrc.mse3CamFromWorld.get_rotation().inverse() *
+        v3Ray_SC);  // The direction of that line in the target kf frame
   Vector<3> v3CamCenter_TC =
-      kfTarget.mse3CamFromWorld *
-      kfSrc.mse3CamFromWorld.inverse().get_translation();  // The position of the source kf in the target kf frame
+    kfTarget.mse3CamFromWorld *
+    kfSrc.mse3CamFromWorld.inverse().get_translation();  // The position of the source kf in the target kf frame
   Vector<3> v3CamCenter_SC =
-      kfSrc.mse3CamFromWorld *
-      kfTarget.mse3CamFromWorld.inverse().get_translation();  // The position of the target kf in the source kf frame
+    kfSrc.mse3CamFromWorld *
+    kfTarget.mse3CamFromWorld.inverse().get_translation();  // The position of the target kf in the source kf frame
 
   double dMaxEpiAngle = M_PI / 3;  // the maximum angle spanned by two view rays allowed
   double dMinEpiAngle = 0.05;      // the minimum angle allowed
@@ -664,7 +664,7 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
 
   double dSeparationDist = norm(v3CamCenter_SC);
   double dSourceAngle =
-      acos((v3CamCenter_SC * v3Ray_SC) / dSeparationDist);  // v3Ray_SC is unit length so don't have to divide
+    acos((v3CamCenter_SC * v3Ray_SC) / dSeparationDist);  // v3Ray_SC is unit length so don't have to divide
 
   double dMinTargetAngle = M_PI - dSourceAngle - dMaxEpiAngle;
   double dStartDepth = dSeparationDist * sin(dMinTargetAngle) / sin(dMaxEpiAngle);
@@ -678,9 +678,9 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
   ROS_DEBUG_STREAM("dStartDepth: " << dStartDepth << " dEndDepth: " << dEndDepth);
 
   Vector<3> v3RayStart_TC =
-      v3CamCenter_TC + dStartDepth * v3LineDirn_TC;  // The start of the epipolar line segment in the target kf frame
+    v3CamCenter_TC + dStartDepth * v3LineDirn_TC;  // The start of the epipolar line segment in the target kf frame
   Vector<3> v3RayEnd_TC =
-      v3CamCenter_TC + dEndDepth * v3LineDirn_TC;  // The end of the epipolar line segment in the target kf frame
+    v3CamCenter_TC + dEndDepth * v3LineDirn_TC;  // The end of the epipolar line segment in the target kf frame
 
   // Project epipolar line segment start and end points onto unit sphere and check for minimum distance between them
   Vector<3> v3A = v3RayStart_TC;
@@ -708,7 +708,7 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
   Vector<3> v3PlaneNormal = v3A ^ v3B;
   normalize(v3PlaneNormal);
   Vector<3> v3PlaneI =
-      v3A;  // Lets call the vector we got from the start of the epipolar line segment the new coordinate frame's x axis
+    v3A;  // Lets call the vector we got from the start of the epipolar line segment the new coordinate frame's x axis
   Vector<3> v3PlaneJ = v3PlaneNormal ^ v3PlaneI;  // Get the y axis
 
   // This will convert a 3D point to the epipolar plane's coordinate frame
@@ -718,11 +718,11 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
   m3ToPlaneCoords[2] = v3PlaneNormal;
 
   Vector<2> v2PlaneB = (m3ToPlaneCoords * v3B).slice<0, 2>();  // The vector we got from the end of the epipolar line
-                                                               // segment, in epipolar plane coordinates
+  // segment, in epipolar plane coordinates
   Vector<2> v2PlaneI = makeVector(1, 0);
 
   double dMaxAngleAlongCircle =
-      acos(v2PlaneB * v2PlaneI);  // The angle between point B (now a 2D point in the plane) and the x axis
+    acos(v2PlaneB * v2PlaneI);  // The angle between point B (now a 2D point in the plane) and the x axis
 
   // For stepping along the circle
   double dAngleStep = cameraTarget.OnePixelAngle() * LevelScale(nLevel) * 3;
@@ -802,7 +802,7 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
 
     int nScore;
     bool bExhaustive =
-        false;  // Should we do an exhaustive search of the target area? Should maybe make this into a param
+      false;  // Should we do an exhaustive search of the target area? Should maybe make this into a param
     bool bFound = finder.FindPatchCoarse(CVD::ir(v2Image), kfTarget, 3, nScore, bExhaustive);
 
     if (!bFound)
@@ -1243,7 +1243,7 @@ void MapMakerServerBase::HandleOutliers(std::vector<std::pair<KeyFrame*, MapPoin
       spBadPoints.insert(&point);
     }
     else if (!point.mbBad)  // need to check because point might have been set as bad from a previous outlier
-                            // measurement
+      // measurement
     {
       // Do we retry it? Depends where it came from!!
       if (meas.eSource == Measurement::SRC_TRACKER || meas.eSource == Measurement::SRC_EPIPOLAR)

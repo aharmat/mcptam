@@ -62,7 +62,7 @@ TaylorCamera::TaylorCamera(CVD::ImageRef irCalibSize, CVD::ImageRef irFullScaleS
   mbCalibrationMode = true;
 
   mv9CameraParams =
-      makeVector(0, 0, 0, 0, 0, 0, 1, 0, 0);  // the only non-zero value is for affine matrix to be identity
+    makeVector(0, 0, 0, 0, 0, 0, 1, 0, 0);  // the only non-zero value is for affine matrix to be identity
   RefreshParams();
 
   ROS_WARN_STREAM(">>> TaylorCamera: In calibration mode, call SetParams AT LEAST ONCE before projecting or getting "
@@ -237,7 +237,7 @@ Vector<2> TaylorCamera::Project(const Vector<3>& v3CamFrame)
     {
       Eigen::Matrix<double, 5, 1> polynomial;
       polynomial << mv5PolyCoeffs[0], mv5PolyCoeffs[1] - dTanTheta, mv5PolyCoeffs[2], mv5PolyCoeffs[3],
-          mv5PolyCoeffs[4];
+                 mv5PolyCoeffs[4];
 
       Eigen::PolynomialSolver<double, 4> psolve(polynomial);
       std::vector<double> vRealRoots;
@@ -262,8 +262,8 @@ Vector<2> TaylorCamera::Project(const Vector<3>& v3CamFrame)
     {
       if (mbUsingInversePoly)
         mdLastRho = PolyVal(mvxPolyInvCoeffs, CenterAndScale(dTheta, mdThetaMean, mdThetaStd));  // If we have a good
-                                                                                                 // inverse poly, that's
-                                                                                                 // the fastest
+      // inverse poly, that's
+      // the fastest
       else
       {
         // Otherwise use Newton's method. Get an approximate solution from linear inverse poly
@@ -525,7 +525,7 @@ Vector<> TaylorCamera::FindInvPolyUsingRoots(const Vector<5>& v5PolyCoeffs, int 
   {
     Eigen::Matrix<double, 5, 1> polynomial;
     polynomial << v5PolyCoeffs[0], v5PolyCoeffs[1] - tan(vThetaVector[i]), v5PolyCoeffs[2], v5PolyCoeffs[3],
-        v5PolyCoeffs[4];
+               v5PolyCoeffs[4];
 
     Eigen::PolynomialSolver<double, 4> psolve(polynomial);
     std::vector<double> vRealRoots;

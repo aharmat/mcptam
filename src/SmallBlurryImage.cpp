@@ -112,7 +112,8 @@ void SmallBlurryImage::MakeJacs()
     }
     else
       v2Grad = Zeros;
-  } while (ir.next(sirSize));
+  }
+  while (ir.next(sirSize));
   mbMadeJacs = true;
 };
 
@@ -126,7 +127,8 @@ double SmallBlurryImage::ZMSSD(SmallBlurryImage &other)
   {
     double dDiff = mimTemplate[ir] - other.mimTemplate[ir];
     dSSD += dDiff * dDiff;
-  } while (ir.next(sirSize));
+  }
+  while (ir.next(sirSize));
   return dSSD;
 }
 
@@ -215,7 +217,8 @@ std::pair<SE2<>, double> SmallBlurryImage::IteratePosRelToTarget(SmallBlurryImag
       *p++ += v4Jac[1];
       *p++ += v4Jac[2];
       *p++ += 1.0;
-    } while (ir.next(sirSize));
+    }
+    while (ir.next(sirSize));
 
     Vector<4> v4Update;
 

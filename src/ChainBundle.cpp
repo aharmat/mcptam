@@ -318,7 +318,7 @@ public:
     //_pPoseChainHelper->UpdateTransforms();
 
     TooN::SE3<> se3SfW = _pPoseChainHelper->_vTransforms.back().first;  // Pose of the source KeyFrame that the point is
-                                                                        // defined relative to
+    // defined relative to
 
     // This is essentially the same as kfSrc.mse3CamFromWorld.inverse() * v3Cam where v3Cam = kfSrc.mse3CamFromWorld *
     // point.mv3WorldPos
@@ -383,7 +383,7 @@ public:
     //_pPoseChainHelper->UpdateTransforms();
 
     TooN::SE3<> se3CfW =
-        _pPoseChainHelper->_vTransforms.back().first;  // Pose of the KeyFrame that made the measurement
+      _pPoseChainHelper->_vTransforms.back().first;  // Pose of the KeyFrame that made the measurement
     VertexRelPoint* pPointVertex = dynamic_cast<VertexRelPoint*>(_vertices.back());
     ROS_ASSERT(pPointVertex);
 
@@ -484,9 +484,9 @@ public:
                                     v3_dPhi);  // derivatives of spherical coords wrt camera frame coords
 
     unsigned poseN =
-        _pPoseChainHelper->_vpVertices.size();  // number of poses in the pose chain that defines the observing camera
+      _pPoseChainHelper->_vpVertices.size();  // number of poses in the pose chain that defines the observing camera
     unsigned pointN = pPointVertex->_pPoseChainHelper->_vpVertices.size();  // number of poses in the pose chain that
-                                                                            // defines the point
+    // defines the point
 
     for (unsigned i = 0; i < poseN; ++i)  // loop over the poses corresponding to the observing camera
     {
@@ -509,7 +509,7 @@ public:
       }
 
       const TooN::Vector<3> v3Base =
-          _pPoseChainHelper->_vTransforms[i].first * v3Global;  // The point in the current pose's frame
+        _pPoseChainHelper->_vTransforms[i].first * v3Global;  // The point in the current pose's frame
       const TooN::Vector<4> v4Base = unproject(v3Base);
 
       // For each of six degrees of freedom...
@@ -562,7 +562,7 @@ public:
       }
 
       const TooN::Vector<3> v3Base =
-          pPointVertex->_pPoseChainHelper->_vTransforms[i].first * v3Global;  // The point in the current pose's frame
+        pPointVertex->_pPoseChainHelper->_vTransforms[i].first * v3Global;  // The point in the current pose's frame
       const TooN::Vector<4> v4Base = unproject(v3Base);
 
       // For each of six degrees of freedom...
@@ -704,55 +704,55 @@ public:
 // If you activate this you NEED to uncomment the appropriate line
 // in VertexRelPoint::estimateInGlobalCartesian() as well as
 // in EdgeChainMeas::computeError() !!
-/*
-const double delta = 1e-9;
-const double scalar = 1.0 / (2*delta);
-ErrorVector errorBak;
-ErrorVector errorBeforeNumeric = _error;
+    /*
+    const double delta = 1e-9;
+    const double scalar = 1.0 / (2*delta);
+    ErrorVector errorBak;
+    ErrorVector errorBeforeNumeric = _error;
 
-for (size_t i = 0; i < _vertices.size(); ++i) {
-  //Xi - estimate the jacobian numerically
-  g2o::OptimizableGraph::Vertex* vi = static_cast<g2o::OptimizableGraph::Vertex*>(_vertices[i]);
+    for (size_t i = 0; i < _vertices.size(); ++i) {
+      //Xi - estimate the jacobian numerically
+      g2o::OptimizableGraph::Vertex* vi = static_cast<g2o::OptimizableGraph::Vertex*>(_vertices[i]);
 
-  if (vi->fixed())
-    continue;
+      if (vi->fixed())
+        continue;
 
-  int vi_dim = vi->dimension();
-  double add_vi[vi_dim];
-  std::fill(add_vi, add_vi + vi_dim, 0.0);
-  assert(_dimension >= 0);
-  assert(_jacobianOplus[i].rows() == _dimension && _jacobianOplus[i].cols() == vi_dim && "jacobian cache dimension does
-not match");
-    _jacobianOplus[i].resize(_dimension, vi_dim);
-  // add small step along the unit vector in each dimension
-  for (int d = 0; d < vi_dim; ++d) {
-    vi->push();
-    add_vi[d] = delta;
-    vi->oplus(add_vi);
-    computeError();
-    errorBak = _error;
-    vi->pop();
-    vi->push();
-    add_vi[d] = -delta;
-    vi->oplus(add_vi);
-    computeError();
-    errorBak -= _error;
-    vi->pop();
-    add_vi[d] = 0.0;
+      int vi_dim = vi->dimension();
+      double add_vi[vi_dim];
+      std::fill(add_vi, add_vi + vi_dim, 0.0);
+      assert(_dimension >= 0);
+      assert(_jacobianOplus[i].rows() == _dimension && _jacobianOplus[i].cols() == vi_dim && "jacobian cache dimension does
+    not match");
+        _jacobianOplus[i].resize(_dimension, vi_dim);
+      // add small step along the unit vector in each dimension
+      for (int d = 0; d < vi_dim; ++d) {
+        vi->push();
+        add_vi[d] = delta;
+        vi->oplus(add_vi);
+        computeError();
+        errorBak = _error;
+        vi->pop();
+        vi->push();
+        add_vi[d] = -delta;
+        vi->oplus(add_vi);
+        computeError();
+        errorBak -= _error;
+        vi->pop();
+        add_vi[d] = 0.0;
 
-    _jacobianOplus[i].col(d) = scalar * errorBak;
-  } // end dimension
+        _jacobianOplus[i].col(d) = scalar * errorBak;
+      } // end dimension
 
-  //std::cerr<<"Jacobian of measurement "<<_nID<<" wrt vertex "<<i<<std::endl;
-  //std::cerr<<"Numerical: "<<std::endl<<_jacobianOplus[i]<<std::endl;
-  //std::cerr<<"Analytic: "<<std::endl<<_jacobianOplusTemp[i]<<std::endl;
-  //std::cerr<<"Diff: "<<std::endl<<_jacobianOplus[i] - _jacobianOplusTemp[i]<<std::endl;
+      //std::cerr<<"Jacobian of measurement "<<_nID<<" wrt vertex "<<i<<std::endl;
+      //std::cerr<<"Numerical: "<<std::endl<<_jacobianOplus[i]<<std::endl;
+      //std::cerr<<"Analytic: "<<std::endl<<_jacobianOplusTemp[i]<<std::endl;
+      //std::cerr<<"Diff: "<<std::endl<<_jacobianOplus[i] - _jacobianOplusTemp[i]<<std::endl;
 
-  //std::cout<<"Jacobian of measurement "<<_nID<<" wrt vertex "<<i<<std::endl;
-  //std::cout<<_jacobianOplus[i]<<std::endl;
-}
-_error = errorBeforeNumeric;
-*/
+      //std::cout<<"Jacobian of measurement "<<_nID<<" wrt vertex "<<i<<std::endl;
+      //std::cout<<_jacobianOplus[i]<<std::endl;
+    }
+    _error = errorBeforeNumeric;
+    */
 // ============= End Numerical Jacobian ========================
 
 #ifdef G2O_OPENMP
@@ -843,7 +843,7 @@ public:
     {
       EdgeChainMeas* pMeas = dynamic_cast<EdgeChainMeas*>(*edge_it);
       vErrorSquared.push_back(
-          fabs(pMeas->chi2()));  // take absolute value because chi2 will be set negative for fixed points
+        fabs(pMeas->chi2()));  // take absolute value because chi2 will be set negative for fixed points
     }
 
     double dSigmaSquared = Huber::FindSigmaSquared(vErrorSquared);
@@ -857,7 +857,7 @@ public:
     _dSigmaLimited = sqrt(_dSigmaSquaredLimited);
 
     ROS_DEBUG_STREAM("Sigma squared (clamped): " << _dSigmaSquaredLimited
-                                                 << " Min sigma squared: " << _dMinSigmaSquared);
+                     << " Min sigma squared: " << _dMinSigmaSquared);
   }
 
   /// Return the raw sigma squared value
@@ -883,7 +883,7 @@ protected:
   double _dMinSigmaSquared;           ///< Minimum allowed value of sigma squared limited
   double _dSigmaSquared;              ///< The last computed value of sigma squared
   double _dSigmaSquaredLimited;  ///< The last computed value of sigma squared, or the minimum allowed, whichever is
-                                 ///larger
+  /// larger
   double _dSigmaLimited;         ///< Square root of the limited sigma squared
   bool _bRecomputeSigmaSquared;  ///< Do we have to recompute robust statistics?
 };
@@ -1057,7 +1057,7 @@ public:
     double dRMS = sqrt(dSumSquaredUpdate / nUpdateSize);
 
     ROS_DEBUG_STREAM("===== Update size: " << nUpdateSize << " magnitude: " << dSumSquaredUpdate << " RMS: " << dRMS
-                                           << " Limit: " << _dLimit << " =========");
+                     << " Limit: " << _dLimit << " =========");
 
     if (dRMS < _dLimit)
     {
@@ -1090,7 +1090,7 @@ protected:
   double _dLimit;                                      ///< The limit on update vector RMS below which we're converged
   bool* _pAbortFlag;                                   ///< Pointer to the flag that triggers abortion of BA
   g2o::OptimizationAlgorithmWithHessian* _pAlgorithm;  ///< Pointer to the optimization algorithm so that we can get
-                                                       ///solver's udpate vector
+  /// solver's udpate vector
 };
 
 /** @brief Checks to see if optimization converged by comparing the change in residual error to a given threshold.
@@ -1140,7 +1140,7 @@ public:
     double dPctChange = (_dLastChi2 - dCurrChi2) / _dLastChi2;
 
     ROS_DEBUG_STREAM("last chi2: " << _dLastChi2 << " new chi2: " << dCurrChi2 << " % change: " << dPctChange
-                                   << " % limit: " << _dPercentLimit);
+                     << " % limit: " << _dPercentLimit);
 
     if (dPctChange >= 0 && dPctChange <= _dPercentLimit)
     {
@@ -1176,7 +1176,7 @@ int ChainBundle::snMaxIterations = 100;  // 100
 int ChainBundle::snMaxTrialsAfterFailure = 100;
 double ChainBundle::sdUpdatePercentConvergenceLimit = 1e-10;
 double ChainBundle::sdUpdateRMSConvergenceLimit = 1e-10;  // 1e-10
-double ChainBundle::sdMinMEstimatorSigma = 0.5;  // 0.4;
+double ChainBundle::sdMinMEstimatorSigma = 0.5;           // 0.4;
 
 // Constructor takes camera models
 ChainBundle::ChainBundle(TaylorCameraMap& cameraModels, bool bUseRobust, bool bUseTukey, bool bVerbose)
@@ -1186,7 +1186,7 @@ ChainBundle::ChainBundle(TaylorCameraMap& cameraModels, bool bUseRobust, bool bU
 
   mpOptimizer = new SparseOptimizer;
   mpRobustKernelData =
-      new RobustKernelData(mpOptimizer, ChainBundle::sdMinMEstimatorSigma * ChainBundle::sdMinMEstimatorSigma);
+    new RobustKernelData(mpOptimizer, ChainBundle::sdMinMEstimatorSigma * ChainBundle::sdMinMEstimatorSigma);
 
   // Tried to use BlockSolver_6_3 with marginalized points, but it has all kinds of problems in certain cases
   // (all points fixed, all poses fixed, getting the point covariance)
@@ -1362,7 +1362,7 @@ int ChainBundle::Compute(bool* pAbortSignal, int nNumIter, double dUserLambda)
     double dChi2 = mpOptimizer->activeRobustChi2();
     double dSigmaSquaredLimited = mpRobustKernelData->GetSigmaSquaredLimited();
     ROS_INFO_STREAM("------- ComputeStep BEFORE optimization, chi2: " << dChi2 << " sigma squared limited: "
-                                                                      << dSigmaSquaredLimited);
+                    << dSigmaSquaredLimited);
   }
 
   ros::WallTime start = ros::WallTime::now();
@@ -1385,7 +1385,7 @@ int ChainBundle::Compute(bool* pAbortSignal, int nNumIter, double dUserLambda)
     double dChi2 = mpOptimizer->activeRobustChi2();
     double dSigmaSquaredLimited = mpRobustKernelData->GetSigmaSquaredLimited();
     ROS_INFO_STREAM("+++++++ ComputeStep AFTER optimization, chi2: " << dChi2 << " sigma squared limited: "
-                                                                     << dSigmaSquaredLimited);
+                    << dSigmaSquaredLimited);
   }
 
   mbConverged = (mpConvergedUpdateMagAction->IsConverged() || mpConvergedResidualAction->IsConverged());
@@ -1407,7 +1407,7 @@ int ChainBundle::Compute(bool* pAbortSignal, int nNumIter, double dUserLambda)
     return -1;
 
   if (nCounter == 0 && *pAbortSignal)  // didn't actually take any steps, so we won't be able to do any of the tasks
-                                       // that follow, so just get out
+    // that follow, so just get out
     return 0;
 
   if (mbUseTukey)  // Need to calculate Tukey sigma and weight computation to determine outliers
@@ -1481,7 +1481,7 @@ int ChainBundle::Compute(bool* pAbortSignal, int nNumIter, double dUserLambda)
       std::sort(vCov22.begin(), vCov22.end());
       double median = vCov22[vCov22.size() / 2];
       ROS_INFO_STREAM("Point Cov 2,2 min: " << *vCov22.begin() << " max: " << *vCov22.rbegin()
-                                            << " median: " << median);
+                      << " median: " << median);
       mdLastMaxCov = median;
     }
     else

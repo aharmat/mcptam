@@ -105,59 +105,59 @@ CameraGroupSubscriber::CameraGroupSubscriber(std::vector<std::string> vCameraNam
   // back to the first subscriber (no performance hit)
   switch (mNumCams)
   {
-    case 1:
-    {
-      mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0],
-                           *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0]);
-      break;
-    }
-    case 2:
-    {
-      mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[1], *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0],
-                           *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0]);
-      break;
-    }
-    case 3:
-    {
-      mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[1], *mvpImageSubs[2], *mvpImageSubs[0], *mvpImageSubs[0],
-                           *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0]);
-      break;
-    }
-    case 4:
-    {
-      mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[1], *mvpImageSubs[2], *mvpImageSubs[3], *mvpImageSubs[0],
-                           *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0]);
-      break;
-    }
-    case 5:
-    {
-      mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[1], *mvpImageSubs[2], *mvpImageSubs[3], *mvpImageSubs[4],
-                           *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0]);
-      break;
-    }
-    case 6:
-    {
-      mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[1], *mvpImageSubs[2], *mvpImageSubs[3], *mvpImageSubs[4],
-                           *mvpImageSubs[5], *mvpImageSubs[0], *mvpImageSubs[0]);
-      break;
-    }
-    case 7:
-    {
-      mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[1], *mvpImageSubs[2], *mvpImageSubs[3], *mvpImageSubs[4],
-                           *mvpImageSubs[5], *mvpImageSubs[6], *mvpImageSubs[0]);
-      break;
-    }
-    case 8:
-    {
-      mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[1], *mvpImageSubs[2], *mvpImageSubs[3], *mvpImageSubs[4],
-                           *mvpImageSubs[5], *mvpImageSubs[6], *mvpImageSubs[7]);
-      break;
-    }
-    default:
-    {
-      ROS_ERROR("CameraGroupSubscriber: Couldn't resolve mpSync connectInput switch block, should never happen");
-      return;
-    }
+  case 1:
+  {
+    mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0],
+                         *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0]);
+    break;
+  }
+  case 2:
+  {
+    mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[1], *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0],
+                         *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0]);
+    break;
+  }
+  case 3:
+  {
+    mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[1], *mvpImageSubs[2], *mvpImageSubs[0], *mvpImageSubs[0],
+                         *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0]);
+    break;
+  }
+  case 4:
+  {
+    mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[1], *mvpImageSubs[2], *mvpImageSubs[3], *mvpImageSubs[0],
+                         *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0]);
+    break;
+  }
+  case 5:
+  {
+    mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[1], *mvpImageSubs[2], *mvpImageSubs[3], *mvpImageSubs[4],
+                         *mvpImageSubs[0], *mvpImageSubs[0], *mvpImageSubs[0]);
+    break;
+  }
+  case 6:
+  {
+    mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[1], *mvpImageSubs[2], *mvpImageSubs[3], *mvpImageSubs[4],
+                         *mvpImageSubs[5], *mvpImageSubs[0], *mvpImageSubs[0]);
+    break;
+  }
+  case 7:
+  {
+    mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[1], *mvpImageSubs[2], *mvpImageSubs[3], *mvpImageSubs[4],
+                         *mvpImageSubs[5], *mvpImageSubs[6], *mvpImageSubs[0]);
+    break;
+  }
+  case 8:
+  {
+    mpSync->connectInput(*mvpImageSubs[0], *mvpImageSubs[1], *mvpImageSubs[2], *mvpImageSubs[3], *mvpImageSubs[4],
+                         *mvpImageSubs[5], *mvpImageSubs[6], *mvpImageSubs[7]);
+    break;
+  }
+  default:
+  {
+    ROS_ERROR("CameraGroupSubscriber: Couldn't resolve mpSync connectInput switch block, should never happen");
+    return;
+  }
   }
 
   // Connect the callback to the synchronizer
@@ -172,17 +172,17 @@ CameraGroupSubscriber::CameraGroupSubscriber(std::vector<std::string> vCameraNam
   for (unsigned i = 0; i < mNumCams; ++i)
   {
     mvInfoSubs[i] = mNodeHandle.subscribe<sensor_msgs::CameraInfo>(
-        std::string(sCameraPrefix + "/" + mvCameraNames[i] + "/" + sInfoTopic), 1,
-        boost::bind(&CameraGroupSubscriber::InfoCallback, this, _1, mvCameraNames[i]));
+                      std::string(sCameraPrefix + "/" + mvCameraNames[i] + "/" + sInfoTopic), 1,
+                      boost::bind(&CameraGroupSubscriber::InfoCallback, this, _1, mvCameraNames[i]));
 
     if (bGetPoseSeparately)
       mvPoseSubs[i] = mNodeHandle.subscribe<geometry_msgs::Pose>(
-          std::string(sCameraPrefix + "/" + mvCameraNames[i] + "/" + sPoseTopic), 1,
-          boost::bind(&CameraGroupSubscriber::PoseCallback, this, _1, mvCameraNames[i]));
+                        std::string(sCameraPrefix + "/" + mvCameraNames[i] + "/" + sPoseTopic), 1,
+                        boost::bind(&CameraGroupSubscriber::PoseCallback, this, _1, mvCameraNames[i]));
   }
 
   ROS_INFO_STREAM("CameraGroupSubscriber: Waiting for camera info" << (bGetPoseSeparately ? " and separate pose" : "")
-                                                                   << " from all cameras");
+                  << " from all cameras");
 
   while (mmSavedInfos.size() < mNumCams && ros::ok())  // loop while we haven't collected all the info yet
   {
@@ -249,10 +249,10 @@ void CameraGroupSubscriber::PoseCallback(const geometry_msgs::Pose::ConstPtr& po
 
 // This will be called by the ROS subscriber whenever images from all the cameras are received
 void CameraGroupSubscriber::ImageCallback(
-    const sensor_msgs::ImageConstPtr& msg1, const sensor_msgs::ImageConstPtr& msg2,
-    const sensor_msgs::ImageConstPtr& msg3, const sensor_msgs::ImageConstPtr& msg4,
-    const sensor_msgs::ImageConstPtr& msg5, const sensor_msgs::ImageConstPtr& msg6,
-    const sensor_msgs::ImageConstPtr& msg7, const sensor_msgs::ImageConstPtr& msg8)
+  const sensor_msgs::ImageConstPtr& msg1, const sensor_msgs::ImageConstPtr& msg2,
+  const sensor_msgs::ImageConstPtr& msg3, const sensor_msgs::ImageConstPtr& msg4,
+  const sensor_msgs::ImageConstPtr& msg5, const sensor_msgs::ImageConstPtr& msg6,
+  const sensor_msgs::ImageConstPtr& msg7, const sensor_msgs::ImageConstPtr& msg8)
 {
   // Remeber that if the number of cameras is less than 8, the messages in the unused slots will point back to the first
   // image message

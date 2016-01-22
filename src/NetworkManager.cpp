@@ -112,7 +112,7 @@ void NetworkManager::Initialize()
   mNodeHandlePriv.setCallbackQueue(&mCallbackQueue);
 
   mModifyMapClient = mNodeHandle.serviceClient<mcptam::ModifyMap>(
-      "modify_map", true);  // This will need to be remapped in a launch file
+                       "modify_map", true);  // This will need to be remapped in a launch file
   mModifyMapServer = mNodeHandlePriv.advertiseService("modify_map", &NetworkManager::ModifyMapCallback, this);
 
   while (!mModifyMapClient.waitForExistence(ros::Duration(5)) && ros::ok())
@@ -721,7 +721,7 @@ void NetworkManager::AddMsg_To_KeyFrame(mcptam::NetworkKeyFrame& kf_msg, KeyFram
     MapPoint* pPoint = mMapPointDict.IdToPtr(meas_msg.mapPointId, false);
 
     if (pPoint)  // if NULL, then map point was deleted while the KeyFrame message was in transit, so don't build a
-                 // measurement for it
+      // measurement for it
     {
       // printNetworkMeasurement(meas_msg, kf_msg.mParentId, &kf, pPoint, mnSeqReceived);
 
@@ -793,7 +793,7 @@ void NetworkManager::KeyFrame_To_AddMsg(KeyFrame& kf, mcptam::NetworkKeyFrame& k
     kf_msg.mvMeasurements[i].v2RootPos[0] = meas.v2RootPos[0];
     kf_msg.mvMeasurements[i].v2RootPos[1] = meas.v2RootPos[1];
     kf_msg.mvMeasurements[i].mapPointId =
-        mMapPointDict.PtrToId(&point, false);  // map point should have id from when it was received
+      mMapPointDict.PtrToId(&point, false);  // map point should have id from when it was received
 
     // printNetworkMeasurement(kf_msg.mvMeasurements[i], kf_msg.mParentId, &kf, &point, mnSeqSend);
 
@@ -824,7 +824,7 @@ void NetworkManager::KeyFrame_To_AddMsg(KeyFrame& kf, mcptam::NetworkKeyFrame& k
 void NetworkManager::KeyFrame_To_UpdateMsg(KeyFrame& kf, mcptam::NetworkKeyFrame& kf_msg)
 {
   kf_msg.mParentId =
-      mMultiKeyFrameDict.PtrToId(kf.mpParent, false);  // parent MKF should already have been assigned an id
+    mMultiKeyFrameDict.PtrToId(kf.mpParent, false);  // parent MKF should already have been assigned an id
   kf_msg.mCamName = kf.mCamName;
 
   std::stringstream ss;
@@ -850,7 +850,7 @@ void NetworkManager::KeyFrame_To_UpdateMsg(KeyFrame& kf, mcptam::NetworkKeyFrame
 
     mcptam::NetworkMeasurement meas_msg;
     meas_msg.mapPointId =
-        mMapPointDict.PtrToId(&point, false);  // map point should have id from when it was first sent out
+      mMapPointDict.PtrToId(&point, false);  // map point should have id from when it was first sent out
     meas_msg.nLevel = meas.nLevel;
     meas_msg.bSubPix = meas.bSubPix;
     meas_msg.eSource = meas.eSource;
@@ -944,7 +944,7 @@ void NetworkManager::UpdateMsg_ApplyTo_KeyFrame(mcptam::NetworkKeyFrame& kf_msg)
     MapPoint* pPoint = mMapPointDict.IdToPtr(meas_msg.mapPointId, false);
 
     if (pPoint)  // if NULL, then map point was deleted while the KeyFrame message was in transit, so don't build a
-                 // measurement for it
+      // measurement for it
     {
       // printNetworkMeasurement(meas_msg, kf_msg.mParentId, &kf, pPoint, mnSeqReceived);
       /*
@@ -1046,7 +1046,7 @@ void NetworkManager::MapPoint_To_AddMsg(MapPoint& point, mcptam::NetworkMapPoint
   point_msg.mirCenter[1] = point.mirCenter[1];
 
   point_msg.mSourceId = mMultiKeyFrameDict.PtrToId(point.mpPatchSourceKF->mpParent,
-                                                   false);  // MKF should have had id assigned when it was received
+                        false);  // MKF should have had id assigned when it was received
   point_msg.mSourceCamName = point.mpPatchSourceKF->mCamName;
 }
 
@@ -1152,13 +1152,13 @@ MapPoint* NetworkManager::DeleteMsg_To_MapPoint(mcptam::NetworkMapPoint& point_m
 }
 
 void NetworkManager::Outlier_To_OutlierMsg(std::pair<KeyFrame*, MapPoint*>& outlier,
-                                           mcptam::NetworkOutlier& outlier_msg)
+    mcptam::NetworkOutlier& outlier_msg)
 {
   KeyFrame* pKF = outlier.first;
   MapPoint* pPoint = outlier.second;
 
   outlier_msg.mMKFId =
-      mMultiKeyFrameDict.PtrToId(pKF->mpParent, false);  // parent MKF should already have been assigned an id
+    mMultiKeyFrameDict.PtrToId(pKF->mpParent, false);  // parent MKF should already have been assigned an id
   outlier_msg.mCamName = pKF->mCamName;
   outlier_msg.mapPointId = mMapPointDict.PtrToId(pPoint, false);
 

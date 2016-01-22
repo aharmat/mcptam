@@ -41,6 +41,10 @@
 #include <mcptam/MapPoint.h>
 #include <mcptam/KeyFrame.h>
 #include <algorithm>
+#include <limits>
+#include <utility>
+#include <vector>
+#include <set>
 
 // Static members
 int BundleAdjusterBase::snRecentMinSize = 8;
@@ -191,7 +195,8 @@ int BundleAdjusterBase::BundleAdjustRecent(std::vector<std::pair<KeyFrame*, MapP
   std::set<MultiKeyFrame*> spFixedSet;
   std::set<MapPoint*> spMapPoints;
 
-  if ((int)mMap.mlpMultiKeyFrames.size() < BundleAdjusterBase::snRecentMinSize)  // Only continue if map is big enough
+  // Only continue if map is big enough
+  if (static_cast<int>(mMap.mlpMultiKeyFrames.size()) < BundleAdjusterBase::snRecentMinSize)
   {
     ROS_INFO("BundleAdjusterBase: Map not big enough for local BA, returning");
     mbBundleConverged_Recent = true;

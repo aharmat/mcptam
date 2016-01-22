@@ -54,7 +54,7 @@ MapMakerServer::MapMakerServer(Map &map, TaylorCameraMap &cameras, BundleAdjuste
 {
   mNetworkManager.SetNewAddCallback(boost::bind(&MapMakerServer::NewAddCallback, this));
   dynamic_cast<BundleAdjusterMulti *>(&mBundleAdjuster)
-      ->SetUpdateCallback(boost::bind(&MapMakerServer::SendUpdate, this, _1, _2));
+  ->SetUpdateCallback(boost::bind(&MapMakerServer::SendUpdate, this, _1, _2));
 
   Reset();  // act like we got a reset request from client on startup
   start();
@@ -215,10 +215,10 @@ void MapMakerServer::run()
         if (mState == MM_INITIALIZING && mdMaxCov < MapMakerServerBase::sdInitCovThresh)
         {
           ROS_INFO_STREAM("MM_INITIALIZING, Max cov " << mdMaxCov << " below threshold "
-                                                      << MapMakerServerBase::sdInitCovThresh
-                                                      << ", sending MM_RUNNING to client");
+                          << MapMakerServerBase::sdInitCovThresh
+                          << ", sending MM_RUNNING to client");
           mNetworkManager.ClearIncomingQueue();  // get rid of any MKFs with no images that the client has already sent
-                                                 // us
+          // us
           mState = MM_RUNNING;
         }
 
@@ -275,11 +275,11 @@ void MapMakerServer::HandleBadEntities()
   std::set<MultiKeyFrame *> spBadMKFs = mMap.MoveBadMultiKeyFramesToTrash();
 
   if (mbInitializedByClient && (spBadPoints.size() > 0 || spBadMKFs.size() > 0))  // only do this if initialized because
-                                                                                  // otherwise client might not have
-                                                                                  // same data yet
+    // otherwise client might not have
+    // same data yet
   {
     ROS_DEBUG_STREAM("In HandleBadEntities, sending " << spBadMKFs.size() << " bad mkfs, " << spBadPoints.size()
-                                                      << " bad points");
+                     << " bad points");
     mNetworkManager.SendDelete(spBadMKFs, spBadPoints);
   }
 
@@ -321,7 +321,7 @@ void MapMakerServer::SendUpdate(std::set<MultiKeyFrame *> spAdjustedFrames, std:
     }
 
     ROS_DEBUG_STREAM("MapMakerServer: sending updates of " << spAdjustedFrames.size() << " MKFs and "
-                                                           << spAdjustedPoints.size() << " points");
+                     << spAdjustedPoints.size() << " points");
     mNetworkManager.SendUpdate(spAdjustedFrames, spAdjustedPoints);
   }
 }
@@ -335,7 +335,7 @@ void MapMakerServer::SendPoints(MapPointPtrList::iterator begin_it, MapPointPtrL
     spNewSet.insert(*begin_it);
 
   ROS_DEBUG_STREAM("MapMakerServer: Sending " << spNewSet.size()
-                                              << " points, current map size: " << mMap.mlpPoints.size());
+                   << " points, current map size: " << mMap.mlpPoints.size());
   mNetworkManager.SendAdd(spNewSet);
 }
 
@@ -350,7 +350,7 @@ bool MapMakerServer::InitCallback(MultiKeyFrame *pMKF)
   }
 
   bool bPutPlaneAtOrigin =
-      pMKF->mbFixed;  // this is how we passed the "put plane at origin" info through network manager
+    pMKF->mbFixed;  // this is how we passed the "put plane at origin" info through network manager
   bool success = InitFromMultiKeyFrame(pMKF, bPutPlaneAtOrigin);  // from MapMakerServerBase
   if (!success)
   {
@@ -449,6 +449,6 @@ void MapMakerServer::DeleteCallback(std::set<MultiKeyFrame *> spMultiKeyFrames, 
 void MapMakerServer::NewAddCallback()
 {
   if (mBundleAdjuster.Running())  // Tell the mapmaker to stop doing low-priority stuff and concentrate on this KF
-                                  // first.
+    // first.
     mBundleAdjuster.RequestAbort();
 }

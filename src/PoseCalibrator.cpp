@@ -295,7 +295,7 @@ std::string PoseCalibrator::Track()
 
         // Call map maker's init from calib image
         bool bSuccess = mpMapMaker->InitFromCalibImage(*(pFirstTracker->mpCalibImage), mdSquareSize, firstCamName,
-                                                       pFirstTracker->mpCurrentMKF->mse3BaseFromWorld);
+                        pFirstTracker->mpCurrentMKF->mse3BaseFromWorld);
         pFirstTracker->MarkKeyFrameAdded();
 
         if (!bSuccess)
@@ -482,7 +482,7 @@ void PoseCalibrator::TransferKeyFrame(MultiKeyFrame* pMKF, TrackerCalib* pCT)
 
   // Destroy tracker's mpCurrentMKF so it (and the appropriate KeyFrame) will be regenerated
   pCT->mpCurrentMKF->mmpKeyFrames.erase(
-      camName);  // first remove our KF from list of keyframes so destructor of MKF won't try to delete KF
+    camName);  // first remove our KF from list of keyframes so destructor of MKF won't try to delete KF
   delete pCT->mpCurrentMKF;
   pCT->mpCurrentMKF = NULL;
 

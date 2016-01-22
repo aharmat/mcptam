@@ -118,7 +118,7 @@ void KeyFrameViewer::Draw()
       for (unsigned int j = 0; j < kf.maLevels[*gvnDrawLevel].vCandidates.size(); ++j)
       {
         CVD::ImageRef irLevelZero =
-            CVD::ir_rounded(LevelZeroPos(kf.maLevels[*gvnDrawLevel].vCandidates[j].irLevelPos, *gvnDrawLevel));
+          CVD::ir_rounded(LevelZeroPos(kf.maLevels[*gvnDrawLevel].vCandidates[j].irLevelPos, *gvnDrawLevel));
         CVD::glVertex(irLevelZero + irOffset);
       }
     }

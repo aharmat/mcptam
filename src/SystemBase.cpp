@@ -43,10 +43,9 @@
 #include <cvd/image_io.h>
 #include <stdlib.h>
 #include <fstream>
-
-using namespace TooN;
-
-// bool SystemBase::sbLevelZeroPoints = false;
+#include <utility>
+#include <deque>
+#include <string>
 
 SystemBase::SystemBase(std::string windowName, bool bFullSize, bool bDrawWindow)
   : mNodeHandlePriv("~")
@@ -80,13 +79,13 @@ SystemBase::SystemBase(std::string windowName, bool bFullSize, bool bDrawWindow)
 
       if (!mmPoses.count(camName))
         ROS_WARN_STREAM("Got camera name " << camName << " in camera pose file but we are not currently using this "
-                                                         "camera");
+                        "camera");
       else
       {
         ROS_INFO_STREAM("Replacing " << camName << " pose, old pose: " << std::endl
-                                     << mmPoses[camName] << std::endl
-                                     << " new pose: " << std::endl
-                                     << se3Pose);
+                        << mmPoses[camName] << std::endl
+                        << " new pose: " << std::endl
+                        << se3Pose);
         mmPoses[camName] = se3Pose;
       }
     }
@@ -109,10 +108,10 @@ SystemBase::SystemBase(std::string windowName, bool bFullSize, bool bDrawWindow)
     CVD::ImageRef& irImageSize = mImageSizes[camName];
     CVD::ImageRef& irFullScaleSize = mFullScaleSizes[camName];
     CVD::ImageRef& irCalibSize = mCalibSizes[camName];
-    Vector<9>& v9Params = mParams[camName];
+    TooN::Vector<9>& v9Params = mParams[camName];
 
     mmCameraModels.insert(std::pair<std::string, TaylorCamera>(
-        camName, TaylorCamera(v9Params, irCalibSize, irFullScaleSize, irImageSize)));
+                            camName, TaylorCamera(v9Params, irCalibSize, irFullScaleSize, irImageSize)));
   }
 
   mpMap = new Map;
@@ -181,7 +180,7 @@ void SystemBase::DumpCamerasToFile(std::string filename)
   ofs << "% Camera calibration parameters, format:" << std::endl;
   ofs << "% Total number of cameras" << std::endl;
   ofs << "% Camera Name, image size (2 vector), projection center (2 vector), polynomial coefficients (5 vector), "
-         "affine matrix components (3 vector), inverse polynomial coefficents (variable size)" << std::endl;
+      "affine matrix components (3 vector), inverse polynomial coefficents (variable size)" << std::endl;
 
   ofs << mmCameraModels.size() << std::endl;
 

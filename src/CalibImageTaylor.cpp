@@ -202,7 +202,8 @@ bool CalibImageTaylor::MakeFromImage(CVD::Image<CVD::byte>& im, CVD::ImageRef ir
       mvCorners.push_back(irCurr);
       CVD::glVertex(irCurr + mirDrawOffset);
     }
-  } while (irCurr.next(irTopLeft, irBotRight));
+  }
+  while (irCurr.next(irTopLeft, irBotRight));
   glEnd();
 
   // If there's not enough corners, i.e. camera pointing somewhere random, abort.
@@ -773,7 +774,7 @@ double CalibImageTaylor::SolveForR3(Vector<6> v6H, int nRNum)
 // the first two components of the translation vector
 // nImgNum and nTotalNum are in c++ vector format, ie if number of images is 2, nTotalNum = 2, and nImgNum = 0 or 1
 std::pair<Matrix<>, Vector<>> CalibImageTaylor::BuildIntrinsicMatrixEntries(Vector<2> v2Center, int nDegree,
-                                                                            int nImgNum, int nTotalNum)
+                           int nImgNum, int nTotalNum)
 {
   // Wouldn't make sense for less than degree 2
   ROS_ASSERT(nDegree >= 2);

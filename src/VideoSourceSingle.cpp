@@ -61,13 +61,13 @@ VideoSourceSingle::VideoSourceSingle(bool bGetPoseSeparately)
   mNodeHandlePriv.param<std::string>("set_info_topic", mSetInfoTopic, "set_camera_info");
 
   mImageSub =
-      mpImageTransport->subscribe(std::string(mCamName + "/" + imageTopic), 1, &VideoSourceSingle::ImageCallback, this);
+    mpImageTransport->subscribe(std::string(mCamName + "/" + imageTopic), 1, &VideoSourceSingle::ImageCallback, this);
   mInfoSub = mNodeHandle.subscribe<sensor_msgs::CameraInfo>(std::string(mCamName + "/" + infoTopic), 1,
-                                                            &VideoSourceSingle::InfoCallback, this);
+             &VideoSourceSingle::InfoCallback, this);
 
   if (mbGetPoseSeparately)
     mPoseSub = mNodeHandle.subscribe<geometry_msgs::Pose>(std::string(mCamName + "/" + poseTopic), 1,
-                                                          &VideoSourceSingle::PoseCallback, this);
+               &VideoSourceSingle::PoseCallback, this);
 
   ROS_INFO("VideoSourceSingle: Set up all subscriptions");
 
@@ -204,8 +204,8 @@ void VideoSourceSingle::InfoCallback(const sensor_msgs::CameraInfo::ConstPtr& in
       TooN::Vector<3> v3Trans = TooN::makeVector(infoMsg->P[3], infoMsg->P[7], infoMsg->P[11]);
 
       // Check the rotation matrix to see if it is a proper rotation
-      TooN::Matrix<3> m3Result = m3Rot * m3Rot.T();  // this should be close to identity
-      TooN::Vector<3> v3Ones = Ones;  // makeVector(1,1,1);
+      TooN::Matrix<3> m3Result = m3Rot * m3Rot.T();         // this should be close to identity
+      TooN::Vector<3> v3Ones = Ones;                        // makeVector(1,1,1);
       TooN::Vector<3> v3Diff = v3Ones - m3Result * v3Ones;  // should be close to zero
 
       if (v3Diff * v3Diff > 1e-4)
@@ -246,7 +246,7 @@ void VideoSourceSingle::PoseCallback(const geometry_msgs::Pose::ConstPtr& poseMs
 
 // Acquires a new image from the camera, outputs it in greyscale and color RGB formats
 bool VideoSourceSingle::GetAndFillFrameBWandRGB(ros::WallDuration timeout, CVD::Image<CVD::byte>& imBW,
-                                                CVD::Image<CVD::Rgb<CVD::byte>>& imRGB)
+    CVD::Image<CVD::Rgb<CVD::byte>>& imRGB)
 {
   bool bSuccess = NewAcquisition(timeout);
 
@@ -308,7 +308,7 @@ bool VideoSourceSingle::SaveParams(const TooN::Vector<9>& v9Params)
 
   // Connect to calib info service
   ros::ServiceClient client =
-      mNodeHandle.serviceClient<sensor_msgs::SetCameraInfo>(std::string(mCamName + "/" + mSetInfoTopic));
+    mNodeHandle.serviceClient<sensor_msgs::SetCameraInfo>(std::string(mCamName + "/" + mSetInfoTopic));
 
   sensor_msgs::SetCameraInfo srv;
   srv.request.camera_info.width = mirSize.x;
@@ -349,7 +349,7 @@ bool VideoSourceSingle::SaveParams(const TooN::Vector<9>& v9Params)
   if (!(client.call(srv) && srv.response.success))
   {
     ROS_ERROR_STREAM(
-        "VideoSourceSingle: Failed to save calibration to camera, response: " << srv.response.status_message);
+      "VideoSourceSingle: Failed to save calibration to camera, response: " << srv.response.status_message);
     return false;
   }
 

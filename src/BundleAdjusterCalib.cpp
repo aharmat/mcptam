@@ -90,8 +90,8 @@ int BundleAdjusterCalib::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std:
   if (!spFixedSet.empty())  // Shouldn't have any MKFs forced to be fixed when using BundleAdjusterCalib
   {
     ROS_FATAL(
-        "BundleAdjusterCalib: Got a non-empty fixed set, you should not call BundleAdjustRecent(...) as the whole map "
-        "is needed for calibration, call BundleAdjustAll(...) instead!");
+      "BundleAdjusterCalib: Got a non-empty fixed set, you should not call BundleAdjustRecent(...) as the whole map "
+      "is needed for calibration, call BundleAdjustAll(...) instead!");
     ROS_BREAK();
   }
 
@@ -107,7 +107,7 @@ int BundleAdjusterCalib::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std:
   if ((int)spMapPoints.size() < BundleAdjusterBase::snMinMapPoints)
   {
     ROS_INFO_STREAM("BundleAdjusterCalib: Not enough good map points, got " << spMapPoints.size() << ", need "
-                                                                            << BundleAdjusterBase::snMinMapPoints);
+                    << BundleAdjusterBase::snMinMapPoints);
     ROS_INFO("BundleAdjusterCalib: Returning 0");
     return 0;
   }
@@ -126,7 +126,7 @@ int BundleAdjusterCalib::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std:
     SE3<>& se3Pose = se3_it->second;
 
     ROS_DEBUG_STREAM("From ExtractRelativePoses, " << camName << std::endl
-                                                   << se3Pose);
+                     << se3Pose);
 
     int nBundleID = calibBundle.AddPose(se3Pose, false);
 
@@ -175,7 +175,7 @@ int BundleAdjusterCalib::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std:
       vPoses.push_back(mmBase_BundleID[point.mpPatchSourceKF->mpParent]);
 
       if (mmCamName_BundleID.count(point.mpPatchSourceKF->mCamName))  // this is a relative camera, camera chain is 2
-                                                                      // poses long
+        // poses long
         vPoses.push_back(mmCamName_BundleID[point.mpPatchSourceKF->mCamName]);
     }
 

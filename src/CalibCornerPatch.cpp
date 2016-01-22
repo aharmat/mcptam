@@ -45,9 +45,9 @@
 #include <cvd/utility.h>
 #include <cvd/convolution.h>
 #include <cvd/image_interpolate.h>
+#include <TooN/TooN.h>
 #include <TooN/Cholesky.h>
-
-using namespace TooN;
+#include <algorithm>
 
 CVD::Image<float> CalibCornerPatch::mimSharedSourceTemplate;
 
@@ -65,7 +65,7 @@ CalibCornerPatch::CalibCornerPatch(int nSideSize, CVD::ImageRef irDrawOffset) : 
 void CalibCornerPatch::MakeTemplateWithCurrentParams()
 {
   double dBlurSigma = 2.0;
-  int nExtraPixels = (int)(dBlurSigma * 6.0) + 2;
+  int nExtraPixels = static_cast<int>(dBlurSigma * 6.0) + 2;
 
   CVD::Image<float> imToBlur(mimTemplate.size() + CVD::ImageRef(nExtraPixels, nExtraPixels));
   CVD::Image<float> imTwiceToBlur(imToBlur.size() * 2);
@@ -73,7 +73,7 @@ void CalibCornerPatch::MakeTemplateWithCurrentParams()
   // Make actual template:
   int nOffset;
   {
-    Matrix<2> m2Warp = mParams.m2Warp();
+    TooN::Matrix<2> m2Warp = mParams.m2Warp();
     CVD::transform(mimSharedSourceTemplate, imTwiceToBlur, opts::M2Inverse(m2Warp),
                    vec(mimSharedSourceTemplate.size() - CVD::ImageRef(1, 1)) * 0.5,
                    vec(imTwiceToBlur.size() - CVD::ImageRef(1, 1)) * 0.5);
@@ -82,12 +82,12 @@ void CalibCornerPatch::MakeTemplateWithCurrentParams()
 
     nOffset = (imToBlur.size().x - mimTemplate.size().x) / 2;
     CVD::copy(imToBlur, mimTemplate, mimTemplate.size(), CVD::ImageRef(nOffset, nOffset));
-  };
+  }
 
   // Make numerical angle jac images:
   for (int dof = 0; dof < 2; dof++)
   {
-    Matrix<2> m2Warp;
+    TooN::Matrix<2> m2Warp;
     for (int i = 0; i < 2; i++)
     {
       double dAngle = mParams.v2Angles[i];
@@ -107,7 +107,8 @@ void CalibCornerPatch::MakeTemplateWithCurrentParams()
     do
     {
       mimAngleJacs[ir][dof] = (imToBlur[ir + CVD::ImageRef(nOffset, nOffset)] - mimTemplate[ir]) / 0.01;
-    } while (ir.next(mimTemplate.size()));
+    }
+    while (ir.next(mimTemplate.size()));
   }
 
   // Make the image of image gradients here too (while we have the bigger template to work from)
@@ -115,10 +116,11 @@ void CalibCornerPatch::MakeTemplateWithCurrentParams()
   do
   {
     mimGradients[ir][0] =
-        0.5 * (imToBlur[ir + CVD::ImageRef(nOffset + 1, nOffset)] - imToBlur[ir + CVD::ImageRef(nOffset - 1, nOffset)]);
+      0.5 * (imToBlur[ir + CVD::ImageRef(nOffset + 1, nOffset)] - imToBlur[ir + CVD::ImageRef(nOffset - 1, nOffset)]);
     mimGradients[ir][1] =
-        0.5 * (imToBlur[ir + CVD::ImageRef(nOffset, nOffset + 1)] - imToBlur[ir + CVD::ImageRef(nOffset, nOffset - 1)]);
-  } while (ir.next(mimGradients.size()));
+      0.5 * (imToBlur[ir + CVD::ImageRef(nOffset, nOffset + 1)] - imToBlur[ir + CVD::ImageRef(nOffset, nOffset - 1)]);
+  }
+  while (ir.next(mimGradients.size()));
 }
 
 bool CalibCornerPatch::IterateOnImageWithDrawing(CalibCornerPatch::Params &params, CVD::Image<CVD::byte> &im)
@@ -167,27 +169,27 @@ bool CalibCornerPatch::IterateOnImage(CalibCornerPatch::Params &params, CVD::Ima
 
 double CalibCornerPatch::Iterate(CVD::Image<CVD::byte> &im)
 {
-  Vector<2> v2TL = mParams.v2Pos - vec(mimTemplate.size() - CVD::ImageRef(1, 1)) / 2.0;
+  TooN::Vector<2> v2TL = mParams.v2Pos - vec(mimTemplate.size() - CVD::ImageRef(1, 1)) / 2.0;
   if (!(v2TL[0] >= 0.0 && v2TL[1] >= 0.0))
     return -1.0;
 
-  Vector<2> v2BR = v2TL + vec(mimTemplate.size() - CVD::ImageRef(1, 1));
+  TooN::Vector<2> v2BR = v2TL + vec(mimTemplate.size() - CVD::ImageRef(1, 1));
   if (!(v2BR[0] < (im.size().x - 1.0) && v2BR[1] < (im.size().y - 1.0)))
     return -1.0;
 
   CVD::image_interpolate<CVD::Interpolate::Bilinear, CVD::byte> imInterp(im);
-  Matrix<6> m6JTJ = Zeros;
-  Vector<6> v6JTD = Zeros;
+  TooN::Matrix<6> m6JTJ = TooN::Zeros;
+  TooN::Vector<6> v6JTD = TooN::Zeros;
 
   CVD::ImageRef ir;
   double dSum = 0.0;
   do
   {
-    Vector<2> v2Pos_Template = vec(ir) - vec(mimTemplate.size() - CVD::ImageRef(1, 1)) / 2.0;
-    Vector<2> v2Pos_Image = mParams.v2Pos + v2Pos_Template;
+    TooN::Vector<2> v2Pos_Template = vec(ir) - vec(mimTemplate.size() - CVD::ImageRef(1, 1)) / 2.0;
+    TooN::Vector<2> v2Pos_Image = mParams.v2Pos + v2Pos_Template;
     double dDiff = imInterp[v2Pos_Image] - (mParams.dGain * mimTemplate[ir] + mParams.dMean);
     dSum += fabs(dDiff);
-    Vector<6> v6Jac;
+    TooN::Vector<6> v6Jac;
     // Jac for center pos: Minus sign because +pos equates to sliding template -
     v6Jac.slice<0, 2>() = -1.0 * mParams.dGain * mimGradients[ir];
     // Jac for angles: dPos/dAngle needs finishing by multiplying by pos..
@@ -200,10 +202,11 @@ double CalibCornerPatch::Iterate(CVD::Image<CVD::byte> &im)
 
     m6JTJ += v6Jac.as_col() * v6Jac.as_row();
     v6JTD += dDiff * v6Jac;
-  } while (ir.next(mimTemplate.size()));
+  }
+  while (ir.next(mimTemplate.size()));
 
-  Cholesky<6> chol(m6JTJ);
-  Vector<6> v6Update = 0.7 * chol.backsub(v6JTD);
+  TooN::Cholesky<6> chol(m6JTJ);
+  TooN::Vector<6> v6Update = 0.7 * chol.backsub(v6JTD);
   mParams.v2Pos += v6Update.slice<0, 2>();
   mParams.v2Angles += v6Update.slice<2, 2>();
   mParams.dMean += v6Update[4];
@@ -227,7 +230,8 @@ void CalibCornerPatch::MakeSharedTemplate()
     float fX = (ir.x < nHalf) ? 1.0 : -1.0;
     float fY = (ir.y < nHalf) ? 1.0 : -1.0;
     mimSharedSourceTemplate[ir] = fX * fY;
-  } while (ir.next(mimSharedSourceTemplate.size()));
+  }
+  while (ir.next(mimSharedSourceTemplate.size()));
 }
 
 CalibCornerPatch::Params::Params()
@@ -236,12 +240,12 @@ CalibCornerPatch::Params::Params()
   v2Angles[1] = M_PI / 2.0;
   dMean = 0.0;
   dGain = 1.0;
-  v3Pos = Zeros;
+  v3Pos = TooN::Zeros;
 }
 
-Matrix<2> CalibCornerPatch::Params::m2Warp()
+TooN::Matrix<2> CalibCornerPatch::Params::m2Warp()
 {
-  Matrix<2> m2Warp;
+  TooN::Matrix<2> m2Warp;
   for (int i = 0; i < 2; i++)
   {
     m2Warp[0][i] = cos(v2Angles[i]);

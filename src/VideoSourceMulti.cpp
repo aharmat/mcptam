@@ -70,7 +70,7 @@ VideoSourceMulti::VideoSourceMulti(bool bGetPoseSeparately) : mWork(mIOService),
       ROS_INFO_STREAM("VideoSourceMulti: Creating camera group from " << vCamGroupStrings[i][j]);
 
     mvpCamGroups.push_back(new CameraGroupSubscriber(
-        vCamGroupStrings[i], bGetPoseSeparately));  // new subscriber group (with pose subscription)
+                             vCamGroupStrings[i], bGetPoseSeparately));  // new subscriber group (with pose subscription)
     mvCamNames.insert(mvCamNames.end(), vCamGroupStrings[i].begin(), vCamGroupStrings[i].end());
   }
 
@@ -100,14 +100,14 @@ VideoSourceMulti::VideoSourceMulti(bool bGetPoseSeparately) : mWork(mIOService),
   for (unsigned i = 0; i < mvpCamGroups.size(); ++i)
   {
     ImagePtrMap mpImages =
-        mvpCamGroups[i]->GetNewImage(&mbWaitActive);  // get a set of images so we can extract image size info
+      mvpCamGroups[i]->GetNewImage(&mbWaitActive);  // get a set of images so we can extract image size info
     for (ImagePtrMap::iterator it = mpImages.begin(); it != mpImages.end(); it++)
     {
       std::string camName = it->first;
       mmSizes[camName] = CVD::ImageRef(it->second->image.cols, it->second->image.rows);
       CVD::ImageRef irBinning = mmBinnings[camName];
       mmFullScaleSizes[camName] =
-          CVD::ImageRef(it->second->image.cols * irBinning.x, it->second->image.rows * irBinning.y);
+        CVD::ImageRef(it->second->image.cols * irBinning.x, it->second->image.rows * irBinning.y);
 
       // Prepare workspace variables
       mmWorkspaceBW[camName] = CVD::Image<CVD::byte>();
@@ -205,7 +205,7 @@ void VideoSourceMulti::RecordInfo(sensor_msgs::CameraInfo infoMsg, std::string c
       m3Rot = Identity;
       v3Trans = Zeros;
       ROS_WARN_STREAM("VideoSourceMulti: The rotation matrix inside the CameraInfo message of " << cameraName
-                                                                                                << " is invalid!");
+                      << " is invalid!");
       ROS_WARN_STREAM("VideoSourceMulti: Perhaps you meant to get the camera pose separately but forgot to set the "
                       "get_pose_separately parameter to true?");
       ROS_WARN_STREAM("VideoSourceMulti: Defaulting to IDENTITY transformation.");
@@ -285,7 +285,7 @@ void VideoSourceMulti::CalcDrawOffsets()
 
 // Acquires a new image from the specified camera, outputs it in greyscale and color RGB formats
 bool VideoSourceMulti::GetAndFillFrameBWandRGB(std::string camName, ros::WallDuration timeout,
-                                               CVD::Image<CVD::byte> &imBW, CVD::Image<CVD::Rgb<CVD::byte>> &imRGB)
+    CVD::Image<CVD::byte> &imBW, CVD::Image<CVD::Rgb<CVD::byte>> &imRGB)
 {
   bool bSuccess = NewAcquistion(timeout, camName);
 
@@ -467,7 +467,7 @@ bool VideoSourceMulti::SavePoses(const SE3Map &mPoses)
     srv.request.camera_info.P[11] = v3Trans[2];
 
     ros::ServiceClient client =
-        mNodeHandle.serviceClient<sensor_msgs::SetCameraInfo>(std::string(cameraName + "/" + mSetInfoTopic));
+      mNodeHandle.serviceClient<sensor_msgs::SetCameraInfo>(std::string(cameraName + "/" + mSetInfoTopic));
 
     if (client.call(srv) && srv.response.success)
     {

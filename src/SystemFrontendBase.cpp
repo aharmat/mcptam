@@ -94,7 +94,7 @@ SystemFrontendBase::SystemFrontendBase(std::string windowName, bool bFullSize)
   if (mnSmallImageLevel >= LEVELS)
   {
     ROS_WARN_STREAM("small_image_level set to " << mnSmallImageLevel << " is too large, setting to maximum allowed "
-                                                                        "value of " << LEVELS - 1);
+                    "value of " << LEVELS - 1);
     mnSmallImageLevel = LEVELS - 1;
   }
 

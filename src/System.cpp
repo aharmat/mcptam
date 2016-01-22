@@ -51,8 +51,8 @@
 #include <mcptam/Types.h>
 #include <gvars3/instances.h>
 
-using namespace GVars3;
-using namespace TooN;
+using GVars3::GUI;
+
 
 System::System() : SystemFrontendBase("mcptam", true)
 {
@@ -124,7 +124,7 @@ System::System() : SystemFrontendBase("mcptam", true)
     bool bLevelZeroPoints;
     mNodeHandlePriv.param<bool>("level_zero_points", bLevelZeroPoints, true);
 
-    static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN | SILENT);
+    static GVars3::gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, GVars3::HIDDEN | GVars3::SILENT);
     *gvnLevelZeroPoints = bLevelZeroPoints;
 
     // Main Menu
@@ -214,7 +214,7 @@ void System::Run()
     bLastGrabSuccess = mpVideoSourceMulti->GetAndFillFrameBW(ros::WallDuration(0.2), mFramesBW, timestamp);
     grabEndTime = ros::Time::now();
 
-    static gvar3<std::string> gvsCurrentSubMenu("Menu.CurrentSubMenu", "", HIDDEN | SILENT);
+    static GVars3::gvar3<std::string> gvsCurrentSubMenu("Menu.CurrentSubMenu", "", GVars3::HIDDEN | GVars3::SILENT);
     bool bDrawKeyFrames = *gvsCurrentSubMenu == "View";
 
     if (bLastGrabSuccess)

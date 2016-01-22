@@ -123,7 +123,7 @@ SystemServer::SystemServer() : SystemBase("mcptam_server", true, true), mImageTr
 
   mSmallImageSub = mImageTransport.subscribe("tracker_small_image", 1, &SystemServer::TrackerSmallImageCallback, this);
   mSmallImagePointsSub =
-      mNodeHandle.subscribe("tracker_small_image_points", 1, &SystemServer::TrackerSmallImagePointsCallback, this);
+    mNodeHandle.subscribe("tracker_small_image_points", 1, &SystemServer::TrackerSmallImagePointsCallback, this);
 
   mpBundleAdjuster = new BundleAdjusterMulti(*mpMap, mmCameraModels);
   mpMapMakerServer = new MapMakerServer(*mpMap, mmCameraModels, *mpBundleAdjuster);

@@ -149,7 +149,7 @@ KeyFrame* MapMakerBase::ClosestKeyFrame(KeyFrame& kf, KeyFrameRegion region, boo
 
 // Finds nMaxNum closest KeyFrames, within a given distance, within a given region
 std::vector<KeyFrame*> MapMakerBase::ClosestKeyFramesWithinDist(KeyFrame& kf, double dThreshDist, unsigned nMaxNum,
-                                                                KeyFrameRegion region)
+    KeyFrameRegion region)
 {
   std::vector<KeyFrame*> vResult;
 

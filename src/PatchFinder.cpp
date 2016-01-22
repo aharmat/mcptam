@@ -208,7 +208,8 @@ inline void PatchFinder::MakeTemplateSums()
     int b = mimTemplate[ir];
     nSum += b;
     nSumSq += b * b;
-  } while (ir.next(mimTemplate.size()));
+  }
+  while (ir.next(mimTemplate.size()));
   mnTemplateSum = nSum;
   mnTemplateSumSq = nSumSq;
 }
@@ -432,7 +433,7 @@ double PatchFinder::IterateSubPix(KeyFrame &kf)
 
   // Loop over template image
   unsigned long nRowOffset =
-      &kf.maLevels[mnSearchLevel].image[CVD::ImageRef(0, 1)] - &kf.maLevels[mnSearchLevel].image[CVD::ImageRef(0, 0)];
+    &kf.maLevels[mnSearchLevel].image[CVD::ImageRef(0, 1)] - &kf.maLevels[mnSearchLevel].image[CVD::ImageRef(0, 0)];
   for (ir.y = 1; ir.y < mnPatchSize - 1; ir.y++)
   {
     pTopLeftPixel = &image[CVD::ir(v2Base) + CVD::ImageRef(1, ir.y)];  // n.b. the x=1 offset, as with y

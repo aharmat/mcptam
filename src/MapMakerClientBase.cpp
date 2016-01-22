@@ -46,7 +46,7 @@
 int MapMakerClientBase::snMinOutliers = 20;
 double MapMakerClientBase::sdOutlierMultiplier = 1.0;
 double MapMakerClientBase::sdMaxScaledMKFDist = 0.1;  // 0.3;
-double MapMakerClientBase::sdMaxScaledKFDist = 0.1;  // 0.3;
+double MapMakerClientBase::sdMaxScaledKFDist = 0.1;   // 0.3;
 
 MapMakerClientBase::MapMakerClientBase(Map &map)
   : MapMakerBase(map, true)  // This will be skipped since inheritance is virtual!
@@ -148,7 +148,7 @@ bool MapMakerClientBase::NeedNewMultiKeyFrame(MultiKeyFrame &mkf)
   bool bNeed = dDist > dThresh;
 
   ROS_INFO_STREAM("NeedNewMultiKeyFrame: dist: " << dDist << " mean depth: " << mkf.mdTotalDepthMean
-                                                 << " thresh: " << dThresh << " need: " << (bNeed ? "yes" : "no"));
+                  << " thresh: " << dThresh << " need: " << (bNeed ? "yes" : "no"));
 
   return bNeed;
 }
@@ -175,7 +175,7 @@ bool MapMakerClientBase::NeedNewMultiKeyFrame(MultiKeyFrame &mkf, int nNumMeas)
   bool bNeed = nNumMeas < dThresh;
 
   ROS_INFO_STREAM("NeedNewMultiKeyFrame: num meas: " << nNumMeas << " thresh: " << dThresh
-                                                     << " need: " << (bNeed ? "yes" : "no"));
+                  << " need: " << (bNeed ? "yes" : "no"));
 
   return nNumMeas < dThresh;
 }

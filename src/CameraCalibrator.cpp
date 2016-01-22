@@ -89,8 +89,8 @@ CameraCalibrator::CameraCalibrator()
   {
     ROS_ERROR("CameraCalibrator: Can't calibrate camera with binning turned on, relaunch camera with binning off");
     ROS_ERROR_STREAM("CameraCalibrator: Got image size of " << mirSize.x << "," << mirSize.y
-                                                            << "  and full scale size of " << irFullScaleSize.x << ","
-                                                            << irFullScaleSize.y);
+                     << "  and full scale size of " << irFullScaleSize.x << ","
+                     << irFullScaleSize.y);
     ros::shutdown();
     return;
   }
@@ -511,7 +511,7 @@ bool CameraCalibrator::OptimizeOneStepLM()
   for (int n = 0; n < nViews; n++)
   {
     mvpCalibImgs[n]->mse3CamFromWorldNew =
-        SE3<>::exp(vCameraPoseUpdate.slice(n * 6, 6)) * mvpCalibImgs[n]->mse3CamFromWorld;
+      SE3<>::exp(vCameraPoseUpdate.slice(n * 6, 6)) * mvpCalibImgs[n]->mse3CamFromWorld;
   }
 
   mpCamera->UpdateParams(vCameraParamsUpdate);
@@ -616,7 +616,7 @@ void CameraCalibrator::FindBestCenter(Vector<2> v2StartCenter, Vector<2> v2Sprea
 // Compute the z component of the translation vector of the CalibImateTaylor's poses, and the polynomial
 // coefficients of the camera model.
 TooN::Vector<4> CameraCalibrator::ComputeParamsUpdatePoses(std::vector<CalibImageTaylor*> vpCalibImgs,
-                                                           TooN::Vector<2> v2Center)
+    TooN::Vector<2> v2Center)
 {
   int nViews = vpCalibImgs.size();
   int nPoints = 0;
@@ -625,7 +625,7 @@ TooN::Vector<4> CameraCalibrator::ComputeParamsUpdatePoses(std::vector<CalibImag
   {
     nPoints += vpCalibImgs[i]->mvGridCorners.size();
     vpCalibImgs[i]->GuessInitialPose(
-        v2Center);  // Update internal pose, make sure this is called before building big matrix!
+      v2Center);  // Update internal pose, make sure this is called before building big matrix!
   }
 
   // This follows Scaramuzza thesis section 3.2.2

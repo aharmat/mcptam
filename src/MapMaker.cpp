@@ -319,8 +319,8 @@ void MapMaker::run()
         if (mState == MM_INITIALIZING && (mdMaxCov < MapMakerServerBase::sdInitCovThresh || mbStopInit))
         {
           ROS_INFO_STREAM("INITIALIZING, Max cov " << mdMaxCov << " below threshold "
-                                                   << MapMakerServerBase::sdInitCovThresh
-                                                   << ", switching to MM_RUNNING");
+                          << MapMakerServerBase::sdInitCovThresh
+                          << ", switching to MM_RUNNING");
           mState = MM_RUNNING;
           ClearIncomingQueue();
           mbStopInit = false;
@@ -419,7 +419,7 @@ void MapMaker::AddMultiKeyFrame(MultiKeyFrame *&pMKF_Incoming)
   lock.unlock();
 
   if (mBundleAdjuster.Running())  // Tell the mapmaker to stop doing low-priority stuff and concentrate on this KF
-                                  // first.
+    // first.
     mBundleAdjuster.RequestAbort();
 }
 
@@ -537,7 +537,7 @@ void MapMaker::AddMultiKeyFrameFromTopOfQueue()
 void MapMaker::HandleBadEntities()
 {
   ROS_DEBUG_STREAM("HandleBadEntities: Before move to trash we have " << mMap.mlpPoints.size() << " map points, and "
-                                                                      << mMap.mlpMultiKeyFrames.size() << " MKFs");
+                   << mMap.mlpMultiKeyFrames.size() << " MKFs");
   mMap.MoveBadMultiKeyFramesToTrash();
   mMap.MoveDeletedMultiKeyFramesToTrash();
 
@@ -547,7 +547,7 @@ void MapMaker::HandleBadEntities()
   mMap.MoveBadPointsToTrash();
   mMap.MoveDeletedPointsToTrash();
   ROS_DEBUG_STREAM("HandleBadEntities: After move to trash we have " << mMap.mlpPoints.size() << " map points, and "
-                                                                     << mMap.mlpMultiKeyFrames.size() << " MKFs");
+                   << mMap.mlpMultiKeyFrames.size() << " MKFs");
 
   EraseBadEntitiesFromQueues();
   mMap.EmptyTrash();

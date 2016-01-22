@@ -98,7 +98,7 @@ Tracker::Tracker(Map& map, MapMakerClientBase& mapmaker, TaylorCameraMap& camera
 
   mmCameraModels = cameras;
   mmCameraModelsSBI = mmCameraModels;  // the SBI version will be used with the frame-to-frame rotation detector which
-                                       // needs to resize the camera image internally
+  // needs to resize the camera image internally
   mmDrawOffsets = offsets;
 
   // Save camera names and image sizes
@@ -313,7 +313,7 @@ void Tracker::TrackFrameSetup(ImageBWMap& imFrames, ros::Time timestamp, bool bD
     std::tuple<double, double, double> kfTimes;
 
     kfTimes = mpCurrentMKF->mmpKeyFrames[camName]->MakeKeyFrame_Lite(img_it->second, false,
-                                                                     *gvnGlareMasking);  // deep copy,  glare masking
+              *gvnGlareMasking);  // deep copy,  glare masking
 
     timingMsg.kf_downsample += std::get<0>(kfTimes);
     timingMsg.kf_mask += std::get<1>(kfTimes);
@@ -326,16 +326,16 @@ void Tracker::TrackFrameSetup(ImageBWMap& imFrames, ros::Time timestamp, bool bD
     {
       // Means this is the first time here, so make both this frame and last frame's SBI's the same
       mmpSBIThisFrame[camName] =
-          new SmallBlurryImage(*mpCurrentMKF->mmpKeyFrames[camName], Tracker::sdRotationEstimatorBlur);
+        new SmallBlurryImage(*mpCurrentMKF->mmpKeyFrames[camName], Tracker::sdRotationEstimatorBlur);
       mmpSBILastFrame[camName] =
-          new SmallBlurryImage(*mpCurrentMKF->mmpKeyFrames[camName], Tracker::sdRotationEstimatorBlur);
+        new SmallBlurryImage(*mpCurrentMKF->mmpKeyFrames[camName], Tracker::sdRotationEstimatorBlur);
     }
     else  // otherwise both this and last frames have SBI
     {
       delete mmpSBILastFrame[camName];
       mmpSBILastFrame[camName] = mmpSBIThisFrame[camName];  // transfer to last frame
       mmpSBIThisFrame[camName] =
-          new SmallBlurryImage(*mpCurrentMKF->mmpKeyFrames[camName], Tracker::sdRotationEstimatorBlur);
+        new SmallBlurryImage(*mpCurrentMKF->mmpKeyFrames[camName], Tracker::sdRotationEstimatorBlur);
     }
 
     timingMsg.sbi += (ros::WallTime::now() - startTime).toSec();
@@ -385,7 +385,7 @@ void Tracker::TrackFrameSetup(ImageBWMap& imFrames, ros::Time timestamp, bool bD
         for (unsigned int j = 0; j < kf.maLevels[*gvnDrawLevel].vCorners.size(); ++j)
         {
           CVD::ImageRef irLevelZero =
-              CVD::ir_rounded(LevelZeroPos(kf.maLevels[*gvnDrawLevel].vCorners[j], *gvnDrawLevel));
+            CVD::ir_rounded(LevelZeroPos(kf.maLevels[*gvnDrawLevel].vCorners[j], *gvnDrawLevel));
           CVD::glVertex(irLevelZero + irOffset);
         }
 
@@ -550,7 +550,7 @@ bool Tracker::AttemptRecovery()
     // The pose returned is for a KeyFrame, so we have to calculate the appropriate base MultiKeyFrame pose from it
     SE3<> se3Best = mRelocaliser.BestPose();
     mse3StartPose = mpCurrentMKF->mse3BaseFromWorld =
-        mpCurrentMKF->mmpKeyFrames[camName]->mse3CamFromBase.inverse() * se3Best;  // CHECK!! GOOD
+                      mpCurrentMKF->mmpKeyFrames[camName]->mse3CamFromBase.inverse() * se3Best;  // CHECK!! GOOD
 
     bSuccess = true;
     break;
@@ -645,7 +645,7 @@ void Tracker::TrackForInitialMap()
     if (mMapMaker.Init(mpCurrentMKF, mbPutPlaneAtOrigin))
     {
       mse3StartPose =
-          mMap.mlpMultiKeyFrames.back()->mse3BaseFromWorld;  // set starting pose from first MultiKeyFrame pose
+        mMap.mlpMultiKeyFrames.back()->mse3BaseFromWorld;  // set starting pose from first MultiKeyFrame pose
       InitCurrentMKF(mse3StartPose);                         // need to regenerate MultiKeyFrame
       CopySceneDepths(*mMap.mlpMultiKeyFrames.back());
       CopyMasks(*mMap.mlpMultiKeyFrames.back());
@@ -718,7 +718,7 @@ void Tracker::FindPVS(std::string cameraName, TDVLevels& vPVSLevels)
 
     // And check what the PatchFinder (included in TrackerData) makes of the mappoint in this view..
     pTData->mnSearchLevel =
-        pTData->mFinder.CalcSearchLevelAndWarpMatrix(pTData->mPoint, kf.mse3CamFromWorld, pTData->mm2CamDerivs);
+      pTData->mFinder.CalcSearchLevelAndWarpMatrix(pTData->mPoint, kf.mse3CamFromWorld, pTData->mm2CamDerivs);
     if (pTData->mnSearchLevel == -1)
       continue;  // a negative search pyramid level indicates an inappropriate warp for this view, so skip.
 
@@ -886,7 +886,7 @@ void Tracker::SetupFineTracking(TDVLevels& vPVSLevels, TrackerDataPtrVector& vIt
   SearchForPoints(vPVSLevels[l], cameraName, nFineRange, 8);
   for (unsigned int i = 0; i < vPVSLevels[l].size(); i++)
     vIterationSet.push_back(
-        vPVSLevels[l][i]);  // Again, plonk all searched points onto the (maybe already populated) vIterationSet.
+      vPVSLevels[l][i]);  // Again, plonk all searched points onto the (maybe already populated) vIterationSet.
 
   // All the others levels: Initially, put all remaining potentially visible patches onto vNextToSearch.
   for (int l = LEVELS - 2; l >= 0; l--)
@@ -1095,7 +1095,7 @@ void Tracker::TrackMap()
                                     iter == 9);  // Even this is probably overkill, the reason we do many
     else                                         // iterations is for M-Estimator convergence rather than
       v6LastUpdate =
-          PoseUpdateStepLinear(mvIterationSets, v6LastUpdate, iter, 16.0, iter == 9);  // linearisation effects.
+        PoseUpdateStepLinear(mvIterationSets, v6LastUpdate, iter, 16.0, iter == 9);  // linearisation effects.
   }
 
   timingMsg.pose = (ros::WallTime::now() - startTime).toSec();
@@ -1226,7 +1226,7 @@ void Tracker::RefreshSceneDepth(std::vector<TrackerDataPtrVector>& vIterationSet
 
       // Calculate the weight the same way as KeyFrame's internal scene depth calculator
       double weight =
-          point.mnMEstimatorInlierCount / (double)(point.mnMEstimatorInlierCount + point.mnMEstimatorOutlierCount);
+        point.mnMEstimatorInlierCount / (double)(point.mnMEstimatorInlierCount + point.mnMEstimatorOutlierCount);
 
       vDepthsAndWeights.push_back(std::make_pair(norm(td.mv3Cam), weight));
     }
@@ -1425,7 +1425,7 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
   else
   {
     ROS_FATAL_STREAM("Tracker: Invalid Tracker MEstimator selected: " << Tracker::sMEstimatorName
-                                                                      << ", choices are [Tukey, Cauchy, Huber]");
+                     << ", choices are [Tukey, Cauchy, Huber]");
     ros::shutdown();
   }
 
@@ -1479,7 +1479,7 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
       if (!td.mbFound)
       {
         if (td.mbSearched && bMarkOutliers && !IsLost())  // testing: mark outliers even if they're not found (not just
-                                                          // if they're outliers in pose minimization)
+          // if they're outliers in pose minimization)
           td.mPoint.mnMEstimatorOutlierCount++;
 
         continue;
@@ -1548,7 +1548,7 @@ void Tracker::ApplyMotionModel()
   // Vector<6> v6Motion = Zeros;
 
   if (Tracker::sbUseRotationEstimator)  // estimate the rotation component of the motion from SmallBlurryImage
-                                        // differences
+    // differences
   {
     Vector<3> v3SBIRot = Zeros;
     bool bSuccess = CalcSBIRotation(v3SBIRot);
@@ -1729,7 +1729,7 @@ bool Tracker::CalcSBIRotation(TooN::Vector<3>& v3SBIRot)
     std::pair<SE2<>, double> result_pair;
     result_pair = mmpSBIThisFrame[camName]->IteratePosRelToTarget(*mmpSBILastFrame[camName], 6);
     SE3<> se3Adjust =
-        SmallBlurryImage::SE3fromSE2(result_pair.first, mmCameraModelsSBI[camName], mmCameraModelsSBI[camName]);
+      SmallBlurryImage::SE3fromSE2(result_pair.first, mmCameraModelsSBI[camName], mmCameraModelsSBI[camName]);
 
     Vector<3> v3AxisAngle_Cam = se3Adjust.get_rotation().ln();
     // Pose found was between KeyFrames, calculate effect on base pose
