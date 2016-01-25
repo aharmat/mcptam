@@ -50,6 +50,7 @@
 #include <mcptam/VideoSourceMulti.h>
 #include <mcptam/Types.h>
 #include <gvars3/instances.h>
+#include <string>
 
 using GVars3::GUI;
 

@@ -35,17 +35,17 @@
 #include <gvars3/instances.h>
 #include <TooN/helpers.h>
 #include <ros/ros.h>
-
-using namespace GVars3;
-using namespace TooN;
+#include <utility>
+#include <string>
+#include <vector>
 
 GLWindow2::GLWindow2(CVD::ImageRef irSize, std::string sTitle) : GLWindow(irSize, sTitle)
 {
   mirVideoSize = irSize;
-  GUI.RegisterCommand("GLWindow.AddMenu", GUICommandCallBack, this);
+  GVars3::GUI.RegisterCommand("GLWindow.AddMenu", GUICommandCallBack, this);
   CVD::glSetFont("sans");
-  mvMCPoseUpdate = Zeros;
-  mvLeftPoseUpdate = Zeros;
+  mvMCPoseUpdate = TooN::Zeros;
+  mvLeftPoseUpdate = TooN::Zeros;
 };
 
 void GLWindow2::AddMenu(std::string sName, std::string sTitle)
@@ -56,12 +56,12 @@ void GLWindow2::AddMenu(std::string sName, std::string sTitle)
 
 void GLWindow2::GUICommandCallBack(void* ptr, std::string sCommand, std::string sParams)
 {
-  ((GLWindow2*)ptr)->GUICommandHandler(sCommand, sParams);
+  (reinterpret_cast<GLWindow2*>(ptr))->GUICommandHandler(sCommand, sParams);
 }
 
 void GLWindow2::GUICommandHandler(std::string sCommand, std::string sParams)  // Called by the callback func..
 {
-  std::vector<std::string> vs = ChopAndUnquoteString(sParams);
+  std::vector<std::string> vs = GVars3::ChopAndUnquoteString(sParams);
   if (sCommand == "GLWindow.AddMenu")
   {
     switch (vs.size())
@@ -127,15 +127,15 @@ void GLWindow2::SetupVideoOrtho()
 {
   glMatrixMode(GL_PROJECTION);
   glLoadIdentity();
-  glOrtho(-0.5, (double)mirVideoSize.x - 0.5, (double)mirVideoSize.y - 0.5, -0.5, -1.0, 1.0);
+  glOrtho(-0.5, static_cast<double>(mirVideoSize.x) - 0.5, static_cast<double>(mirVideoSize.y) - 0.5, -0.5, -1.0, 1.0);
 }
 
 void GLWindow2::SetupVideoRasterPosAndZoom()
 {
   glRasterPos2d(-0.5, -0.5);
   double adZoom[2];
-  adZoom[0] = (double)size()[0] / (double)mirVideoSize[0];
-  adZoom[1] = (double)size()[1] / (double)mirVideoSize[1];
+  adZoom[0] = static_cast<double>(size()[0]) / static_cast<double>(mirVideoSize[0]);
+  adZoom[1] = static_cast<double>(size()[1]) / static_cast<double>(mirVideoSize[1]);
   glPixelZoom(adZoom[0], -adZoom[1]);
 }
 
@@ -233,21 +233,21 @@ void GLWindow2::on_mouse_down(GLWindow& win, CVD::ImageRef where, int state, int
   {
     std::stringstream ss;
     ss << button << " " << state << " " << where.x << " " << where.y;
-    GUI.ParseLine("try MouseDown " + ss.str());
+    GVars3::GUI.ParseLine("try MouseDown " + ss.str());
   }
 }
 
 void GLWindow2::on_event(GLWindow& win, int event)
 {
   if (event == EVENT_CLOSE)
-    GUI.ParseLine("quit");
+    GVars3::GUI.ParseLine("quit");
 }
 
-std::pair<Vector<6>, Vector<6>> GLWindow2::GetMousePoseUpdate()
+std::pair<TooN::Vector<6>, TooN::Vector<6>> GLWindow2::GetMousePoseUpdate()
 {
-  std::pair<Vector<6>, Vector<6>> result = std::make_pair(mvLeftPoseUpdate, mvMCPoseUpdate);
-  mvLeftPoseUpdate = Zeros;
-  mvMCPoseUpdate = Zeros;
+  std::pair<TooN::Vector<6>, TooN::Vector<6>> result = std::make_pair(mvLeftPoseUpdate, mvMCPoseUpdate);
+  mvLeftPoseUpdate = TooN::Zeros;
+  mvMCPoseUpdate = TooN::Zeros;
   return result;
 }
 
@@ -412,9 +412,9 @@ void GLWindow2::on_key_down(GLWindow&, int k)
     s = "Escape";
     break;
   default:
-    ;
+    {}
   }
 
   if (s != "")
-    GUI.ParseLine("try KeyPress " + s);
+    GVars3::GUI.ParseLine("try KeyPress " + s);
 }

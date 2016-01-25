@@ -47,9 +47,12 @@
 #include <tf/transform_broadcaster.h>
 #include <geometry_msgs/PoseArray.h>
 #include <fstream>
+#include <string>
+#include <queue>
+#include <deque>
 
-using namespace GVars3;
-using namespace TooN;
+using GVars3::GUI;
+
 
 PoseCalibrator::PoseCalibrator() : SystemBase("PoseCalibrator", true, true)
 {
@@ -110,7 +113,7 @@ PoseCalibrator::PoseCalibrator() : SystemBase("PoseCalibrator", true, true)
   bool bLevelZeroPoints;
   mNodeHandlePriv.param<bool>("level_zero_points", bLevelZeroPoints, true);
 
-  static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN | SILENT);
+  static GVars3::gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, GVars3::HIDDEN | GVars3::SILENT);
   *gvnLevelZeroPoints = bLevelZeroPoints;
 
   // Main Menu
@@ -180,7 +183,7 @@ PoseCalibrator::~PoseCalibrator()
 // Blocking function that loops indefinitiely
 void PoseCalibrator::Run()
 {
-  static gvar3<std::string> gvsCurrentSubMenu("Menu.CurrentSubMenu", "", HIDDEN | SILENT);
+  static GVars3::gvar3<std::string> gvsCurrentSubMenu("Menu.CurrentSubMenu", "", GVars3::HIDDEN | GVars3::SILENT);
 
   while (!mbDone && ros::ok())
   {
@@ -229,7 +232,7 @@ std::string PoseCalibrator::Track()
   ros::Time timestamp;
   bool bGotNewFrame = mpVideoSourceMulti->GetAndFillFrameBW(ros::WallDuration(0.1), mmFramesBW, timestamp);
 
-  static gvar3<std::string> gvsCurrentSubMenu("Menu.CurrentSubMenu", "", HIDDEN | SILENT);
+  static GVars3::gvar3<std::string> gvsCurrentSubMenu("Menu.CurrentSubMenu", "", GVars3::HIDDEN | GVars3::SILENT);
   bool bDrawKeyFrames = *gvsCurrentSubMenu == "View";
 
   if (bGotNewFrame)
@@ -358,7 +361,6 @@ std::string PoseCalibrator::Track()
             mvInitialized[i]->MarkKeyFrameAdded();
         }
       }
-
     }  // end if need to drop
 
     qTotalDurations.push_back(ros::Time::now() - start);
@@ -444,7 +446,7 @@ std::string PoseCalibrator::Optimize()
       captionStream << " Translation: " << v3Trans;
 
       // Use Bullet rotation matrix to get roll, pitch, yaw angles instead of recoding my own
-      Matrix<3> m3Rot = it->second.get_rotation().get_matrix();
+      TooN::Matrix<3> m3Rot = it->second.get_rotation().get_matrix();
       tf::Matrix3x3 rot(m3Rot(0, 0), m3Rot(0, 1), m3Rot(0, 2), m3Rot(1, 0), m3Rot(1, 1), m3Rot(1, 2), m3Rot(2, 0),
                         m3Rot(2, 1), m3Rot(2, 2));
       double r, p, y;
@@ -489,7 +491,7 @@ void PoseCalibrator::TransferKeyFrame(MultiKeyFrame* pMKF, TrackerCalib* pCT)
   if (pMKF->mmpKeyFrames.size() == 1)  // if first camera to be transfered
   {
     pMKF->mse3BaseFromWorld = pTransferKF->mse3CamFromWorld;  // set mkf pose to be pose from tracker
-    pTransferKF->mse3CamFromBase = SE3<>();                   // identity transform
+    pTransferKF->mse3CamFromBase = TooN::SE3<>();                   // identity transform
   }
   else
   {

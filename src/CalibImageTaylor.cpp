@@ -50,8 +50,9 @@
 #include <TooN/wls.h>
 #include <unsupported/Eigen/Polynomials>
 #include <iomanip>
-
-using namespace TooN;
+#include <vector>
+#include <algorithm>
+#include <utility>
 
 // Static members
 int CalibImageTaylor::snCornerPatchSize = 20;
@@ -111,7 +112,7 @@ inline bool IsCorner(CVD::Image<CVD::byte>& im, CVD::ImageRef ir, int nGate)
   return (nSwaps == 4);
 }
 
-inline Vector<2> GuessInitialAngles(CVD::Image<CVD::byte>& im, CVD::ImageRef irCenter)
+inline TooN::Vector<2> GuessInitialAngles(CVD::Image<CVD::byte>& im, CVD::ImageRef irCenter)
 {
   // The iterative patch-finder works better if the initial guess
   // is roughly aligned! Find one of the line-axes by searching round
@@ -127,10 +128,10 @@ inline Vector<2> GuessInitialAngles(CVD::Image<CVD::byte>& im, CVD::ImageRef irC
   double dGradAtBest = 0;
   for (double dAngle = 0.0; dAngle < M_PI; dAngle += 0.1)
   {
-    Vector<2> v2Dirn;
+    TooN::Vector<2> v2Dirn;
     v2Dirn[0] = cos(dAngle);
     v2Dirn[1] = sin(dAngle);
-    Vector<2> v2Perp;
+    TooN::Vector<2> v2Perp;
     v2Perp[1] = -v2Dirn[0];
     v2Perp[0] = v2Dirn[1];
 
@@ -147,7 +148,7 @@ inline Vector<2> GuessInitialAngles(CVD::Image<CVD::byte>& im, CVD::ImageRef irC
     }
   }
 
-  Vector<2> v2Ret;
+  TooN::Vector<2> v2Ret;
   if (dGradAtBest < 0)
   {
     v2Ret[0] = dBestAngle;
@@ -207,7 +208,7 @@ bool CalibImageTaylor::MakeFromImage(CVD::Image<CVD::byte>& im, CVD::ImageRef ir
   glEnd();
 
   // If there's not enough corners, i.e. camera pointing somewhere random, abort.
-  if ((int)mvCorners.size() < CalibImageTaylor::snMinCornersForGrabbedImage)
+  if (static_cast<int>(mvCorners.size()) < CalibImageTaylor::snMinCornersForGrabbedImage)
     return false;
 
   // Pick a central corner point...
@@ -311,7 +312,7 @@ bool CalibImageTaylor::MakeFromImage(CVD::Image<CVD::byte>& im, CVD::ImageRef ir
     dXAxisAngle -= dRadialAngle;
   }
 
-  Matrix<2> m2GridRot;
+  TooN::Matrix<2> m2GridRot;
   int nDirnShift;
 
   if (dXAxisAngle <= M_PI / 4 && dXAxisAngle > -M_PI / 4)
@@ -362,7 +363,7 @@ bool CalibImageTaylor::MakeFromImage(CVD::Image<CVD::byte>& im, CVD::ImageRef ir
   for (unsigned i = 0; i < mvGridCorners.size(); ++i)
   {
     CVD::ImageRef& irGridPos = mvGridCorners[i].mirGridPos;
-    Vector<2> v2GridPosVec = m2GridRot * CVD::vec(irGridPos);
+    TooN::Vector<2> v2GridPosVec = m2GridRot * CVD::vec(irGridPos);
     irGridPos = CVD::ir(v2GridPosVec);
 
     CalibGridCorner::NeighborState aNewNeighborStates[4];
@@ -423,19 +424,19 @@ bool CalibImageTaylor::ExpandByAngle(int nSrc, int nDirn)
 
   CVD::ImageRef irBest;
   double dBestDist = 99999;
-  Vector<2> v2TargetDirn = gSrc.mParams.m2Warp().T()[nDirn % 2];
+  TooN::Vector<2> v2TargetDirn = gSrc.mParams.m2Warp().T()[nDirn % 2];
   if (nDirn >= 2)
     v2TargetDirn *= -1;
   for (unsigned int i = 0; i < mvCorners.size(); i++)
   {
-    Vector<2> v2Diff = CVD::vec(mvCorners[i]) - gSrc.mParams.v2Pos;
+    TooN::Vector<2> v2Diff = CVD::vec(mvCorners[i]) - gSrc.mParams.v2Pos;
     if (v2Diff * v2Diff < 100)
       continue;
 
     if (v2Diff * v2Diff > dBestDist * dBestDist)
       continue;
 
-    Vector<2> v2Dirn = v2Diff;
+    TooN::Vector<2> v2Dirn = v2Diff;
     normalize(v2Dirn);
     if (v2Dirn * v2TargetDirn < cos(M_PI / 18.0))
       continue;
@@ -515,12 +516,12 @@ bool CalibImageTaylor::ExpandByStep(int n)
   ROS_ASSERT(nDirn != -10);
 
   CVD::ImageRef irGridStep = IR_from_dirn(nDirn);
-  Vector<2> v2SearchPos;
-  Vector<2> v2Step;
+  TooN::Vector<2> v2SearchPos;
+  TooN::Vector<2> v2Step;
 
   if (mpCamera)
   {
-    Vector<3> v3Step = gSrc.GetSteps3D(mvGridCorners).T() * CVD::vec(irGridStep);
+    TooN::Vector<3> v3Step = gSrc.GetSteps3D(mvGridCorners).T() * CVD::vec(irGridStep);
     ROS_ASSERT(gSrc.mParams.v3Pos != TooN::Zeros);
     v2SearchPos = mpCamera->Project(gSrc.mParams.v3Pos + v3Step);
     v2Step = v2SearchPos - gSrc.mParams.v2Pos;  // the equivalent v2step
@@ -538,7 +539,7 @@ bool CalibImageTaylor::ExpandByStep(int n)
   double dBestDist = 99999;
   for (unsigned int i = 0; i < mvCorners.size(); i++)
   {
-    Vector<2> v2Diff = CVD::vec(mvCorners[i]) - v2SearchPos;
+    TooN::Vector<2> v2Diff = CVD::vec(mvCorners[i]) - v2SearchPos;
     if (v2Diff * v2Diff > dBestDist * dBestDist)
       continue;
 
@@ -597,7 +598,7 @@ void CalibImageTaylor::DrawImageGrid()
   glEnable(GL_BLEND);
   glBegin(GL_LINES);
 
-  for (int i = 0; i < (int)mvGridCorners.size(); i++)
+  for (int i = 0; i < static_cast<int>(mvGridCorners.size()); i++)
   {
     if (mvGridCorners[i].mirGridPos == CVD::ImageRef(0, 0))
       nOriginIdx = i;
@@ -672,13 +673,13 @@ void CalibImageTaylor::Draw3DGrid(TaylorCamera& camera, bool bDrawErrors)
   glEnable(GL_BLEND);
   glBegin(GL_LINES);
 
-  for (int i = 0; i < (int)mvGridCorners.size(); i++)
+  for (int i = 0; i < static_cast<int>(mvGridCorners.size()); i++)
   {
     for (int dirn = 0; dirn < 4; dirn++)
     {
       if (mvGridCorners[i].maNeighborStates[dirn].val > i)
       {
-        Vector<3> v3;
+        TooN::Vector<3> v3;
         v3[2] = 0.0;
         v3.slice<0, 2>() = CVD::vec(mvGridCorners[i].mirGridPos);
         CVD::glVertex(camera.Project(mse3CamFromWorld * v3) + CVD::vec(mirDrawOffset));
@@ -694,13 +695,13 @@ void CalibImageTaylor::Draw3DGrid(TaylorCamera& camera, bool bDrawErrors)
     glColor3f(1, 0, 0);
     glLineWidth(1);
     glBegin(GL_LINES);
-    for (int i = 0; i < (int)mvGridCorners.size(); i++)
+    for (int i = 0; i < static_cast<int>(mvGridCorners.size()); i++)
     {
-      Vector<3> v3;
+      TooN::Vector<3> v3;
       v3[2] = 0.0;
       v3.slice<0, 2>() = CVD::vec(mvGridCorners[i].mirGridPos);
-      Vector<2> v2Pixels_Projected = camera.Project(mse3CamFromWorld * v3);
-      Vector<2> v2Error = mvGridCorners[i].mParams.v2Pos - v2Pixels_Projected;
+      TooN::Vector<2> v2Pixels_Projected = camera.Project(mse3CamFromWorld * v3);
+      TooN::Vector<2> v2Error = mvGridCorners[i].mParams.v2Pos - v2Pixels_Projected;
       CVD::glVertex(v2Pixels_Projected + CVD::vec(mirDrawOffset));
       CVD::glVertex(v2Pixels_Projected + 10.0 * v2Error + CVD::vec(mirDrawOffset));
     }
@@ -718,7 +719,7 @@ CVD::ImageRef CalibImageTaylor::IR_from_dirn(int nDirn)
 
 // Given the vector H from Scaramuzza thesis eq 3.7, solves for one of two entries of the 3rd column of the rotation
 // matrix of the image pose.
-double CalibImageTaylor::SolveForR3(Vector<6> v6H, int nRNum)
+double CalibImageTaylor::SolveForR3(TooN::Vector<6> v6H, int nRNum)
 {
   // See the Matlab code of OCamCalib for more info on this
 
@@ -773,15 +774,15 @@ double CalibImageTaylor::SolveForR3(Vector<6> v6H, int nRNum)
 // extracted as well as
 // the first two components of the translation vector
 // nImgNum and nTotalNum are in c++ vector format, ie if number of images is 2, nTotalNum = 2, and nImgNum = 0 or 1
-std::pair<Matrix<>, Vector<>> CalibImageTaylor::BuildIntrinsicMatrixEntries(Vector<2> v2Center, int nDegree,
-                           int nImgNum, int nTotalNum)
+std::pair<TooN::Matrix<>, TooN::Vector<>> CalibImageTaylor::BuildIntrinsicMatrixEntries(TooN::Vector<2> v2Center,
+                           int nDegree, int nImgNum, int nTotalNum)
 {
   // Wouldn't make sense for less than degree 2
   ROS_ASSERT(nDegree >= 2);
 
   int nPoints = mvGridCorners.size();
-  Matrix<> mxM_segment = Zeros(2 * nPoints, nDegree + nTotalNum);
-  Vector<> vxB_segment(2 * nPoints);
+  TooN::Matrix<> mxM_segment = TooN::Zeros(2 * nPoints, nDegree + nTotalNum);
+  TooN::Vector<> vxB_segment(2 * nPoints);
   int nIdx = 0;
 
   for (int n = 0; n < nPoints; n++)
@@ -795,7 +796,7 @@ std::pair<Matrix<>, Vector<>> CalibImageTaylor::BuildIntrinsicMatrixEntries(Vect
     double rho = sqrt(u * u + v * v);
 
     // mse3CamFromWorld needs to be up to date!
-    Matrix<3> R = mse3CamFromWorld.get_rotation().get_matrix();
+    TooN::Matrix<3> R = mse3CamFromWorld.get_rotation().get_matrix();
     double& r11 = R[0][0];
     double& r21 = R[1][0];
     double& r31 = R[2][0];
@@ -803,7 +804,7 @@ std::pair<Matrix<>, Vector<>> CalibImageTaylor::BuildIntrinsicMatrixEntries(Vect
     double& r22 = R[1][1];
     double& r32 = R[2][1];
 
-    Vector<3> t = mse3CamFromWorld.get_translation();
+    TooN::Vector<3> t = mse3CamFromWorld.get_translation();
     double& t1 = t[0];
     double& t2 = t[1];
 
@@ -835,10 +836,10 @@ std::pair<Matrix<>, Vector<>> CalibImageTaylor::BuildIntrinsicMatrixEntries(Vect
 }
 
 // Converts a 3x3 matrix representation of the pose to an SE3
-SE3<> CalibImageTaylor::M3ToSE3(Matrix<3> R)
+TooN::SE3<> CalibImageTaylor::M3ToSE3(TooN::Matrix<3> R)
 {
-  SE3<> se3;
-  Matrix<3> rot;
+  TooN::SE3<> se3;
+  TooN::Matrix<3> rot;
 
   // First two columns are the same
   rot.T()[0] = R.T()[0];
@@ -856,10 +857,10 @@ SE3<> CalibImageTaylor::M3ToSE3(Matrix<3> R)
 }
 
 // Decide which matrix from the inputs contains the correct rotation
-int CalibImageTaylor::FindCorrectRotation(std::vector<Matrix<3>> vRs, Vector<2> v2Center)
+int CalibImageTaylor::FindCorrectRotation(std::vector<TooN::Matrix<3>> vRs, TooN::Vector<2> v2Center)
 {
   // Save old transform in case someone else is using it
-  SE3<> se3Backup = mse3CamFromWorld;
+  TooN::SE3<> se3Backup = mse3CamFromWorld;
   int nCorrectIdx = -1;
   double dSmallestCoeff = 1e100;
 
@@ -869,10 +870,10 @@ int CalibImageTaylor::FindCorrectRotation(std::vector<Matrix<3>> vRs, Vector<2> 
   for (unsigned i = 0; i < vRs.size(); ++i)
   {
     mse3CamFromWorld = M3ToSE3(vRs[i]);
-    std::pair<Matrix<>, Vector<>> Mb = BuildIntrinsicMatrixEntries(v2Center, 2, 0, 1);
+    std::pair<TooN::Matrix<>, TooN::Vector<>> Mb = BuildIntrinsicMatrixEntries(v2Center, 2, 0, 1);
 
-    SVD<> svd(Mb.first);
-    Vector<> vxParams = svd.backsub(Mb.second);
+    TooN::SVD<> svd(Mb.first);
+    TooN::Vector<> vxParams = svd.backsub(Mb.second);
 
     if (vxParams[2] > 0)  // This is the t3 term in a second order fit, if it's positive we have the right solution
     {
@@ -897,7 +898,7 @@ int CalibImageTaylor::FindCorrectRotation(std::vector<Matrix<3>> vRs, Vector<2> 
 void CalibImageTaylor::GuessInitialPose(TooN::Vector<2> v2Center)
 {
   int nPoints = mvGridCorners.size();
-  Matrix<> mxN6(nPoints, 6);
+  TooN::Matrix<> mxN6(nPoints, 6);
 
   /*
   double dFirstU = 0, dFirstV = 0;
@@ -932,11 +933,11 @@ void CalibImageTaylor::GuessInitialPose(TooN::Vector<2> v2Center)
   }
 
   // Get H vector solution as last colum of V in SVD
-  SVD<> svd(mxN6);
-  Vector<6> v6H = svd.get_VT()[5];
+  TooN::SVD<> svd(mxN6);
+  TooN::Vector<6> v6H = svd.get_VT()[5];
 
   // debug
-  Vector<> vxResidual = mxN6 * v6H;
+  TooN::Vector<> vxResidual = mxN6 * v6H;
   ROS_DEBUG_STREAM("####### residual error: " << sqrt(vxResidual * vxResidual));
 
   // Try solving for r32 first, if close to zero then solve for r31 directly instead of dividing by r32
@@ -984,18 +985,18 @@ void CalibImageTaylor::GuessInitialPose(TooN::Vector<2> v2Center)
   ROS_ASSERT(nLambdaSign != 0);
   */
 
-  Vector<3> r1 = makeVector(r11, r21, r31);
-  Vector<3> r2 = makeVector(r12, r22, r32);
-  Vector<3> t = makeVector(t1, t2, 0);
+  TooN::Vector<3> r1 = TooN::makeVector(r11, r21, r31);
+  TooN::Vector<3> r2 = TooN::makeVector(r12, r22, r32);
+  TooN::Vector<3> t = TooN::makeVector(t1, t2, 0);
 
-  std::vector<Matrix<3>> vRs(4);
+  std::vector<TooN::Matrix<3>> vRs(4);
   int signs[] = {1, -1};
   int lambdaSigns[] = {1, -1};
 
   // Fill the two possible R matrices
   for (unsigned i = 0; i < vRs.size(); ++i)
   {
-    Matrix<3>& m3R = vRs[i];
+    TooN::Matrix<3>& m3R = vRs[i];
     m3R.T()[0] = dLambda * lambdaSigns[i % 2] * r1;
     m3R.T()[1] = dLambda * lambdaSigns[i % 2] * r2;
     m3R.T()[2] = dLambda * lambdaSigns[i % 2] * t;
@@ -1016,26 +1017,26 @@ void CalibImageTaylor::GuessInitialPose(TooN::Vector<2> v2Center)
 
 // Project the found corners using the given camera model, but return only only the projection errors without any
 // jacobians
-std::vector<Vector<2>> CalibImageTaylor::ProjectGetOnlyErrors(TaylorCamera& camera, bool bNewTransform)
+std::vector<TooN::Vector<2>> CalibImageTaylor::ProjectGetOnlyErrors(TaylorCamera& camera, bool bNewTransform)
 {
-  std::vector<Vector<2>> vResult;
-  SE3<> se3Transform = bNewTransform ? mse3CamFromWorldNew : mse3CamFromWorld;
+  std::vector<TooN::Vector<2>> vResult;
+  TooN::SE3<> se3Transform = bNewTransform ? mse3CamFromWorldNew : mse3CamFromWorld;
 
   for (unsigned int n = 0; n < mvGridCorners.size(); n++)
   {
     // First, project into image...
-    Vector<3> v3World;
+    TooN::Vector<3> v3World;
     v3World[2] = 0.0;
     v3World.slice<0, 2>() = CVD::vec(mvGridCorners[n].mirGridPos);
 
-    Vector<3> v3Cam = se3Transform * v3World;
+    TooN::Vector<3> v3Cam = se3Transform * v3World;
 
-    Vector<2> v2Proj = camera.Project(v3Cam);
-    Vector<2> v2Error;
+    TooN::Vector<2> v2Proj = camera.Project(v3Cam);
+    TooN::Vector<2> v2Error;
     if (camera.Invalid())
     {
       // continue;
-      v2Error = makeVector(1e10, 1e10);
+      v2Error = TooN::makeVector(1e10, 1e10);
     }
     else
     {
@@ -1056,13 +1057,13 @@ std::vector<CalibImageTaylor::ErrorAndJacobians> CalibImageTaylor::Project(Taylo
     ErrorAndJacobians EAJ;
 
     // First, project into image...
-    Vector<3> v3World;
+    TooN::Vector<3> v3World;
     v3World[2] = 0.0;
     v3World.slice<0, 2>() = CVD::vec(mvGridCorners[n].mirGridPos);
 
-    Vector<3> v3Cam = mse3CamFromWorld * v3World;
+    TooN::Vector<3> v3Cam = mse3CamFromWorld * v3World;
 
-    Vector<2> v2Proj = camera.Project(v3Cam);
+    TooN::Vector<2> v2Proj = camera.Project(v3Cam);
     if (camera.Invalid())
     {
       continue;
@@ -1071,18 +1072,18 @@ std::vector<CalibImageTaylor::ErrorAndJacobians> CalibImageTaylor::Project(Taylo
     EAJ.v2Error = mvGridCorners[n].mParams.v2Pos - v2Proj;
 
     // Now find motion jacobian..
-    Matrix<2> m2CamDerivs = camera.GetProjectionDerivs();
+    TooN::Matrix<2> m2CamDerivs = camera.GetProjectionDerivs();
 
     // For each of six degrees of freedom...
     for (int dof = 0; dof < 6; dof++)
     {
       // Get the motion of the point in the camera's frame when the pose of the camera changes by one of the degrees of
       // freedom
-      const Vector<4> v4Motion = SE3<>::generator_field(dof, unproject(v3Cam));
+      const TooN::Vector<4> v4Motion = TooN::SE3<>::generator_field(dof, unproject(v3Cam));
 
-      Vector<3> v3_dTheta, v3_dPhi;
+      TooN::Vector<3> v3_dTheta, v3_dPhi;
       TaylorCamera::GetCamSphereDeriv(v3Cam, v3_dTheta, v3_dPhi);
-      Vector<2> v2CamSphereMotion;
+      TooN::Vector<2> v2CamSphereMotion;
       v2CamSphereMotion[0] = v3_dTheta * v4Motion.slice<0, 3>();  // theta component
       v2CamSphereMotion[1] = v3_dPhi * v4Motion.slice<0, 3>();    // phi component
 

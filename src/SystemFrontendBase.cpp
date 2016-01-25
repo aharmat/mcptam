@@ -51,10 +51,12 @@
 #include <cvd/utility.h>
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h>
-//#include <opencv2/imgproc/imgproc.hpp>
+// #include <opencv2/imgproc/imgproc.hpp>
 #include <fstream>
-
-using namespace TooN;
+#include <deque>
+#include <string>
+#include <algorithm>
+#include <vector>
 
 SystemFrontendBase::SystemFrontendBase(std::string windowName, bool bFullSize)
   : SystemBase(windowName, bFullSize, !IsHeadless())
@@ -168,8 +170,8 @@ void SystemFrontendBase::PublishPose()
   pose_cov_msg.header.stamp = mpTracker->GetCurrentTimestamp();
   pose_cov_msg.header.frame_id = "vision_world";
 
-  SE3<> pose = mpTracker->GetCurrentPose().inverse();
-  Matrix<3> rot = pose.get_rotation().get_matrix();
+  TooN::SE3<> pose = mpTracker->GetCurrentPose().inverse();
+  TooN::Matrix<3> rot = pose.get_rotation().get_matrix();
   TooN::Matrix<6> cov = mpTracker->GetCurrentCovariance();
 
   // clear cross correlation
@@ -271,7 +273,7 @@ void SystemFrontendBase::PublishSystemInfo(std::stringstream &captionStream)
     info_msg.dFPS = dFPS;
   }
 
-  info_msg.dGrabSuccessRatio = (double)mnGrabSuccesses / mnGrabAttempts;
+  info_msg.dGrabSuccessRatio = static_cast<double>(mnGrabSuccesses) / mnGrabAttempts;
   info_msg.message = captionStream.str();
 
   mSystemInfoPub.publish(info_msg);
