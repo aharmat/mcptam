@@ -98,8 +98,6 @@ void MapMakerServer::run()
   ros::Rate publishRate(10);
   ros::Duration publishDur = publishRate.expectedCycleTime();
   ros::Time lastPublishTime = ros::Time::now();
-
-
   
   while(!shouldStop() && ros::ok())  // ShouldStop is a CVD::Thread func which return true if the thread is told to exit.
   {

@@ -104,10 +104,8 @@ public:
     mnMEstimatorInlierCount = 1;
     //mtCreationTime = ros::Time::now();
     mpPatchSourceKF = NULL;
-    
-    depthCovariance = 25; ///covariance for real point should never be this high
-	lockDown = false;
-  };
+    depthCovariance = 25;//std::numeric_limits<double>::max(); /// todo (adas) figure out how to set initial depth covariance to a good initial value
+	};
   
   /// Delete owned TrackerData pointers
   ~MapPoint();
@@ -163,9 +161,7 @@ public:
   
   //things needed for entropy based keyframe insertion
   double depthCovariance; ///depth covariance for the point
-  bool lockDown;		///do we lock it down?  It it well known enough to not bundle adjust?
-  
-  
+ 
 };
 
 #endif

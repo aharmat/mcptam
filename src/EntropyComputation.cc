@@ -2,27 +2,24 @@
 #include <mcptam/EntropyComputation.h>
 
 
-//this function evaluates a keyframe regarding the expected global entropy drop
+//this function evaluates a point's entropy reduction
 double EvaluatePoint(Tracker* tracker, MapPoint& point, KeyFrame& tracker_kf, double priorPointCovariance, int pointLevel, double& prevEntropy)
 {
-	
-	
+		
 	//step 1: find the point's anchor keyframe
 	KeyFrame& anchorKF = *point.mpPatchSourceKF;
 	
 	//check to see if the anchorKF and trackerKF are from the SAME MKF parent.  If this is the case, ignore
 	//if (anchorKF.mpParent == tracker_kf.mpParent)
-		//return 0;
+		//return 0; //todo (adas): do we need this still?
 	
 	//step 2: extract the location of the anchor keyframe
 	TooN::SE3<> anchorCamFromWorld = anchorKF.mse3CamFromWorld;
 	
 	//step 3: compute the relative transform from the anchor keyframe to the current tracker location
 	TooN::SE3<> trackerCamFromWorld = tracker_kf.mse3CamFromWorld;
-	TooN::SE3<> relativeTransform = trackerCamFromWorld*anchorCamFromWorld.inverse(); //CHECK THIS
-	
-	//std::cout<<relativeTransform<<std::endl;
-		
+	TooN::SE3<> relativeTransform = trackerCamFromWorld*anchorCamFromWorld.inverse(); 
+
 	//step 4: compute the motion derivatives of the point wrt the anchor keyframe
 	
 	 TooN::Vector<3> v3PointInCam = anchorKF.mse3CamFromWorld*point.mv3WorldPos;
@@ -69,17 +66,11 @@ double EvaluatePoint(Tracker* tracker, MapPoint& point, KeyFrame& tracker_kf, do
           
 	//step 8: using the prior point covariance and the new point covariance, compute the reduction in entropy
 	double levelScaleSigmaSquared = LevelScale(pointLevel)*LevelScale(pointLevel)*10;
-	TooN::Matrix<2> R = TooN::Identity*((levelScaleSigmaSquared)); //todo: change to levels, same as used in BA
-	
+	TooN::Matrix<2> R = TooN::Identity*((levelScaleSigmaSquared)); //todo (adas): is this the best noise model?
 	TooN::Matrix<2> S = (v2ImageJacobian.as_col()*priorPointCovariance*v2ImageJacobian.as_row()) +R;
 	TooN::Matrix<1,2> K = priorPointCovariance*v2ImageJacobian.as_row()*TooN::inv(S);
-	//TooN::Vector<2> vK = TooN::makeVector(K[0],K[1]);
 	double updatedCov = (1.0 - (K[0])*v2ImageJacobian)*priorPointCovariance;
-	
-	//std::cout<<"prev: " <<priorPointCovariance << " new cov: " <<updatedCov <<std::endl;
-	//std::cout<<"anchor " <<anchorKF.mCamName << "  obs: " << tracker_kf.mCamName <<std::endl;
-	//std::cout<<"img Jacob: " <<v2ImageJacobian << "  K: " << K <<std::endl;
-		
+			
 	//step 10: return the entropy reduction.
 	
 	double previousEntropy = compute_point_entropy_scalar(priorPointCovariance);
@@ -87,15 +78,14 @@ double EvaluatePoint(Tracker* tracker, MapPoint& point, KeyFrame& tracker_kf, do
 	
 	double depthEntropyReduction = previousEntropy - updatedEntropy;
 	prevEntropy = previousEntropy; //save this
+	
+	//todo (adas): add max/min for the entropy reduction? check for inf, nan, other strange outputs
+
 	//shouldn't be able to reduce it by more than factor 100
 	if( updatedCov< previousEntropy/100.0)
 		depthEntropyReduction = 0;
-		
-		
+
 	return depthEntropyReduction;
-  
-	
-	
 }
 
 TooN::Vector<3> EvaluateTracker(Tracker* tracker) //TODO (adas): include rotation states

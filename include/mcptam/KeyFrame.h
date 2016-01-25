@@ -117,11 +117,7 @@ struct Measurement
   //for testing
   CVD::ImageRef irOffset;
   bool bSelected;
-  
-  //for keeping track of bin positions
-  //TooN::Vector<2> binIndex; //bin index of measurement
-  //bool isMaxInBin; //is it the best in the bin
-    
+      
 };
 
 /// Contains image data and corner points. Each keyframe is made of LEVELS pyramid levels, stored in struct Level.
@@ -245,10 +241,8 @@ public:
   bool NoImage();
   
   void RemoveImage();
-  
-  //partially copy keyframe
-  
-  KeyFrame* CopyKeyFramePartial(MultiKeyFrame* sourceMKF, std::string name);
+    
+  KeyFrame* CopyKeyFramePartial(MultiKeyFrame* sourceMKF, std::string name); //partially copy keyframe
   
   // Variables
          

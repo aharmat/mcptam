@@ -69,7 +69,6 @@ MapMakerClient::~MapMakerClient()
   ROS_DEBUG("MapMakerClient: Run thread has died.");
 }
 
-
 void MapMakerClient::RequestReset()
 {
   // No prior processing necessary, just call the base class function to signal

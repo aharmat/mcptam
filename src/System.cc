@@ -170,12 +170,9 @@ System::System()
   mpMapMaker = new MapMaker(*mpMap, mmCameraModels, *mpBundleAdjuster);
   mpTracker = new Tracker(*mpMap, *mpMapMaker, mmCameraModels, mmPoses, mmDrawOffsets, mpGLWindow);
   mpKeyFrameViewer = new KeyFrameViewer(*mpMap, *mpGLWindow, mmDrawOffsets, mpVideoSourceMulti->GetSizes());
-  
   ImageBWMap masksMap = LoadMasks(); 
   mpTracker->SetMasks(masksMap);
-    
   mbDone = false;
-
  }
 
 System::~System()

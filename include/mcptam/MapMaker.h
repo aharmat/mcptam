@@ -108,7 +108,6 @@ public:
   /// Request that the initialization phase is completed early
   void RequestStopInit();
 
-    
 protected:
   
   /// Resets the parent classes

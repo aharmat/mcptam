@@ -84,7 +84,7 @@ double Tracker::sdTrackingQualityBad = 0.13;
 int Tracker::snLostFrameThresh = 3;
 bool Tracker::sbCollectAllPoints = true;
 
-bool kfComparitor ( const score_pair& l, const score_pair& r)
+bool kfComparitor ( const score_pair& l, const score_pair& r) //todo (adas): put this inside class
    { return l.first > r.first; }
 
 // The constructor mostly sets up interal reference variables

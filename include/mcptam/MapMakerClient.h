@@ -93,7 +93,7 @@ public:
   
   /// Overridden from MapMakerClientBase, entry point for Tracker to request a reset
   virtual void RequestReset();
-    
+
 protected:
 
   /** @brief Calls Reset on parent classes and server */

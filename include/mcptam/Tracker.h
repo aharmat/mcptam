@@ -119,24 +119,6 @@ typedef std::map<std::string, V2Levels > V2LevelsMap;
  *  Uses MultiKeyFrames and MapPoints in the Map to calculate the pose of the current MultiKeyFrame. 
  *  Communicates with a map maker to help build the Map as the environment is explored */
  
- /*struct TrackerMeasData ///tracker data for a SINGLE keyframe (single camera measurement information)
- {
-	MapPoint* measPoint;						///reference to map point of measurement
-	KeyFrame* measKF;							///keyframe from which this measurement is taken
-	Measurement measData; 						///The actual measurement. 
-	bool mbFound; 								///did the patch finder find the point?
-	
- };*/
-  
- 
- /*struct TrackerMKFData //single element for buffer of MKF
-{
-	MultiKeyFrame* mMKF;		/// partial copy of the "current" MKF while tracking, copy over static variables, but NO measurement data
-	std::map<std::string,std::vector<TrackerMeasData> > mTrackerDataMap; /// map of the tracker data for the n camearas in the group
-	
-};*/
-
- 
 class Tracker
 {
 public:

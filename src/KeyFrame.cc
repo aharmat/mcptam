@@ -64,10 +64,10 @@ using namespace TooN;
 double KeyFrame::sdCandidateThresh = 70;
 double KeyFrame::sdDistanceMeanDiffFraction = 0.5;
 //double KeyFrame::saThreshDerivs[LEVELS]  = {-600, -200, -50, -12};
-double KeyFrame::sdCandidateTopFraction= 0.7;
-std::string KeyFrame::ssCandidateType = "shi";
+double KeyFrame::sdCandidateTopFraction= 0.8;
+std::string KeyFrame::ssCandidateType = "fast";
 std::string KeyFrame::ssCandidateCriterion = "percent";
-bool KeyFrame::sbAdaptiveThresh = false;
+bool KeyFrame::sbAdaptiveThresh = true;
 int Level::snNumPrev = 2;
 
 
@@ -84,6 +84,7 @@ KeyFrame::KeyFrame(MultiKeyFrame* pMKF, std::string name)
 
 void KeyFrame::AddMeasurement(MapPoint* pPoint, Measurement* pMeas)
 {
+  ROS_ASSERT(!mmpMeasurements.count(pPoint));
   if(mmpMeasurements.count(pPoint)) //safety: we've already added the measurements, don't add again!
 	return;
   
@@ -103,7 +104,6 @@ void KeyFrame::AddMeasurement(MapPoint* pPoint, Measurement* pMeas)
 void KeyFrame::ClearMeasurements()
 {
 	
-  //std::cout<<"locking mutex" << std::endl;	
   boost::mutex::scoped_lock lock(mMeasMutex);
   
   for(MeasPtrMap::iterator it = mmpMeasurements.begin(); it != mmpMeasurements.end(); ++it)
@@ -113,7 +113,6 @@ void KeyFrame::ClearMeasurements()
   
   mmpMeasurements.clear();
 		  
-   //std::cout<<"done clearing" <<std::endl;	
 }
 
 KeyFrame::~KeyFrame()
@@ -202,13 +201,6 @@ std::tuple<double,double,double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::byt
       // .. make a half-size image from the previous level..
       lev.image.resize(maLevels[i-1].image.size() / 2);
       CVD::halfSample(maLevels[i-1].image, lev.image);
-      
-      //test: print out the size of the image
-      
-      
-      
-      //std::cout<<"imsize: "<< lev.image.size()<<std::endl;
-      
       dDownsampleTime += (ros::WallTime::now()-startTime).toSec();
     }
     
@@ -342,62 +334,22 @@ std::tuple<double,double,double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::byt
     
       if(i == 0)
       {
-		/*//CVD::SubImage<CVD::byte> subimg = lev.image.sub_image(CVD::ImageRef(0,400), CVD::ImageRef(900,200));
-		//CVD::BasicImage<CVD::byte> bsubimg(subimg.data());
-		//subimg = 
-        //fast_corner_detect_9(&subimg, lev.vCorners, 40);
-        //fast_corner_detect_9(subimg, lev.vCorners, 40);
-        CVD::Image<CVD::byte> &im = lev.image;
-        cv::Mat temp_img(im.size().y, im.size().x, CV_8U, im.data(), im.row_stride());
-		cv::Rect ROI = cv::Rect(0, 400, 900, 200);
-		cv::Mat roiImg(temp_img,ROI);
-        CVD::BasicImage<CVD::byte> cvd_level_image(roiImg.ptr(), CVD::ImageRef(roiImg.cols, roiImg.rows));*/
-        
-        fast_corner_detect_9(lev.image, lev.vCorners, 20);
-        lev.nFastThresh = 20;
-        
-        //std::cout<<lev.vCorners.size()<<std::endl;
-        
-      /*  for( std::vector<CVD::ImageRef>::iterator p_it = lev.vCorners.begin(); p_it!=lev.vCorners.end(); )
-        {
-			
-				if( p_it->y<400) //throw away if outside ROI
-				{
-					lev.vCorners.erase(p_it);
-				}
-				else
-				{
-					p_it++;
-				}
-		}*/
-      }
+        fast_corner_detect_10(lev.image, lev.vCorners, 10);
+        lev.nFastThresh = 10;
+		  }
       if(i == 1)
       {
-        fast_corner_detect_9(lev.image, lev.vCorners, 20);
-        lev.nFastThresh = 20;
-        
-        /*for( std::vector<CVD::ImageRef>::iterator p_it = lev.vCorners.begin(); p_it!=lev.vCorners.end(); )
-        {
-			
-				if( p_it->y<400) //throw away if outside ROI
-				{
-					lev.vCorners.erase(p_it);
-				}
-				else
-				{
-					p_it++;
-				}
-		}*/
-        
+        fast_corner_detect_10(lev.image, lev.vCorners, 15);
+        lev.nFastThresh = 15;
       }
       if(i == 2)
       {
-        fast_corner_detect_9(lev.image, lev.vCorners, 15);
+        fast_corner_detect_10(lev.image, lev.vCorners, 15);
         lev.nFastThresh = 15;
       }
       if(i == 3)
       {
-        fast_corner_detect_9(lev.image, lev.vCorners, 10);
+        fast_corner_detect_10(lev.image, lev.vCorners, 10);
         lev.nFastThresh = 10;
       }
       
@@ -474,51 +426,6 @@ void KeyFrame::MakeKeyFrame_Rest()
     {
       std::vector<CVD::ImageRef> vMaxCornersTemp;
       CVD::fast_nonmax(lev.image, lev.vCorners, lev.nFastThresh, vMaxCornersTemp);
-      
-      /*if(l==0)
-      {
-		  
-		   CVD::Image<CVD::byte> &im = lev.image;
-		   cv::Mat temp_img(im.size().y, im.size().x, CV_8U, im.data(), im.row_stride());
-                        
-			//Perform hough transform to find the horizon
-			std::vector<cv::Vec2f> lines;
-			cv::HoughLines(temp_img, lines, 100, CV_PI/2, 1000, 0, 0 );	//parameters recommended by Devinder
-	
-			cv::Point pt1, pt2;
-
-			//find the first non-vertical line thorugh a point
-			for( size_t i = 0; i < lines.size(); i++ )
-			{
-			   float rho = lines[i][0], theta = lines[i][1];
-			   if (theta == 0){
-				continue;
-			   }
-			   double a = cos(theta), b = sin(theta);
-			   double x0 = a*rho, y0 = b*rho;
-			   pt1.x = cvRound(x0 + 1000*(-b));
-			   pt1.y = cvRound(y0 + 1000*(a));
-			   pt2.x = cvRound(x0 - 1000*(-b));
-			   pt2.y = cvRound(y0 - 1000*(a));
-			   break;
-			}
-		  
-		  for( std::vector<CVD::ImageRef>::iterator p_it = vMaxCornersTemp.begin(); p_it!=vMaxCornersTemp.end(); )
-			{
-				
-					if( p_it->y < (pt1.y+ 150)) //throw away if outside ROI
-					{
-						vMaxCornersTemp.erase(p_it);
-					}
-					else
-					{
-						p_it++;
-					}
-			}
-	  }*/
-      
-      
-      //vMaxCornersTemp = lev.vCorners; 
       std::vector<int> vMaxScoresTemp;
       CVD::fast_corner_score_10(lev.image, vMaxCornersTemp, lev.nFastThresh, vMaxScoresTemp);  
       
@@ -1053,7 +960,6 @@ void MultiKeyFrame::RefreshSceneDepthRobust()
     nNum++;
   }
   
-  //ROS_INFO("nNum: %d", nNum);
   ROS_ASSERT(nNum > 0);
   mdTotalDepthMean = dSumDepth / nNum;
 }
