@@ -82,8 +82,8 @@ double EvaluatePoint(Tracker* tracker, MapPoint& point, KeyFrame& tracker_kf, do
 	//todo (adas): add max/min for the entropy reduction? check for inf, nan, other strange outputs
 
 	//shouldn't be able to reduce it by more than factor 100
-	if( updatedCov< previousEntropy/100.0)
-		depthEntropyReduction = 0;
+	//if( updatedCov< previousEntropy/100.0)
+	//	depthEntropyReduction = 0;
 
 	return depthEntropyReduction;
 }

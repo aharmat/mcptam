@@ -5,18 +5,11 @@
 
 
 TEST(EntropyComputation, basicOperations){
-EXPECT_FLOAT_EQ(1.4189382, compute_point_entropy_scalar(1));
+EXPECT_FLOAT_EQ(1.418938196, compute_point_entropy_scalar(1)); 
 }
 
-/*TEST(MathExpressions, complexOperations){
-  TEST_EXPRESSION(((3 + 4) / 2.0) + 10);
-  TEST_EXPRESSION(7 * (1 + 2 + 3 - 2 + 3.4) / 12.7);
-  TEST_EXPRESSION((1 + 2 + 3) - (8.0 / 10)); 
-}*/
-
-
 TEST(EntropyComputation, badInput){
-  EXPECT_FLOAT_EQ(-1, compute_point_entropy_scalar(0));
+  EXPECT_FLOAT_EQ(-1.0, compute_point_entropy_scalar(0));
 }
 
 int main(int argc, char **argv){
