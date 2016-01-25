@@ -88,7 +88,7 @@ class SmallBlurryImage;
 #define LEVELS 4  
 #define MAX_DEPTH 10000
 #define MAX_SIGMA 10000
-#define MIN_FAST_THRESH 20
+#define MIN_FAST_THRESH 5
 #define MAX_FAST_THRESH 30
 
 
@@ -237,7 +237,7 @@ public:
   /// Erase all measurements
   void ClearMeasurements();
   
-  void AddMeasurement(MapPoint* pPoint, Measurement* pMeas); //if its a buffer measurement, we don't want to update the information on the points.
+  void AddMeasurement(MapPoint* pPoint, Measurement* pMeas);
   
   /// Make the small blurry image
   void MakeSBI();
@@ -366,9 +366,6 @@ public:
   
   double mdTotalDepthMean;  ///< The mean of all owned KeyFrames' mdSceneDepthMean values
   int mnID;      ///< Used for identifying MultiKeyFrame when writing map to file       
-  
-  std::map<int, std::vector<TooN::Vector<3> > > predictedPointMap; //the predicted points given the measurements of the keyframe, one vector for each level
-     
 };
 
 
