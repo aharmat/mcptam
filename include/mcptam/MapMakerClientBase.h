@@ -137,12 +137,13 @@ public:
    *  This initialization method assumes that the given MultiKeyFrame contains at least two KeyFrames.
    *  @param pMKF_Incoming Pointer to the MultiKeyFrame being used to initialize Map */
   virtual bool Init(MultiKeyFrame*& pMKF_Incoming, bool bPutPlaneAtOrigin) = 0;
-  
-  //---------------------------------------- Override me! -----------------------------------------------
+
+    //---------------------------------------- Override me! -----------------------------------------------
   /// Override this to implement signaling a reset. Called by the Tracker.
   virtual void RequestReset() = 0;
+
   
-  // Static members
+    // Static members
   static int snMinOutliers;           ///< Minimum number of times a point needs to be seen as an outlier to be considered for removal
   static double sdOutlierMultiplier;  ///< A point needs to be seen as an outlier this many more times than an inlier to be considered for removal
   static double sdMaxScaledMKFDist;   ///< Maximum permissible depth-scaled distance between MultiKeyFrames before a new one should be added

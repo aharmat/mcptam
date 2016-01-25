@@ -478,23 +478,27 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
       bool use_entropy_keyframe = true;	
 	  if(use_entropy_keyframe) // use the entropy based keyframe method (CPER)
 	  {
-		TooN::Vector<3> trackerEntropy = EvaluateTracker(this);
-      	std::cout<<"tracker entropy: " << trackerEntropy <<std::endl;
-      	double entropyThresh = -4.0;
-		bool addEntropyMKF = false;
-		RecordMeasurementsAndBufferKeyFrame(); //todo (adas) turn into circular buffer
-		
-		MultiKeyFrame* closest_mkf = mMapMaker.ClosestMultiKeyFrame(*mpCurrentMKF);
-		double distance_to_closest_mkf = closest_mkf->Distance(*mpCurrentMKF);
-		ROS_INFO_STREAM("distance to closest mkf is: " << distance_to_closest_mkf);
-		
+  		TooN::Vector<3> trackerEntropy = EvaluateTracker(this);
+      std::cout<<"tracker entropy: " << trackerEntropy <<std::endl;
+      double entropyThresh = -4.0; //todo (adas) pull this out to a param
+  		bool addEntropyMKF = false;
+  		RecordMeasurementsAndBufferKeyFrame(); //todo (adas) turn into circular buffer
+  		
+  		//MultiKeyFrame* closest_mkf = mMapMaker.ClosestMultiKeyFrame(*mpCurrentMKF);
+  		//double distance_to_closest_mkf = closest_mkf->Distance(*mpCurrentMKF);
+  		//ROS_INFO_STREAM("distance to closest mkf is: " << distance_to_closest_mkf);
+
+      //bool test = mMapMaker.HasLocalMapConverged();
+		  int tracker_queue_size = mMapMaker.TrackerQueueSize();
+      //ROS_WARN_STREAM("q size: " <<test_size);
+
 		if( (trackerEntropy[0] > entropyThresh ) || (trackerEntropy[1] > entropyThresh ) || (trackerEntropy[2] > entropyThresh ) )
       	{
 
 			addEntropyMKF = true;
-		}
+		} //todo (adas) include rotational entropies as well, plus options for the threshold type (just trans, just rot, both, etc)
 
-		if(addEntropyMKF && distance_to_closest_mkf > 0.5) //add new keyframe //todo (adas) figure how to to limit the number of mkf we add at once.  Problem is that we can't tell how long it will take for the mkf to get into the map.  Need a smart way of adding a "delay" between additions
+		if(addEntropyMKF && tracker_queue_size < 1 && (ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.2)) ) //add new keyframe //todo (adas) figure how to to limit the number of mkf we add at once.  Problem is that we can't tell how long it will take for the mkf to get into the map.  Need a smart way of adding a "delay" between additions
 		{
 			mMessageForUser << " SHOULD BE Adding MultiKeyFrame to Map";
 			//sort keyframe vec
@@ -508,7 +512,7 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
 				{
 					bestSortIndex = vKeyframeScores[k_itr].second;
 					k_itr++;
-				}
+				} //todo (adas) get rid of this, turn into circular buffer, this is a hack!
 			
 			//double bestMKFScore = vKeyframeScores[k_itr].first;
 			AddNewKeyFrameFromBuffer(bestSortIndex); 
@@ -2077,6 +2081,7 @@ void Tracker::AddNewKeyFrameFromBuffer(int bufferPosition)
 	mvKeyFrameBuffer.clear(); //clear the buffer.  Note: this clears the pointers in the buffer, but doesn't call delete on each item, so we retain the data for the selected insterted keyframe
 	
 		
-	
+	mtLastMultiKeyFrameDropped = ros::Time::now();
+
 }    
 

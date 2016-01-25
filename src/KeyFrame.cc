@@ -71,42 +71,6 @@ bool KeyFrame::sbAdaptiveThresh = false;
 int Level::snNumPrev = 2;
 
 
-LevelBinArray::LevelBinArray(int x, int y)
-{
-	nx = x;
-	ny = y;
-	
-	for( int i=0; i<nx; i++)
-	{
-		for(int j=0; j<ny; j++)
-		{
-		
-				BinInfo b;
-				b.maxScore = 0;
-				b.isInit = false;
-				bins.push_back(b);
-		}
-	}
-}
-
-int LevelBinArray::pointToIndex(double px, double py)
-{
-	    //std::cout<<pix_x<<","<<pix_y<<std::endl;
-		double xres = pix_x / nx;
-		double yres = pix_y / ny;
-		int bindx = floor((px) / xres) ;
-        int bindy = floor((py) / yres) ;
-
-         if(bindx < 0 || bindx >=nx || bindy<0 || bindy>ny) //invalid bin
-         {
-            return -1;
-         }
-         else
-         {
-            return bindx+ny*bindy; //linear index of bin
-         }
-}
-
 KeyFrame::KeyFrame(MultiKeyFrame* pMKF, std::string name)
   : mCamName(name)
   , mpParent(pMKF)
@@ -116,36 +80,6 @@ KeyFrame::KeyFrame(MultiKeyFrame* pMKF, std::string name)
   mdSceneDepthMean = MAX_DEPTH;
   mdSceneDepthSigma = MAX_SIGMA;
   
-  //init the bin information
-  
-  for(int i=0; i<LEVELS; i++)
-  {
-		if(i==0) //fine level
-		{
-			LevelBinArray l(5*4,4*4);
-			mBins.push_back(l);
-						
-		}
-		else if(i==1) //next level
-		{
-			LevelBinArray l(4*4,3*4);
-			mBins.push_back(l);
-		}
-		else if(i==2) //next level
-		{
-			LevelBinArray l(3*4,2*4);
-			mBins.push_back(l);
-		}
-		else if(i==3) //next level
-		{
-			LevelBinArray l(2*4,2*4);
-			mBins.push_back(l);
-		}
-		else
-		{
-			ROS_ERROR("Using more then 4 levels");
-		}
-  }
 }
 
 void KeyFrame::AddMeasurement(MapPoint* pPoint, Measurement* pMeas)
@@ -292,14 +226,7 @@ std::tuple<double,double,double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::byt
         
     startTime = ros::WallTime::now();
     
-    for(int b_itr = 0; b_itr<mBins[i].bins.size(); b_itr++)
-    {
-		mBins[i].bins[b_itr].maxScore = 0;
-		mBins[i].bins[b_itr].isInit = false;
-	}
-    
-    
-    
+      
     // Use some OpenCV images because they provide an easy way to do dilation, threshold, and bitwise AND
     // We'll just use OpenCV Mat headers to wrap the underlying CVD Image data, so there's very little computational effort involved
     cv::Mat finalMask;
@@ -508,36 +435,6 @@ std::tuple<double,double,double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::byt
     }
     
     ROS_DEBUG_STREAM("MakeKeyFrame_Lite: level: "<<i<<" image prev size: "<<lev.imagePrev.size());
-    
-    //fill in the image size for the bins
-    mBins[i].pix_x = lev.image.size().x;
-    mBins[i].pix_y = lev.image.size().y;
-    
-    
-    //now we watnt to interate through the vmax scores and assign them to a bin
-    
-    
-	for(unsigned int j=0; j<lev.vScoresAndMaxCorners.size(); ++j) 
-	{
-	  double cScore = lev.vScoresAndMaxCorners[j].first;
-	  double px = lev.vScoresAndMaxCorners[j].second.x;
-	  double py = lev.vScoresAndMaxCorners[j].second.y;
-	  
-	  int lidx = mBins[i].pointToIndex(px,py); //get linear index;
-	  //std::cout<<"level: " <<k<<" index: " <<lidx <<std::endl;
-	  double bestBinScore = mBins[i].bins[lidx].maxScore;
-	  
-	  if(cScore>bestBinScore) //we have a new winner for that bin
-	  {
-		  mBins[i].bins[lidx].maxScore = cScore;
-		  mBins[i].bins[lidx].maxPos.x = (int)px;
-		  mBins[i].bins[lidx].maxPos.y = (int)py;
-		  mBins[i].bins[lidx].isInit = true;
-	  }
-	  
-	}
-	
-	        
     
   }
   
@@ -1019,17 +916,11 @@ KeyFrame* KeyFrame::CopyKeyFramePartial(MultiKeyFrame* sourceMKF, std::string na
 	returnKF->sbAdaptiveThresh=sbAdaptiveThresh;  ///< should we use an adaptive computation of the feature detection threshold?
 	returnKF->mse3CamFromBase=mse3CamFromBase;   ///< The current pose in a base frame, which is the pose of the parent MultiKeyFrame
 	returnKF->mse3CamFromWorld=mse3CamFromWorld;  ///< The current pose in the world frame, a product of mse3CamFromBase and the parent's mse3BaseFromWorld
-    returnKF->mdSceneDepthMean=mdSceneDepthMean;  ///< The mean z-axis value of all the points visible from this keyframe
+  returnKF->mdSceneDepthMean=mdSceneDepthMean;  ///< The mean z-axis value of all the points visible from this keyframe
 	returnKF->mdSceneDepthSigma=mdSceneDepthSigma; ///< The variance of the z-axis values of the points visible from this keyframe
 	returnKF->mbActive=mbActive; 
-	returnKF->mBins = mBins;
 	
-	returnKF->pointHeatImg[0] = pointHeatImg[0].clone();
-	returnKF->featureHeatImg[0] = featureHeatImg[0].clone();
-    returnKF->goodHeatMap = goodHeatMap;
-	
-	//returnKF->mMeasMutex=mMeasMutex; 
-	
+		
 	//deep copy the Levels info
 	
 	for(int i=0; i<LEVELS; i++)

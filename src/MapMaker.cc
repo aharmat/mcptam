@@ -66,6 +66,7 @@ MapMaker::~MapMaker()
   ROS_DEBUG("MapMaker: Run thread has died.");;
 }
 
+
 // Requests an abort from the bundle adjuster and sets flags that signal a reset is waiting
 void MapMaker::RequestReset()
 { 
@@ -335,11 +336,11 @@ void MapMaker::AddMultiKeyFrame(MultiKeyFrame*& pMKF_Incoming)
   
   ProcessIncomingKeyFrames(*pMKF);
   
-  ROS_INFO("MKF contains: ");
+  //ROS_INFO("MKF contains: kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk");
   for(KeyFramePtrMap::iterator it = pMKF->mmpKeyFrames.begin(); it != pMKF->mmpKeyFrames.end(); it++)
   {
     KeyFrame& kf = *(it->second);
-    ROS_INFO_STREAM(kf.mCamName);
+    //ROS_INFO_STREAM(kf.mCamName);
     if(kf.mpSBI)
     {
       delete kf.mpSBI; // Mapmaker uses a different SBI than the tracker, so will re-gen its own
@@ -353,14 +354,20 @@ void MapMaker::AddMultiKeyFrame(MultiKeyFrame*& pMKF_Incoming)
     pMKF->RemoveImages();   // don't need images when in initializing state
   }
   
-  boost::mutex::scoped_lock lock(mQueueMutex);
-  mqpMultiKeyFramesFromTracker.push_back(pMKF);
-  lock.unlock();
+  //if(!mBundleAdjuster.ConvergedRecent()) //only add if not currently trying to add
+  //{
+	  boost::mutex::scoped_lock lock(mQueueMutex);
+	  mqpMultiKeyFramesFromTracker.push_back(pMKF);
+	  lock.unlock();
+  //}
+  //else
+  	ROS_INFO_STREAM("BA RUN STATE: " << mBundleAdjuster.Running());
   
   if(mBundleAdjuster.Running())   // Tell the mapmaker to stop doing low-priority stuff and concentrate on this KF first.
     mBundleAdjuster.RequestAbort();
   
 }
+
 
 // Entry point for Tracker to initialize the map. Here, the tracker DOES
 // hang around and wait for the function to finish, because what would it do

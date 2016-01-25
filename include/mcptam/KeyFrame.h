@@ -91,35 +91,6 @@ class SmallBlurryImage;
 #define MIN_FAST_THRESH 20
 #define MAX_FAST_THRESH 30
 
-struct PredictedFeatureInfo
-{
-	CVD::ImageRef rootPos;
-	TooN::Matrix<2,6> jac;
-};
-
-struct BinInfo
-{
-	CVD::ImageRef maxPos;
-	double maxScore; 
-	bool isInit;
-};
-
-
-class LevelBinArray
-{
-	public:
-	
-	LevelBinArray(int,int);
-	int pointToIndex(double, double);
-	
-	int nx;
-	int ny;
-	double pix_x;
-	double pix_y;
-	std::vector<BinInfo> bins; //container of bins
-	
-};
-
 
 /// A feature in an image which could be made into a map point
 struct Candidate
@@ -280,9 +251,7 @@ public:
   KeyFrame* CopyKeyFramePartial(MultiKeyFrame* sourceMKF, std::string name);
   
   // Variables
-  
-  std::vector<LevelBinArray> mBins; //bin information, one for each level;
-     
+         
   static double sdDistanceMeanDiffFraction;  ///< fraction of distance between mean scene depth points that is used in overall distance computation
 //  static double saThreshDerivs[LEVELS];  ///< derivatives that determine FAST threshold
   static std::string ssCandidateType; ///< decide scoring type ("fast, "shi")
@@ -316,14 +285,7 @@ public:
   
   bool mbActive;  ///< The tracker uses this to indicate which keyframes have been updated with new measurements, the MapMaker culls inactive keyframes when it receives a new MultiKeyFrame
   
-  std::map<int, std::vector<CVD::ImageRef> > vPointHeatMap; //vector of heat map vectors, one for each level
-  std::map<int, std::vector<CVD::ImageRef> > vFeatureHeatMap; //vector of feature map vectors, one for each level
-  std::map<int, std::vector<PredictedFeatureInfo> > vPredictedInfo;//container of predicted feature locations for each kf.
-  std::map<int, cv::Mat> pointHeatImg;
-  std::map<int, cv::Mat> featureHeatImg;
-  bool goodHeatMap;
-  
-  
+    
 private:
 
   /// Generate a vector of <depth, weight> pairs from points that this keyframe measures, used in the RefreshSceneDepth functions
