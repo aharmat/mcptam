@@ -1,41 +1,15 @@
 #!/bin/bash
 set -e  # exit on first error
-ROS_VERSION="indigo"
-ROS_BASH="/opt/ros/$ROS_VERSION/setup.bash"
-ROS_PACKAGES_URL='http://packages.ros.org/ros/ubuntu'
-APT_KEYS_URL='hkp://pool.sks-keyservers.net:80'
-APT_TARGETS="$(lsb_release -sc) main"
-SOURCES_LIST_TARGET='/etc/apt/sources.list.d/ros-latest.list'
+ROS_DISTRO=indigo
+ROS_CI_DESKTOP="`lsb_release -cs`"  # e.g. [precise|trusty|...]
 
-
-install()
-{
-	# update sources.list and add apt-keys
-	sudo echo "deb $ROS_PACKAGES_URL $APT_TARGETS" > $SOURCES_LIST_TARGET
-	wget https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -O - | sudo apt-key add -
-
-	# update apt and install ros
-	sudo apt-get update
-	sudo apt-get install -y ros-$ROS_VERSION-desktop-full
-
-	# initialize rosdep
-	sudo rosdep init
-	rosdep update
-
-	# env setup
-	echo "source /opt/ros/$ROS_VERSION/setup.bash" >> $HOME/.bashrc
-
-	# install ros
-	sudo apt-get install -y python-rosinstall
-
-	# install ros packages	
-	sudo apt-get install -y \
-		ros-$ROS_VERSION-pcl-ros \
-		ros-$ROS_VERSION-image-transport \
-		ros-$ROS_VERSION-image-transport-plugins \
-		ros-$ROS_VERSION-libg2o
-}
-
-
-# RUN
-install
+sudo sh -c "echo \"deb http://packages.ros.org/ros/ubuntu $ROS_CI_DESKTOP main\" > /etc/apt/sources.list.d/ros-latest.list"
+wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
+sudo apt-get update -qq
+sudo apt-get install -y python-catkin-pkg python-rosdep python-wstool ros-$ROS_DISTRO-catkin ros-$ROS_DISTRO-desktop
+sudo apt-get install -y ros-$ROS_DISTRO-pcl-ros ros-$ROS_DISTRO-image-transport ros-$ROS_DISTRO-image-transport-plugins ros-$ROS_DISTRO-libg2o
+# Prepare rosdep to install dependencies.
+sudo rosdep init
+rosdep update
+source /opt/ros/$ROS_DISTRO/setup.bash
+sudo apt-get install python-rosinstall

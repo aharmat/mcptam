@@ -57,29 +57,17 @@ virtualenv:
 # trigger a build matrix for different ROS distributions if desired.
 env:
   global:
-    - ROS_DISTRO=indigo
-    - ROS_CI_DESKTOP="`lsb_release -cs`"  # e.g. [precise|trusty|...]
-    - ROS_PARALLEL_JOBS='-j8 -l6'
-
+        
 ################################################################################
 
 # Install system dependencies, namely a very barebones ROS setup.
 before_install:
-  - sudo sh -c "echo \"deb http://packages.ros.org/ros/ubuntu $ROS_CI_DESKTOP main\" > /etc/apt/sources.list.d/ros-latest.list"
-  - wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
-  - sudo apt-get update -qq
-  - sudo apt-get install -y python-catkin-pkg python-rosdep python-wstool ros-$ROS_DISTRO-catkin ros-$ROS_DISTRO-desktop
-  - sudo apt-get install -y ros-$ROS_DISTRO-pcl-ros ros-$ROS_DISTRO-image-transport ros-$ROS_DISTRO-image-transport-plugins ros-$ROS_DISTRO-libg2o
-    # Prepare rosdep to install dependencies.
-  - sudo rosdep init
-  - rosdep update
-  - source /opt/ros/$ROS_DISTRO/setup.bash
-  - sudo apt-get install python-rosinstall
+- bash scripts/ros_install.bash
 
 # Install all dependencies, using wstool and rosdep.
 # wstool looks for a ROSINSTALL_FILE defined in the environment variables.
 before_script:
-- bash scripts/ci_install.bash
+- bash scripts/mcptam_install.bash
 
 # Compile and test. If the CATKIN_OPTIONS file exists, use it as an argument to
 # catkin_make.
@@ -87,6 +75,18 @@ script:
   - source $HOME/catkin_ws/devel/setup.bash
   - cd ~/catkin_ws
   - catkin_make 
-  # Testing: Use both run_tests (to see the output) and test (to error out).
-  - catkin_make run_tests  # This always returns 0, but looks pretty.
-  - catkin_make test # This will return non-zero if a test fails.
+  #testing
+  - cd ~/catkin_ws
+  - bash src/mcptam/test/run_catkin_tests.bash
+  
+
+branches:
+    only:
+        #set the CI branch if desired
+
+notifications:
+    recipients:
+        - stevenw@uwaterloo.ca
+    email:
+        on_success: change
+        on_failure: always
