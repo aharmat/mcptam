@@ -41,12 +41,7 @@
 #include <mcptam/MEstimator.h>
 #include <iomanip>
 #include <ros/ros.h>
-
-// These next two lines are needed otherwise Eigen::Map and our own Map class
-// get confused by the compiler and barely comprehensible messages get spewed
 #include <Eigen/Core>
-using Eigen::Map;
-
 #include <g2o/core/sparse_optimizer.h>
 #include <g2o/core/block_solver.h>
 #include <g2o/core/solver.h>
@@ -57,6 +52,15 @@ using Eigen::Map;
 #include <g2o/core/base_multi_edge.h>
 #include <g2o/core/optimizable_graph.h>
 #include <g2o/core/hyper_graph_action.h>
+#include <string>
+#include <algorithm>
+#include <tuple>
+#include <utility>
+#include <vector>
+#include <limits>
+
+
+using Eigen::Map;
 
 // debugging
 static int poseID = 0;
@@ -164,7 +168,7 @@ public:
       int nTestIdx = nFurthestSharedIdx + 1;
 
       // If one or both have run out of vertices
-      if ((int)_vpVertices.size() <= nTestIdx || (int)other._vpVertices.size() <= nTestIdx)
+      if (static_cast<int>(_vpVertices.size()) <= nTestIdx || static_cast<int>(other._vpVertices.size()) <= nTestIdx)
         break;
 
       // If the vertices at nTestIdx don't match
@@ -238,7 +242,7 @@ public:
     // Make sure the same thing is done in EdgeChainMeas::linearizeOplus
     // The logic here is that the update in XYZ parameterization can be simply added
     // to the point estimate rather than converting from bearing+inverse depth
-    //_estimate += TooN::makeVector(update[0], update[1], update[2]);
+    // _estimate += TooN::makeVector(update[0], update[1], update[2]);
     // return;
 
     // The update is specified in a coordinate frame where the _estimate
@@ -315,7 +319,7 @@ public:
 
     // This NEEDS to be uncommented if you're using numerical jacobians!
     // With analytical it doesn't matter, just wasting your time if you leave it uncommented
-    //_pPoseChainHelper->UpdateTransforms();
+    // _pPoseChainHelper->UpdateTransforms();
 
     TooN::SE3<> se3SfW = _pPoseChainHelper->_vTransforms.back().first;  // Pose of the source KeyFrame that the point is
     // defined relative to
@@ -380,7 +384,7 @@ public:
 
     // This NEEDS to be uncommented if you're using numerical jacobians!
     // With analytical it doesn't matter, just wasting your time if you leave it uncommented
-    //_pPoseChainHelper->UpdateTransforms();
+    // _pPoseChainHelper->UpdateTransforms();
 
     TooN::SE3<> se3CfW =
       _pPoseChainHelper->_vTransforms.back().first;  // Pose of the KeyFrame that made the measurement
@@ -756,7 +760,7 @@ public:
 // ============= End Numerical Jacobian ========================
 
 #ifdef G2O_OPENMP
-    for (int i = (int)(_vertices.size()) - 1; i >= 0; --i)
+    for (int i = static_cast<int>(_vertices.size()) - 1; i >= 0; --i)
     {
       g2o::OptimizableGraph::Vertex* v = static_cast<g2o::OptimizableGraph::Vertex*>(_vertices[i]);
       v->unlockQuadraticForm();
@@ -897,7 +901,7 @@ class RobustKernelAdaptive : public g2o::RobustKernel
 {
 public:
   /** @param pData Pointer to the RobustKernelData object used to store robust statistics */
-  RobustKernelAdaptive(RobustKernelData* pData)
+  explicit RobustKernelAdaptive(RobustKernelData* pData)
   {
     _pData = pData;
   }
@@ -944,7 +948,7 @@ class UpdateSigmaSquaredAction : public g2o::HyperGraphAction
 {
 public:
   /** @param pData Pointer to the RobustKernelData object */
-  UpdateSigmaSquaredAction(RobustKernelData* pData) : _pData(pData)
+  explicit UpdateSigmaSquaredAction(RobustKernelData* pData) : _pData(pData)
   {
   }
 
@@ -965,7 +969,7 @@ class UpdateHelpersAction : public g2o::HyperGraphAction
 {
 public:
   /** @param helpers A map of pose chain vectors => helper object pointers, all helper objects are kept in there */
-  UpdateHelpersAction(HelperMap& helpers) : _mHelpers(helpers)
+  explicit UpdateHelpersAction(HelperMap& helpers) : _mHelpers(helpers)
   {
   }
 
@@ -1103,7 +1107,7 @@ class CheckConvergedResidualAction : public g2o::HyperGraphAction
 public:
   /** @param dPercentLimit The threshold for the change in residual error below which optimization is considered
    * converged */
-  CheckConvergedResidualAction(double dPercentLimit)
+  explicit CheckConvergedResidualAction(double dPercentLimit)
     : _bConverged(false)
     , _dPercentLimit(dPercentLimit)
     , _pAbortFlag(NULL)
@@ -1168,9 +1172,6 @@ protected:
   double _dLastChi2;      ///< Last value of chi2
 };
 
-using namespace TooN;
-using namespace g2o;
-
 // Static members
 int ChainBundle::snMaxIterations = 100;  // 100
 int ChainBundle::snMaxTrialsAfterFailure = 100;
@@ -1178,13 +1179,15 @@ double ChainBundle::sdUpdatePercentConvergenceLimit = 1e-10;
 double ChainBundle::sdUpdateRMSConvergenceLimit = 1e-10;  // 1e-10
 double ChainBundle::sdMinMEstimatorSigma = 0.5;           // 0.4;
 
+using namespace g2o;
+
 // Constructor takes camera models
 ChainBundle::ChainBundle(TaylorCameraMap& cameraModels, bool bUseRobust, bool bUseTukey, bool bVerbose)
   : mmCameraModels(cameraModels), mbUseRobust(bUseRobust), mbUseTukey(bUseTukey), mbVerbose(bVerbose)
 {
   mnCurrId = 1;
 
-  mpOptimizer = new SparseOptimizer;
+  mpOptimizer = new g2o::SparseOptimizer;
   mpRobustKernelData =
     new RobustKernelData(mpOptimizer, ChainBundle::sdMinMEstimatorSigma * ChainBundle::sdMinMEstimatorSigma);
 
@@ -1235,7 +1238,7 @@ ChainBundle::~ChainBundle()
 }
 
 // Add a pose to the system, return value is the bundle adjuster's ID for the pose
-int ChainBundle::AddPose(SE3<> se3PoseFromRef, bool bFixed)
+int ChainBundle::AddPose(TooN::SE3<> se3PoseFromRef, bool bFixed)
 {
   VertexPoseSE3* pPoseVertex = new VertexPoseSE3;
   pPoseVertex->setId(mnCurrId++);
@@ -1248,7 +1251,7 @@ int ChainBundle::AddPose(SE3<> se3PoseFromRef, bool bFixed)
 }
 
 // Add a map point to the system, return value is the bundle adjuster's ID for the point
-int ChainBundle::AddPoint(Vector<3> v3PointInCam, std::vector<int> vCams, bool bFixed)
+int ChainBundle::AddPoint(TooN::Vector<3> v3PointInCam, std::vector<int> vCams, bool bFixed)
 {
   int N = vCams.size();
   VertexRelPoint* pPointVertex = new VertexRelPoint;
@@ -1262,7 +1265,7 @@ int ChainBundle::AddPoint(Vector<3> v3PointInCam, std::vector<int> vCams, bool b
 
   PoseChainHelper* pHelper = mmHelpers[vCams];
 
-  if ((int)pHelper->_vpVertices.size() != N)  // helper hasn't been set up yet
+  if (static_cast<int>(pHelper->_vpVertices.size()) != N)  // helper hasn't been set up yet
   {
     pHelper->_vpVertices.resize(N);  // only needs to keep track of the N poses
     for (int i = 0; i < N; ++i)
@@ -1276,7 +1279,7 @@ int ChainBundle::AddPoint(Vector<3> v3PointInCam, std::vector<int> vCams, bool b
 }
 
 // Add a measurement of one point from the end of one pose chain
-void ChainBundle::AddMeas(std::vector<int> vCams, int nPointIdx, Vector<2> v2Pos, double dNoiseSigmaSquared,
+void ChainBundle::AddMeas(std::vector<int> vCams, int nPointIdx, TooN::Vector<2> v2Pos, double dNoiseSigmaSquared,
                           std::string cameraName)
 {
   int N = vCams.size();
@@ -1307,7 +1310,7 @@ void ChainBundle::AddMeas(std::vector<int> vCams, int nPointIdx, Vector<2> v2Pos
 
   pMeas->vertices().back() = mpOptimizer->vertex(nPointIdx);  // finally the point
 
-  if ((int)pHelper->_vpVertices.size() != N)  // helper hasn't been set up yet
+  if (static_cast<int>(pHelper->_vpVertices.size()) != N)  // helper hasn't been set up yet
   {
     pHelper->_vpVertices.resize(N);  // only needs to keep track of the N measurement camera poses
     for (int i = 0; i < N; ++i)
@@ -1499,13 +1502,13 @@ int ChainBundle::Compute(bool* pAbortSignal, int nNumIter, double dUserLambda)
   return nCounter;
 }
 
-Vector<3> ChainBundle::GetPoint(int n)
+TooN::Vector<3> ChainBundle::GetPoint(int n)
 {
   const VertexRelPoint* pPointVertex = dynamic_cast<const VertexRelPoint*>(mpOptimizer->vertex(n));
   return pPointVertex->estimate();
 }
 
-SE3<> ChainBundle::GetPose(int n)
+TooN::SE3<> ChainBundle::GetPose(int n)
 {
   const VertexPoseSE3* pPoseVertex = dynamic_cast<const VertexPoseSE3*>(mpOptimizer->vertex(n));
   return pPoseVertex->estimate();

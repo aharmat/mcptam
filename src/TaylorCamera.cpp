@@ -39,8 +39,10 @@
 #include <TooN/helpers.h>
 #include <TooN/SVD.h>
 #include <unsupported/Eigen/Polynomials>
+#include <algorithm>
+#include <vector>
 
-using namespace TooN;
+using TooN::Vector;
 
 TaylorCamera::TaylorCamera(Vector<9> v9Params, CVD::ImageRef irCalibSize, CVD::ImageRef irFullScaleSize,
                            CVD::ImageRef irImageSize)
@@ -62,7 +64,7 @@ TaylorCamera::TaylorCamera(CVD::ImageRef irCalibSize, CVD::ImageRef irFullScaleS
   mbCalibrationMode = true;
 
   mv9CameraParams =
-    makeVector(0, 0, 0, 0, 0, 0, 1, 0, 0);  // the only non-zero value is for affine matrix to be identity
+    TooN::makeVector(0, 0, 0, 0, 0, 0, 1, 0, 0);  // the only non-zero value is for affine matrix to be identity
   RefreshParams();
 
   ROS_WARN_STREAM(">>> TaylorCamera: In calibration mode, call SetParams AT LEAST ONCE before projecting or getting "
@@ -252,7 +254,7 @@ Vector<2> TaylorCamera::Project(const Vector<3>& v3CamFrame)
       if (vRealRoots.size() != 1)  // no roots or more than 1 root means a bad polynomial
       {
         mbInvalid = true;
-        return makeVector(-1, -1);
+        return TooN::makeVector(-1, -1);
       }
 
       ROS_ASSERT(vRealRoots.size() > 0);
@@ -359,7 +361,7 @@ Vector<3> TaylorCamera::UnProject(const Vector<2>& v2ImFrame)
 //                    |d_im2/d_theta  d_im2/d_phi  d_im2/d_r|
 // Derivatives with respect to r are zero since image of a point does not change as it moves along the view ray
 // therefore the output matrix is 2x2 instead
-Matrix<2> TaylorCamera::GetProjectionDerivs()
+TooN::Matrix<2> TaylorCamera::GetProjectionDerivs()
 {
   double w = PolyVal(mv5PolyCoeffs, mdLastRho);
 
@@ -383,7 +385,7 @@ Matrix<2> TaylorCamera::GetProjectionDerivs()
   Vector<2> dIm_dTheta = mm2Affine * dLast_dTheta;
   Vector<2> dIm_dPhi = mm2Affine * dLast_dPhi;
 
-  Matrix<2> m2Derivs;
+  TooN::Matrix<2> m2Derivs;
 
   m2Derivs.T()[0] = dIm_dTheta;
   m2Derivs.T()[1] = dIm_dPhi;
@@ -394,9 +396,9 @@ Matrix<2> TaylorCamera::GetProjectionDerivs()
 // Derivatives of the last projection wrt to the camera parameters
 // Use these to calibrate the camera
 // No need for this to be quick, so do them numerically
-Matrix<2, 9> TaylorCamera::GetCameraParameterDerivs()
+TooN::Matrix<2, 9> TaylorCamera::GetCameraParameterDerivs()
 {
-  Matrix<2, 9> m29NumDerivs;
+  TooN::Matrix<2, 9> m29NumDerivs;
   Vector<9> v9Original = mv9CameraParams;  // save the actual params
   Vector<3> v3Cam = mv3LastCam;
   Vector<2> v2Out = Project(v3Cam);
@@ -404,7 +406,7 @@ Matrix<2, 9> TaylorCamera::GetCameraParameterDerivs()
   for (int i = 0; i < 9; i++)
   {
     Vector<9> v9Update;
-    v9Update = Zeros;
+    v9Update = TooN::Zeros;
     double const dMinUpdateMag = 1e-10;
 
     double dUpdateMag = fabs(v9Original[i] / 100.0);  // Make update magnitude 1% of current value
@@ -459,9 +461,9 @@ Vector<> TaylorCamera::PolyFit(Vector<> vxX, Vector<> vxY, int nDegree)
   int nDimensions = vxX.size();
 
   // Uses the Vandermonde matrix method of fitting a least squares polynomial to a set of data
-  Matrix<> mxVandermondeTrans(nDegree + 1, nDimensions);
+  TooN::Matrix<> mxVandermondeTrans(nDegree + 1, nDimensions);
 
-  mxVandermondeTrans[0] = Ones(nDimensions);
+  mxVandermondeTrans[0] = TooN::Ones(nDimensions);
   mxVandermondeTrans[1] = vxX;
 
   for (int i = 2; i <= nDegree; ++i)
@@ -470,7 +472,7 @@ Vector<> TaylorCamera::PolyFit(Vector<> vxX, Vector<> vxY, int nDegree)
   }
 
   // create the SVD decomposition
-  SVD<> svd(mxVandermondeTrans.T());
+  TooN::SVD<> svd(mxVandermondeTrans.T());
 
   Vector<> a = svd.backsub(vxY);
 
@@ -619,7 +621,7 @@ Vector<3> TaylorCamera::ConvertToSpherical(Vector<3> v3CartesianCoords)
   double theta = asin(v3CartesianCoords[2] / r);
   double phi = atan2(v3CartesianCoords[1], v3CartesianCoords[0]);
 
-  return makeVector(theta, phi, r);
+  return TooN::makeVector(theta, phi, r);
 }
 
 // Get the derivatives of a cartesian 3-vector projected onto the unit sphere, in spherical coordinates
