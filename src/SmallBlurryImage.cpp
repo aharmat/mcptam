@@ -36,15 +36,16 @@
 #include <TooN/Cholesky.h>
 #include <TooN/wls.h>
 #include <TooN/SVD.h>
+#include <utility>
+#include <algorithm>
 
-//#include <tag/kalmanfilter.h>
-//#include <tag/constantposition.h>
-//#include <tag/measurements.h>
+
+// #include <tag/kalmanfilter.h>
+// #include <tag/constantposition.h>
+// #include <tag/measurements.h>
 
 #include <opencv2/imgproc/imgproc.hpp>
 #include <ros/ros.h>
-
-using namespace TooN;
 
 CVD::ImageRef SmallBlurryImage::sirSize(40, 30);
 
@@ -81,14 +82,18 @@ void SmallBlurryImage::MakeFromKF(KeyFrame &kf, double dBlur)
   CVD::ImageRef ir;
   unsigned int nSum = 0;
   do
+  {
     nSum += mimSmall[ir];
+  }
   while (ir.next(sirSize));
 
-  float fMean = ((float)nSum) / sirSize.area();
+  float fMean = (static_cast<float>(nSum)) / sirSize.area();
 
   ir.home();
   do
+  {
     mimTemplate[ir] = mimSmall[ir] - fMean;
+  }
   while (ir.next(sirSize));
 
   convolveGaussian(mimTemplate, dBlur);
@@ -103,7 +108,7 @@ void SmallBlurryImage::MakeJacs()
   CVD::ImageRef ir;
   do
   {
-    Vector<2> &v2Grad = mimImageJacs[ir];
+    TooN::Vector<2> &v2Grad = mimImageJacs[ir];
     if (mimTemplate.in_image_with_border(ir, 1))
     {
       v2Grad[0] = mimTemplate[ir + CVD::ImageRef(1, 0)] - mimTemplate[ir - CVD::ImageRef(1, 0)];
@@ -111,7 +116,7 @@ void SmallBlurryImage::MakeJacs()
       // N.b. missing 0.5 factor in above, this will be added later.
     }
     else
-      v2Grad = Zeros;
+      v2Grad = TooN::Zeros;
   }
   while (ir.next(sirSize));
   mbMadeJacs = true;
@@ -134,14 +139,14 @@ double SmallBlurryImage::ZMSSD(SmallBlurryImage &other)
 
 // Find an SE2 which best aligns an SBI to a target
 // Do this by ESM-tracking a la Benhimane & Malis
-std::pair<SE2<>, double> SmallBlurryImage::IteratePosRelToTarget(SmallBlurryImage &other, int nIterations)
+std::pair<TooN::SE2<>, double> SmallBlurryImage::IteratePosRelToTarget(SmallBlurryImage &other, int nIterations)
 {
-  SE2<> se2CtoC;
-  SE2<> se2WfromC;
+  TooN::SE2<> se2CtoC;
+  TooN::SE2<> se2WfromC;
   CVD::ImageRef irCenter = sirSize / 2;
   se2WfromC.get_translation() = CVD::vec(irCenter);
 
-  std::pair<SE2<>, double> result_pair;
+  std::pair<TooN::SE2<>, double> result_pair;
   if (!other.mbMadeJacs)
   {
     ROS_FATAL("SmallBlurryImage: You spanner, you didn't make the jacs for the target.");
@@ -149,24 +154,24 @@ std::pair<SE2<>, double> SmallBlurryImage::IteratePosRelToTarget(SmallBlurryImag
   }
 
   double dMeanOffset = 0.0;
-  Vector<4> v4Accum;
+  TooN::Vector<4> v4Accum;
 
-  Vector<10> v10Triangle;
+  TooN::Vector<10> v10Triangle;
   CVD::Image<float> imWarped(sirSize);
 
   double dFinalScore = 0.0;
   for (int it = 0; it < nIterations; it++)
   {
     dFinalScore = 0.0;
-    v4Accum = Zeros;
-    v10Triangle = Zeros;  // Holds the bottom-left triangle of JTJ
-    Vector<4> v4Jac;
+    v4Accum = TooN::Zeros;
+    v10Triangle = TooN::Zeros;  // Holds the bottom-left triangle of JTJ
+    TooN::Vector<4> v4Jac;
     v4Jac[3] = 1.0;
 
-    SE2<> se2XForm = se2WfromC * se2CtoC * se2WfromC.inverse();
+    TooN::SE2<> se2XForm = se2WfromC * se2CtoC * se2WfromC.inverse();
 
     // Make the warped current image template:
-    Vector<2> v2Zero = Zeros;
+    TooN::Vector<2> v2Zero = TooN::Zeros;
     CVD::transform(mimTemplate, imWarped, se2XForm.get_rotation().get_matrix(), se2XForm.get_translation(), v2Zero,
                    -9e20f);
 
@@ -186,11 +191,11 @@ std::pair<SE2<>, double> SmallBlurryImage::IteratePosRelToTarget(SmallBlurryImag
       if (l + r + u + d + here < -9999.9)  // This means it's out of the image; c.f. the -9e20f param to transform.
         continue;
 
-      Vector<2> v2CurrentGrad;
+      TooN::Vector<2> v2CurrentGrad;
       v2CurrentGrad[0] = r - l;  // Missing 0.5 factor
       v2CurrentGrad[1] = d - u;
 
-      Vector<2> v2SumGrad = 0.25 * (v2CurrentGrad + other.mimImageJacs[ir]);
+      TooN::Vector<2> v2SumGrad = 0.25 * (v2CurrentGrad + other.mimImageJacs[ir]);
       // Why 0.25? This is from missing 0.5 factors: One for
       // the fact we average two gradients, the other from
       // each gradient missing a 0.5 factor.
@@ -220,24 +225,24 @@ std::pair<SE2<>, double> SmallBlurryImage::IteratePosRelToTarget(SmallBlurryImag
     }
     while (ir.next(sirSize));
 
-    Vector<4> v4Update;
+    TooN::Vector<4> v4Update;
 
     // Solve for JTJ-1JTv;
     {
-      Matrix<4> m4;
+      TooN::Matrix<4> m4;
       int v = 0;
       for (int j = 0; j < 4; j++)
       {
         for (int i = 0; i <= j; i++)
           m4[j][i] = m4[i][j] = v10Triangle[v++];
       }
-      Cholesky<4> chol(m4);
+      TooN::Cholesky<4> chol(m4);
       v4Update = chol.backsub(v4Accum);
     }
 
-    SE2<> se2Update;
+    TooN::SE2<> se2Update;
     se2Update.get_translation() = -v4Update.slice<0, 2>();
-    se2Update.get_rotation() = SO2<>::exp(-v4Update[2]);
+    se2Update.get_rotation() = TooN::SO2<>::exp(-v4Update[2]);
     se2CtoC = se2CtoC * se2Update;
     dMeanOffset -= v4Update[3];
   }
@@ -249,7 +254,7 @@ std::pair<SE2<>, double> SmallBlurryImage::IteratePosRelToTarget(SmallBlurryImag
 
 // What is the 3D camera rotation (zero trans) SE3<> which causes an
 // input image SO2 rotation?
-SE3<> SmallBlurryImage::SE3fromSE2(SE2<> se2, TaylorCamera &cameraSrc, TaylorCamera &cameraTarget)
+TooN::SE3<> SmallBlurryImage::SE3fromSE2(TooN::SE2<> se2, TaylorCamera &cameraSrc, TaylorCamera &cameraTarget)
 {
   // Do this by projecting two points, and then iterating the SE3<> (SO3
   // actually) until convergence. It might seem stupid doing this so
@@ -261,35 +266,35 @@ SE3<> SmallBlurryImage::SE3fromSE2(SE2<> se2, TaylorCamera &cameraSrc, TaylorCam
   if (cameraTarget.GetImageSize() != sirSize)
     cameraTarget.SetImageSize(sirSize);
 
-  Vector<2> av2Turned[2];  // Our two warped points in pixels
+  TooN::Vector<2> av2Turned[2];  // Our two warped points in pixels
   av2Turned[0] = CVD::vec(sirSize / 2) + se2 * CVD::vec(CVD::ImageRef(5, 0));
   av2Turned[1] = CVD::vec(sirSize / 2) + se2 * CVD::vec(CVD::ImageRef(-5, 0));
 
-  Vector<3> av3OrigPoints[2];  // 3D versions of these points.
+  TooN::Vector<3> av3OrigPoints[2];  // 3D versions of these points.
   av3OrigPoints[0] = cameraTarget.UnProject(CVD::vec(sirSize / 2) + CVD::vec(CVD::ImageRef(5, 0)));
   av3OrigPoints[1] = cameraTarget.UnProject(CVD::vec(sirSize / 2) + CVD::vec(CVD::ImageRef(-5, 0)));
 
-  SO3<> so3;
+  TooN::SO3<> so3;
   for (int it = 0; it < 3; it++)
   {
-    WLS<3> wls;  // lazy; no need for the 'W'
+    TooN::WLS<3> wls;  // lazy; no need for the 'W'
     wls.add_prior(10.0);
     for (int i = 0; i < 2; i++)
     {
       // Project into the image to find error
-      Vector<3> v3Cam = so3 * av3OrigPoints[i];
-      Vector<2> v2Pixels = cameraSrc.Project(v3Cam);
-      Vector<2> v2Error = av2Turned[i] - v2Pixels;
+      TooN::Vector<3> v3Cam = so3 * av3OrigPoints[i];
+      TooN::Vector<2> v2Pixels = cameraSrc.Project(v3Cam);
+      TooN::Vector<2> v2Error = av2Turned[i] - v2Pixels;
 
-      Matrix<2> m2CamDerivs = cameraSrc.GetProjectionDerivs();
-      Matrix<2, 3> m23Jacobian;
+      TooN::Matrix<2> m2CamDerivs = cameraSrc.GetProjectionDerivs();
+      TooN::Matrix<2, 3> m23Jacobian;
 
       for (int m = 0; m < 3; m++)
       {
-        const Vector<3> v3Motion = SO3<>::generator_field(m, v3Cam);
-        Vector<3> v3_dTheta, v3_dPhi;
+        const TooN::Vector<3> v3Motion = TooN::SO3<>::generator_field(m, v3Cam);
+        TooN::Vector<3> v3_dTheta, v3_dPhi;
         TaylorCamera::GetCamSphereDeriv(v3Cam, v3_dTheta, v3_dPhi);
-        Vector<2> v2CamSphereMotion;
+        TooN::Vector<2> v2CamSphereMotion;
         v2CamSphereMotion[0] = v3_dTheta * v3Motion;  // theta component
         v2CamSphereMotion[1] = v3_dPhi * v3Motion;    // phi component
 
@@ -301,17 +306,17 @@ SE3<> SmallBlurryImage::SE3fromSE2(SE2<> se2, TaylorCamera &cameraSrc, TaylorCam
     }
 
     wls.compute();
-    Vector<3> v3Res = wls.get_mu();
-    so3 = SO3<>::exp(v3Res) * so3;
+    TooN::Vector<3> v3Res = wls.get_mu();
+    so3 = TooN::SO3<>::exp(v3Res) * so3;
   }
 
-  SE3<> se3Result;
+  TooN::SE3<> se3Result;
   se3Result.get_rotation() = so3;
 
   return se3Result;
 }
 /*
-void SmallBlurryImage::SE3fromSE2(SE2<> se2, TaylorCamera& cameraSrc, TaylorCamera& cameraTarget, TooN::SE3<>& se3,
+void SmallBlurryImage::SE3fromSE2(TooN::SE2<> se2, TaylorCamera& cameraSrc, TaylorCamera& cameraTarget, TooN::SE3<>& se3,
 TooN::Matrix<6>& m6Cov)
 {
   // Do this by projecting two points, and then iterating the SE3<> (SO3
@@ -324,15 +329,15 @@ TooN::Matrix<6>& m6Cov)
   if(cameraTarget.GetImageSize() != sirSize)
     cameraTarget.SetImageSize(sirSize);
 
-  Vector<2> av2Turned[2];   // Our two warped points in pixels
+  TooN::Vector<2> av2Turned[2];   // Our two warped points in pixels
   av2Turned[0] = CVD::vec(sirSize / 2) + se2 * CVD::vec(CVD::ImageRef(5,0));
   av2Turned[1] = CVD::vec(sirSize / 2) + se2 * CVD::vec(CVD::ImageRef(-5,0));
 
-  Vector<3> av3OrigPoints[2];   // 3D versions of these points.
+  TooN::Vector<3> av3OrigPoints[2];   // 3D versions of these points.
   av3OrigPoints[0] = cameraTarget.UnProject(CVD::vec(sirSize / 2) + CVD::vec(CVD::ImageRef(5,0)));
   av3OrigPoints[1] = cameraTarget.UnProject(CVD::vec(sirSize / 2) + CVD::vec(CVD::ImageRef(-5,0)));
 
-  SO3<> so3;
+  TooN::SO3<> so3;
   tag::KalmanFilter<tag::ConstantPosition::State, tag::ConstantPosition::Model> filter;
   for(int it = 0; it<3; it++)
   {
@@ -341,19 +346,19 @@ TooN::Matrix<6>& m6Cov)
     for(int i=0; i<2; i++)
     {
       // Project into the image to find error
-      Vector<3> v3Cam = so3 * av3OrigPoints[i];
-      Vector<2> v2Pixels = cameraSrc.Project(v3Cam);
-      Vector<2> v2Error = av2Turned[i] - v2Pixels;
+      TooN::Vector<3> v3Cam = so3 * av3OrigPoints[i];
+      TooN::Vector<2> v2Pixels = cameraSrc.Project(v3Cam);
+      TooN::Vector<2> v2Error = av2Turned[i] - v2Pixels;
 
-      Matrix<2> m2CamDerivs = cameraSrc.GetProjectionDerivs();
-      Matrix<2,3> m23Jacobian;
+      TooN::Matrix<2> m2CamDerivs = cameraSrc.GetProjectionDerivs();
+      TooN::Matrix<2,3> m23Jacobian;
 
       for(int m=0; m<3; m++)
       {
-        const Vector<3> v3Motion = SO3<>::generator_field(m, v3Cam);
-        Vector<3> v3_dTheta, v3_dPhi;
+        const TooN::Vector<3> v3Motion = TooN::SO3<>::generator_field(m, v3Cam);
+        TooN::Vector<3> v3_dTheta, v3_dPhi;
         TaylorCamera::GetCamSphereDeriv(v3Cam, v3_dTheta, v3_dPhi);
-        Vector<2> v2CamSphereMotion;
+        TooN::Vector<2> v2CamSphereMotion;
         v2CamSphereMotion[0] = v3_dTheta * v3Motion;  // theta component
         v2CamSphereMotion[1] = v3_dPhi * v3Motion;  // phi component
 
@@ -365,11 +370,11 @@ TooN::Matrix<6>& m6Cov)
     }
 
     wls.compute();
-    Vector<3> v3Res = wls.get_mu();
+    TooN::Vector<3> v3Res = wls.get_mu();
 
     if(it == 0)
     {
-      filter.state.pose.get_rotation() = SO3<>::exp(v3Res);
+      filter.state.pose.get_rotation() = TooN::SO3<>::exp(v3Res);
       filter.state.covariance.slice<3,3,3,3>() = SVD<3>(wls.get_C_inv()).get_pinv();
     }
     else
@@ -384,7 +389,7 @@ TooN::Matrix<6>& m6Cov)
     so3 = filter.state.pose.get_rotation();
   }
 
-  //SE3<> se3Result;
+  //TooN::SE3<> se3Result;
   //se3Result.get_rotation() = so3;
 
   se3 = filter.state.pose;

@@ -59,9 +59,6 @@
 #include <vector>
 #include <limits>
 
-
-using Eigen::Map;
-
 // debugging
 static int poseID = 0;
 
@@ -1172,14 +1169,14 @@ protected:
   double _dLastChi2;      ///< Last value of chi2
 };
 
+using g2o::BlockSolverX;
+
 // Static members
 int ChainBundle::snMaxIterations = 100;  // 100
 int ChainBundle::snMaxTrialsAfterFailure = 100;
 double ChainBundle::sdUpdatePercentConvergenceLimit = 1e-10;
 double ChainBundle::sdUpdateRMSConvergenceLimit = 1e-10;  // 1e-10
 double ChainBundle::sdMinMEstimatorSigma = 0.5;           // 0.4;
-
-using namespace g2o;
 
 // Constructor takes camera models
 ChainBundle::ChainBundle(TaylorCameraMap& cameraModels, bool bUseRobust, bool bUseTukey, bool bVerbose)
@@ -1197,9 +1194,9 @@ ChainBundle::ChainBundle(TaylorCameraMap& cameraModels, bool bUseRobust, bool bU
 
   // BlockSolver_6_3::LinearSolverType* pLinearSolver = new LinearSolverCholmod<BlockSolver_6_3::PoseMatrixType>();
   // BlockSolver_6_3* pSolver = new BlockSolver_6_3(pLinearSolver);
-  BlockSolverX::LinearSolverType* pLinearSolver = new LinearSolverCholmod<BlockSolverX::PoseMatrixType>();
+  BlockSolverX::LinearSolverType* pLinearSolver = new g2o::LinearSolverCholmod<BlockSolverX::PoseMatrixType>();
   BlockSolverX* pSolver = new BlockSolverX(pLinearSolver);
-  OptimizationAlgorithmLevenberg* pAlgorithm = new OptimizationAlgorithmLevenberg(pSolver);
+  g2o::OptimizationAlgorithmLevenberg* pAlgorithm = new g2o::OptimizationAlgorithmLevenberg(pSolver);
 
   pAlgorithm->setMaxTrialsAfterFailure(ChainBundle::snMaxTrialsAfterFailure);
   mpOptimizer->setAlgorithm(pAlgorithm);
@@ -1352,7 +1349,7 @@ int ChainBundle::Compute(bool* pAbortSignal, int nNumIter, double dUserLambda)
   Initialize();
 
   mpOptimizer->setForceStopFlag(pAbortSignal);
-  dynamic_cast<OptimizationAlgorithmLevenberg*>(mpOptimizer->solver())->setUserLambdaInit(dUserLambda);
+  dynamic_cast<g2o::OptimizationAlgorithmLevenberg*>(mpOptimizer->solver())->setUserLambdaInit(dUserLambda);
 
   // The following two actions need access to the abort signal so they can trigger an abort if necessary
   mpConvergedUpdateMagAction->SetAbortFlag(pAbortSignal);
@@ -1465,7 +1462,7 @@ int ChainBundle::Compute(bool* pAbortSignal, int nNumIter, double dUserLambda)
       nNumPoses++;
   }
 
-  SparseBlockMatrix<MatrixXd> spinv;  // This will hold the covariance matrices
+  g2o::SparseBlockMatrix<Eigen::MatrixXd> spinv;  // This will hold the covariance matrices
 
   if (nNumPoses < 3 && mpOptimizer->computeMarginals(spinv, vPointVertices))
   {
@@ -1535,5 +1532,5 @@ double ChainBundle::GetMeanChiSquared()
 double ChainBundle::GetLambda()
 {
   ROS_ASSERT(mpOptimizer && mpOptimizer->solver());
-  return dynamic_cast<OptimizationAlgorithmLevenberg*>(mpOptimizer->solver())->currentLambda();
+  return dynamic_cast<g2o::OptimizationAlgorithmLevenberg*>(mpOptimizer->solver())->currentLambda();
 }

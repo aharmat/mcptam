@@ -177,6 +177,9 @@ protected:
   bool mbInitializedByClient;  ///< Some operations shouldn't be carried out
   /// before map has fully initialized because client
   /// won't have the same data as server.
+
+  ///< Thread-safe seed for rand_r
+  unsigned int seed = 1;
 };
 
 #endif  // MCPTAM_MAPMAKERSERVER_H

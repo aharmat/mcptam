@@ -43,8 +43,11 @@
 #include <mcptam/LevelHelpers.h>
 #include <geometry_msgs/PoseArray.h>
 #include <TooN/wls.h>
+#include <utility>
+#include <string>
+#include <vector>
 
-using namespace TooN;
+
 
 MapMakerCalib::MapMakerCalib(Map& map, TaylorCameraMap& cameras, BundleAdjusterBase& bundleAdjuster)
   : MapMakerBase(map, true), MapMaker(map, cameras, bundleAdjuster)  // this will start parent's run thread
@@ -67,7 +70,7 @@ MapMakerCalib::~MapMakerCalib()
 
 // Initialize the map
 bool MapMakerCalib::InitFromCalibImage(CalibImageTaylor& calibImage, double dSquareSize, std::string cameraName,
-                                       SE3<>& se3TrackerPose)
+                                       TooN::SE3<>& se3TrackerPose)
 {
   // Create a new MKF
   MultiKeyFrame* pMKF = new MultiKeyFrame;
@@ -81,7 +84,7 @@ bool MapMakerCalib::InitFromCalibImage(CalibImageTaylor& calibImage, double dSqu
   pMKF->mmpKeyFrames[cameraName] = pKF;
 
   pKF->mse3CamFromWorld = pMKF->mse3BaseFromWorld;  // same as parent MKF
-  pKF->mse3CamFromBase = SE3<>();                   // set relative pose to identity;
+  pKF->mse3CamFromBase = TooN::SE3<>();                   // set relative pose to identity;
   pKF->mbActive = true;
 
   pKF->MakeKeyFrame_Lite(calibImage.mImage, true);
@@ -107,9 +110,9 @@ bool MapMakerCalib::InitFromCalibImage(CalibImageTaylor& calibImage, double dSqu
       // Patch source stuff:
       pNewPoint->mpPatchSourceKF = pKF;
       pNewPoint->mnSourceLevel = l;
-      pNewPoint->mv3Normal_NC = makeVector(0, 0, -1);
+      pNewPoint->mv3Normal_NC = TooN::makeVector(0, 0, -1);
 
-      Vector<2> v2RootPos = calibImage.mvGridCorners[i].mParams.v2Pos;
+      TooN::Vector<2> v2RootPos = calibImage.mvGridCorners[i].mParams.v2Pos;
 
       // Same code as in MapMakerServerBase::AddPointEpipolar
       pNewPoint->mirCenter = CVD::ir_rounded(LevelNPos(v2RootPos, l));
@@ -149,8 +152,8 @@ bool MapMakerCalib::InitFromCalibImage(CalibImageTaylor& calibImage, double dSqu
     for(MapPointPtrList::iterator it = mMap.mlpPoints.begin(); it != mMap.mlpPoints.end(); ++it, ++i)
     {
       std::cout<<"Point pos: "<<(*it)->mv3WorldPos;
-      Vector<3> v3Cam = pKF->mse3CamFromWorld * (*it)->mv3WorldPos;
-      Vector<2> v2Image = mmCameraModels[cameraName].Project(v3Cam);
+      TooN::Vector<3> v3Cam = pKF->mse3CamFromWorld * (*it)->mv3WorldPos;
+      TooN::Vector<2> v2Image = mmCameraModels[cameraName].Project(v3Cam);
       std::cout<<" Reprojected: "<<v2Image<<" Original: "<<calibImage.mvGridCorners[i].mParams.v2Pos;
       std::cout<<std::endl;
 
@@ -199,8 +202,8 @@ bool MapMakerCalib::InitFromCalibImage(CalibImageTaylor& calibImage, double dSqu
     for(MapPointPtrList::iterator it = mMap.mlpPoints.begin(); it != mMap.mlpPoints.end(); ++it, ++i)
     {
       std::cout<<"Point pos: "<<(*it)->mv3WorldPos;
-      Vector<3> v3Cam = pKF->mse3CamFromWorld * (*it)->mv3WorldPos;
-      Vector<2> v2Image = mmCameraModels[cameraName].Project(v3Cam);
+      TooN::Vector<3> v3Cam = pKF->mse3CamFromWorld * (*it)->mv3WorldPos;
+      TooN::Vector<2> v2Image = mmCameraModels[cameraName].Project(v3Cam);
       std::cout<<" Reprojected: "<<v2Image<<" Original: "<<calibImage.mvGridCorners[i].mParams.v2Pos;
       std::cout<<std::endl;
 
@@ -235,7 +238,7 @@ void MapMakerCalib::RemoveMultiKeyFrames(std::string camName, bool bShouldHave)
     MultiKeyFrame& mkf = *(*mkf_it);
 
     // If should have, but doesn't have, or vice versa, mark as bad
-    if ((bool)mkf.mmpKeyFrames.count(camName) != bShouldHave)
+    if (static_cast<bool>(mkf.mmpKeyFrames.count(camName)) != bShouldHave)
     {
       mkf.mbBad = true;
     }
@@ -283,17 +286,17 @@ SE3Map MapMakerCalib::FindAverageRelativePoses()
   for (SE3Map::iterator it = ++mPoses.begin(); it != mPoses.end(); it++)
   {
     std::string camName = it->first;
-    SE3<>& se3Pose = it->second;  // the pose we'll refine
+    TooN::SE3<>& se3Pose = it->second;  // the pose we'll refine
 
-    SO3<> R = se3Pose.get_rotation();
+    TooN::SO3<> R = se3Pose.get_rotation();
 
     // Start iterative calculation of the rotation
     // Follows the algorithm of "Rotation Averaging with Application to Camera-Rig Calibration"
     // by Dai et. al. section "geodesic L2-mean"
     while (1)
     {
-      Vector<3> r;
-      r = Zeros;
+      TooN::Vector<3> r;
+      r = TooN::Zeros;
       int n = 0;
 
       // Go through all MultiKeyFrames in the map
@@ -317,15 +320,15 @@ SE3Map MapMakerCalib::FindAverageRelativePoses()
       if (r * r < dEpsilon * dEpsilon)  // converged, so get out of here
         break;
 
-      R = R * SO3<>::exp(r);  // update R
+      R = R * TooN::SO3<>::exp(r);  // update R
     }
 
     se3Pose.get_rotation() = R;  // set the rotation
 
     // Do a similar thing for the translation vector, but its calculation is simpler since we can just average these
     // vectors
-    Vector<3> v3Trans;
-    v3Trans = Zeros;
+    TooN::Vector<3> v3Trans;
+    v3Trans = TooN::Zeros;
     int n = 0;
 
     // Go through all MultiKeyFrames in the map
@@ -484,7 +487,7 @@ bool MapMakerCalib::CalibInit()
 
       wls.compute();
       TooN::Vector<6> v6Update = wls.get_mu();
-      se3BaseShift = (SE3<>::exp(v6Update)).inverse() * se3BaseShift;
+      se3BaseShift = (TooN::SE3<>::exp(v6Update)).inverse() * se3BaseShift;
     }
 
     ROS_DEBUG_STREAM("Final se3BaseShift for MKF: " << se3BaseShift);
@@ -544,7 +547,7 @@ bool MapMakerCalib::CalibOneStep()
 // Pause the map making optimization (not the calibration optimization)
 void MapMakerCalib::PauseRun()
 {
-  mnSavedRunState = (int)mMap.mbGood;
+  mnSavedRunState = static_cast<int>(mMap.mbGood);
   mMap.mbGood = false;
 
   if (mBundleAdjuster.Running())
@@ -570,7 +573,7 @@ void MapMakerCalib::ResumeRun()
 {
   if (mnSavedRunState != -1)
   {
-    mMap.mbGood = (bool)mnSavedRunState;
+    mMap.mbGood = static_cast<bool>(mnSavedRunState);
     mbPaused = false;
     meCalibState = CALIB_INVALID;
     mnSavedRunState = -1;

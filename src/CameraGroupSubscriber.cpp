@@ -35,6 +35,8 @@
 
 #include <mcptam/CameraGroupSubscriber.h>
 #include <sensor_msgs/image_encodings.h>
+#include <string>
+#include <vector>
 
 // Static members
 bool CameraGroupSubscriber::sbDynamicSync = false;

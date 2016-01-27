@@ -42,6 +42,10 @@
 #include <mcptam/KeyFrame.h>
 #include <mcptam/BundleAdjusterBase.h>
 #include <mcptam/BundleAdjusterMulti.h>
+#include <utility>
+#include <list>
+#include <vector>
+#include <set>
 
 MapMakerServer::MapMakerServer(Map &map, TaylorCameraMap &cameras, BundleAdjusterBase &bundleAdjuster)
   : MapMakerBase(map, true)
@@ -233,7 +237,7 @@ void MapMakerServer::run()
     }
 
     // Very low priorty: re-find measurements marked as vOutliers
-    if (mBundleAdjuster.ConvergedRecent() && mBundleAdjuster.ConvergedFull() && rand() % 20 == 0 &&
+    if (mBundleAdjuster.ConvergedRecent() && mBundleAdjuster.ConvergedFull() && rand_r(&seed) % 20 == 0 &&
         IncomingQueueSize() == 0)
     {
       ROS_DEBUG("MapMakerServer: ReFindFromFailureQueue");

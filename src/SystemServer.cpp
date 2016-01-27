@@ -48,9 +48,9 @@
 #include <mcptam/LevelHelpers.h>
 #include <gvars3/instances.h>
 #include <std_srvs/Empty.h>
+#include <string>
 
-using namespace GVars3;
-using namespace TooN;
+using GVars3::GUI;
 
 SystemServer::SystemServer() : SystemBase("mcptam_server", true, true), mImageTransport(mNodeHandle)
 {
@@ -90,7 +90,7 @@ SystemServer::SystemServer() : SystemBase("mcptam_server", true, true), mImageTr
   bool bLevelZeroPoints;
   mNodeHandlePriv.param<bool>("level_zero_points", bLevelZeroPoints, true);
 
-  static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN | SILENT);
+  static GVars3::gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, GVars3::HIDDEN | GVars3::SILENT);
   *gvnLevelZeroPoints = bLevelZeroPoints;
 
   // Main Menu
@@ -165,10 +165,10 @@ void SystemServer::Run()
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    static gvar3<std::string> gvsCurrentSubMenu("Menu.CurrentSubMenu", "", HIDDEN | SILENT);
+    static GVars3::gvar3<std::string> gvsCurrentSubMenu("Menu.CurrentSubMenu", "", GVars3::HIDDEN | GVars3::SILENT);
     bool bDrawKeyFrames = *gvsCurrentSubMenu == "View";
 
-    static gvar3<int> gvnDrawTrackerMeas("DrawTrackerMeas", 1, HIDDEN | SILENT);
+    static GVars3::gvar3<int> gvnDrawTrackerMeas("DrawTrackerMeas", 1, GVars3::HIDDEN | GVars3::SILENT);
 
     std::stringstream captionStream;
 
@@ -194,7 +194,7 @@ void SystemServer::Run()
         for (unsigned i = 0; i < mTrackerSmallImagePoints.points.size(); ++i)
         {
           pcl::PointXYZ& point = mTrackerSmallImagePoints.points[i];
-          CVD::glColor(gavLevelColors[(int)point.z]);
+          CVD::glColor(gavLevelColors[static_cast<int>(point.z)]);
           CVD::glVertex(CVD::vec(irOffset) + TooN::makeVector(point.x, point.y));
         }
 
