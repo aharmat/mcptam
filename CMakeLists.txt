@@ -3,8 +3,7 @@ project(mcptam)
 
 # Add cmake_modules directory to cmake module path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules")
-# Define build type
-set(CMAKE_BUILD_TYPE None)
+
 # Set our own specific flags. Want something like RelWithDebInfo but without the 
 # -DNDEBUG flag that disables asserts
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x -march=core2 -msse3 -O3 -g -fopenmp")
@@ -25,15 +24,34 @@ find_package(LAPACK REQUIRED)
 
 message(STATUS "G2O_CORE_LIBRARY=${G2O_CORE_LIBRARY}")
 
-include_directories(include ${catkin_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${SUITESPARSE_INCLUDE_DIRS} ${CVD_INCLUDE_DIR} 
-                    ${GVars3_INCLUDE_DIR} ${OpenCV_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS}
+                            ${Boost_INCLUDE_DIRS}
+                            ${SUITESPARSE_INCLUDE_DIRS}
+                            ${CVD_INCLUDE_DIR}
+                            ${GVars3_INCLUDE_DIR}
+                            ${OpenCV_INCLUDE_DIRS}
+)
 
-link_directories(${catkin_LIBRARY_DIRS} ${Boost_LIBRARY_DIRS} ${SUITESPARSE_LIBRARY_DIRS} ${OpenCV_LIB_DIR} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
+link_directories(${catkin_LIBRARY_DIRS}
+                 ${Boost_LIBRARY_DIRS}
+                 ${SUITESPARSE_LIBRARY_DIRS}
+                 ${OpenCV_LIB_DIR}
+                 ${LAPACK_LIBRARIES}
+                 ${BLAS_LIBRARIES}
+)
 
 add_message_files(
   DIRECTORY msg
-  FILES MapInfo.msg MapMakerTiming.msg NetworkMapPoint.msg NetworkMeasurement.msg NetworkKeyFrame.msg NetworkMultiKeyFrame.msg NetworkOutlier.msg
-        SystemInfo.msg TrackerTiming.msg TrackerState.msg
+  FILES MapInfo.msg 
+        MapMakerTiming.msg
+        NetworkMapPoint.msg
+        NetworkMeasurement.msg
+        NetworkKeyFrame.msg
+        NetworkMultiKeyFrame.msg
+        NetworkOutlier.msg
+        SystemInfo.msg
+        TrackerTiming.msg
+        TrackerState.msg
 )
 
 add_service_files(
@@ -46,52 +64,208 @@ generate_messages(DEPENDENCIES std_msgs sensor_msgs)
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}
-  CATKIN_DEPENDS roscpp image_transport sensor_msgs cv_bridge geometry_msgs tf message_filters std_msgs std_srvs 
-                 visualization_msgs dynamic_reconfigure pcl_ros message_runtime
+  CATKIN_DEPENDS roscpp
+                 image_transport
+                 sensor_msgs
+                 cv_bridge geometry_msgs
+                 tf
+                 message_filters
+                 std_msgs
+                 std_srvs 
+                 visualization_msgs
+                 dynamic_reconfigure
+                 pcl_ros
+                 message_runtime
   DEPENDS SuiteSparse CVD OpenGL GVars3)
 
-add_executable(mcptam src/Main.cc src/GLWindow2.cc src/GLWindowMenu.cc src/VideoSourceMulti.cc src/CameraGroupSubscriber.cc 
-                      src/SystemBase.cc src/SystemFrontendBase.cc src/System.cc src/TaylorCamera.cc src/KeyFrame.cc src/MapPoint.cc src/Map.cc 
-                      src/SmallBlurryImage.cc src/ShiTomasi.cc src/MapMaker.cc src/MapMakerBase.cc src/MapMakerClientBase.cc src/MapMakerServerBase.cc 
-                      src/PatchFinder.cc src/Relocaliser.cc src/Tracker.cc src/KeyFrameViewer.cc 
-                      src/BundleAdjusterBase.cc src/MiniPatch.cc src/BundleAdjusterMulti.cc src/ChainBundle.cc)
+set(MCPTAM_SRC 
+      src/Main.cc 
+      src/GLWindow2.cc
+      src/GLWindowMenu.cc
+      src/VideoSourceMulti.cc
+      src/CameraGroupSubscriber.cc
+      src/SystemBase.cc
+      src/SystemFrontendBase.cc
+      src/System.cc
+      src/TaylorCamera.cc
+      src/KeyFrame.cc
+      src/MapPoint.cc
+      src/Map.cc
+      src/SmallBlurryImage.cc
+      src/ShiTomasi.cc
+      src/MapMaker.cc
+      src/MapMakerBase.cc
+      src/MapMakerClientBase.cc
+      src/MapMakerServerBase.cc
+      src/PatchFinder.cc
+      src/Relocaliser.cc
+      src/Tracker.cc
+      src/KeyFrameViewer.cc
+      src/BundleAdjusterBase.cc
+      src/MiniPatch.cc
+      src/BundleAdjusterMulti.cc
+      src/ChainBundle.cc
+)
+
+set(MCPTAM_CLIENT_SRC
+        src/MainClient.cc
+        src/GLWindow2.cc
+        src/GLWindowMenu.cc
+        src/VideoSourceMulti.cc
+        src/CameraGroupSubscriber.cc
+        src/SystemBase.cc
+        src/SystemFrontendBase.cc
+        src/SystemClient.cc
+        src/TaylorCamera.cc
+        src/KeyFrame.cc
+        src/MapPoint.cc
+        src/Map.cc
+        src/SmallBlurryImage.cc
+        src/ShiTomasi.cc
+        src/MapMakerClient.cc
+        src/MapMakerBase.cc
+        src/MapMakerClientBase.cc
+        src/NetworkManager.cc
+        src/PatchFinder.cc
+        src/Relocaliser.cc
+        src/MiniPatch.cc
+        src/Tracker.cc
+        src/KeyFrameViewer.cc
+)  
+
+set(MCPTAM_SERVER_SRC 
+            src/MainServer.cc
+            src/GLWindow2.cc
+            src/GLWindowMenu.cc
+            src/VideoSourceMulti.cc
+            src/CameraGroupSubscriber.cc
+            src/SystemBase.cc
+            src/SystemServer.cc
+            src/TaylorCamera.cc
+            src/KeyFrame.cc
+            src/MapPoint.cc
+            src/Map.cc
+            src/SmallBlurryImage.cc
+            src/ShiTomasi.cc
+            src/MapMakerServer.cc
+            src/MapMakerBase.cc
+            src/MapMakerServerBase.cc
+            src/NetworkManager.cc
+            src/PatchFinder.cc
+            src/KeyFrameViewer.cc
+            src/MiniPatch.cc
+            src/BundleAdjusterBase.cc
+            src/BundleAdjusterMulti.cc
+            src/ChainBundle.cc
+)
+
+set(CAMERA_CALIBRATOR_SRC 
+           src/MainCameraCalibrator.cc
+            src/GLWindow2.cc
+             src/GLWindowMenu.cc
+            src/VideoSourceSingle.cc
+            src/CameraCalibrator.cc
+            src/CalibImageTaylor.cc
+            src/CalibCornerPatch.cc
+            src/TaylorCamera.cc
+            src/CalibGridCorner.cc
+)
+
+set(CAMERA_CALIBRATOR_LIBS
+    ${catkin_LIBRARIES}
+    ${Boost_LIBRARIES}
+    ${SUITESPARSE_LIBRARIES}
+    ${CVD_LIBRARY}
+    ${OPENGL_gl_LIBRARY}
+    ${OpenCV_LIBS} 
+    ${GVars3_LIBRARIES}
+    ${LAPACK_LIBRARIES}
+    ${BLAS_LIBRARIES}
+)
+
+set(MCPTAM_LIBS
+    ${catkin_LIBRARIES}
+    ${Boost_LIBRARIES}
+    ${SUITESPARSE_LIBRARIES}
+    ${CVD_LIBRARY}
+    ${OPENGL_gl_LIBRARY}
+    ${OpenCV_LIBS}
+    ${GVars3_LIBRARIES}
+    ${G2O_STUFF_LIBRARY}
+    ${G2O_CORE_LIBRARY}
+    ${G2O_SOLVER_CHOLMOD}
+    ${LAPACK_LIBRARIES}
+    ${BLAS_LIBRARIES}
+)
+
+set(POSE_CALIBRATOR_SRC
+              src/MainPoseCalibrator.cc
+              src/GLWindow2.cc
+              src/GLWindowMenu.cc
+              src/VideoSourceMulti.cc
+              src/CameraGroupSubscriber.cc
+              src/SystemBase.cc
+              src/PoseCalibrator.cc
+              src/CalibImageTaylor.cc
+              src/CalibCornerPatch.cc
+              src/CalibGridCorner.cc
+              src/TrackerCalib.cc
+              src/MapMakerCalib.cc
+              src/MapMaker.cc
+              src/MapMakerBase.cc
+              src/MapMakerClientBase.cc
+              src/MapMakerServerBase.cc
+              src/TaylorCamera.cc
+              src/KeyFrame.cc
+              src/MapPoint.cc
+              src/Map.cc
+              src/SmallBlurryImage.cc
+              src/ShiTomasi.cc
+              src/PatchFinder.cc
+              src/Relocaliser.cc
+              src/Tracker.cc
+              src/KeyFrameViewer.cc
+              src/BundleAdjusterBase.cc
+              src/BundleAdjusterSingle.cc
+              src/BundleAdjusterCalib.cc
+              src/ChainBundle.cc
+              src/MiniPatch.cc
+)
+
+set(POSE_CALIBRATOR_LIBS
+        ${catkin_LIBRARIES}
+        ${Boost_LIBRARIES}
+        ${SUITESPARSE_LIBRARIES}
+        ${CVD_LIBRARY}
+        ${OPENGL_gl_LIBRARY}
+        ${OpenCV_LIBS}
+        ${GVars3_LIBRARIES}
+        ${G2O_STUFF_LIBRARY}
+        ${G2O_CORE_LIBRARY}
+        ${G2O_SOLVER_CHOLMOD}
+        ${LAPACK_LIBRARIES} 
+        ${BLAS_LIBRARIES}
+)
+
+add_executable(mcptam ${MCPTAM_SRC} )
 add_dependencies(mcptam ${PROJECT_NAME}_gencpp)
-target_link_libraries(mcptam ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${OpenCV_LIBS} ${GVars3_LIBRARIES}
-                             ${G2O_STUFF_LIBRARY} ${G2O_CORE_LIBRARY} ${G2O_SOLVER_CHOLMOD} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
-                             
-add_executable(mcptam_client src/MainClient.cc src/GLWindow2.cc src/GLWindowMenu.cc src/VideoSourceMulti.cc src/CameraGroupSubscriber.cc  
-                             src/SystemBase.cc src/SystemFrontendBase.cc src/SystemClient.cc src/TaylorCamera.cc src/KeyFrame.cc src/MapPoint.cc src/Map.cc 
-                             src/SmallBlurryImage.cc src/ShiTomasi.cc src/MapMakerClient.cc src/MapMakerBase.cc src/MapMakerClientBase.cc 
-                             src/NetworkManager.cc src/PatchFinder.cc src/Relocaliser.cc src/MiniPatch.cc 
-                             src/Tracker.cc src/KeyFrameViewer.cc)
+target_link_libraries(mcptam ${MCPTAM_LIBS})
+
+add_executable(mcptam_client $MCPTAM_CLIENT_SRC)
 add_dependencies(mcptam_client ${PROJECT_NAME}_gencpp)
-target_link_libraries(mcptam_client ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${OpenCV_LIBS} ${GVars3_LIBRARIES}
-                                    ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
+target_link_libraries(mcptam_client ${MCPTAM_LIBS})
  
-add_executable(mcptam_server src/MainServer.cc src/GLWindow2.cc src/GLWindowMenu.cc src/VideoSourceMulti.cc src/CameraGroupSubscriber.cc   
-                             src/SystemBase.cc src/SystemServer.cc src/TaylorCamera.cc src/KeyFrame.cc src/MapPoint.cc src/Map.cc 
-                             src/SmallBlurryImage.cc src/ShiTomasi.cc src/MapMakerServer.cc src/MapMakerBase.cc src/MapMakerServerBase.cc 
-                             src/NetworkManager.cc src/PatchFinder.cc src/KeyFrameViewer.cc  src/MiniPatch.cc 
-                             src/BundleAdjusterBase.cc src/BundleAdjusterMulti.cc src/ChainBundle.cc)
+add_executable(mcptam_server ${MCPTAM_SERVER_SRC})
 add_dependencies(mcptam_server ${PROJECT_NAME}_gencpp)
-target_link_libraries(mcptam_server ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${OpenCV_LIBS} ${GVars3_LIBRARIES}
-                                    ${G2O_STUFF_LIBRARY} ${G2O_CORE_LIBRARY} ${G2O_SOLVER_CHOLMOD} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
+target_link_libraries(mcptam_server ${MCPTAM_LIBS})
 
-add_executable(camera_calibrator src/MainCameraCalibrator.cc src/GLWindow2.cc src/GLWindowMenu.cc src/VideoSourceSingle.cc  
-                                src/CameraCalibrator.cc src/CalibImageTaylor.cc src/CalibCornerPatch.cc src/TaylorCamera.cc src/CalibGridCorner.cc)
+add_executable(camera_calibrator ${CAMERA_CALIBRATOR_SRC})
 add_dependencies(camera_calibrator ${PROJECT_NAME}_gencpp)
-target_link_libraries(camera_calibrator ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${OpenCV_LIBS} ${GVars3_LIBRARIES}
-                                        ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
+target_link_libraries(camera_calibrator ${CAMERA_CALIBRATOR_LIBS})
 
-add_executable(pose_calibrator src/MainPoseCalibrator.cc src/GLWindow2.cc src/GLWindowMenu.cc src/VideoSourceMulti.cc src/CameraGroupSubscriber.cc 
-                              src/SystemBase.cc src/PoseCalibrator.cc src/CalibImageTaylor.cc src/CalibCornerPatch.cc src/CalibGridCorner.cc 
-                              src/TrackerCalib.cc src/MapMakerCalib.cc src/MapMaker.cc src/MapMakerBase.cc src/MapMakerClientBase.cc src/MapMakerServerBase.cc
-                              src/TaylorCamera.cc src/KeyFrame.cc src/MapPoint.cc src/Map.cc src/SmallBlurryImage.cc src/ShiTomasi.cc  
-                              src/PatchFinder.cc src/Relocaliser.cc src/Tracker.cc src/KeyFrameViewer.cc
-                              src/BundleAdjusterBase.cc src/BundleAdjusterSingle.cc src/BundleAdjusterCalib.cc src/ChainBundle.cc src/MiniPatch.cc)
+add_executable(pose_calibrator ${POSE_CALIBRATOR_SRC})
 add_dependencies(pose_calibrator ${PROJECT_NAME}_gencpp)
-target_link_libraries(pose_calibrator ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${OpenCV_LIBS} ${GVars3_LIBRARIES}
-                                     ${G2O_STUFF_LIBRARY} ${G2O_CORE_LIBRARY} ${G2O_SOLVER_CHOLMOD} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
+target_link_libraries(pose_calibrator ${POSE_CALIBRATOR_LIBS})
                                      
 install(TARGETS mcptam mcptam_client mcptam_server camera_calibrator pose_calibrator
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
