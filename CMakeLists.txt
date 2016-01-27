@@ -9,6 +9,9 @@ set(CMAKE_BUILD_TYPE None)
 # -DNDEBUG flag that disables asserts
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x -march=core2 -msse3 -O3 -g -fopenmp")
 
+#Testing options, set to true if you want to build the rostests
+SET(BUILD_TEST TRUE)
+
 # Find various packages in order to set up environment variables
 find_package(catkin REQUIRED COMPONENTS roscpp image_transport sensor_msgs cv_bridge geometry_msgs tf message_filters std_msgs
                                         std_srvs visualization_msgs dynamic_reconfigure pcl_ros message_generation)
@@ -93,7 +96,8 @@ add_dependencies(pose_calibrator ${PROJECT_NAME}_gencpp)
 target_link_libraries(pose_calibrator ${catkin_LIBRARIES} ${Boost_LIBRARIES} ${SUITESPARSE_LIBRARIES} ${CVD_LIBRARY} ${OPENGL_gl_LIBRARY} ${OpenCV_LIBS} ${GVars3_LIBRARIES}
                                      ${G2O_STUFF_LIBRARY} ${G2O_CORE_LIBRARY} ${G2O_SOLVER_CHOLMOD} ${LAPACK_LIBRARIES} ${BLAS_LIBRARIES})
 
-if(1)
+if(BUILD_TEST)
+  MESSAGE("adding files for unit testing...")
   find_package(rostest REQUIRED)
   add_rostest_gtest(test_entropy test/entropy_test.test test/entropy_test.cpp)
   target_link_libraries(test_entropy ${catkin_LIBRARIES})
