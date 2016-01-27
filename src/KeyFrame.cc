@@ -84,7 +84,7 @@ KeyFrame::KeyFrame(MultiKeyFrame* pMKF, std::string name)
 
 void KeyFrame::AddMeasurement(MapPoint* pPoint, Measurement* pMeas)
 {
-  ROS_ASSERT(!mmpMeasurements.count(pPoint));
+  //ROS_ASSERT(!mmpMeasurements.count(pPoint));
   if(mmpMeasurements.count(pPoint)) //safety: we've already added the measurements, don't add again!
 	return;
   

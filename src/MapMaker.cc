@@ -358,7 +358,7 @@ void MapMaker::AddMultiKeyFrame(MultiKeyFrame*& pMKF_Incoming)
 	mqpMultiKeyFramesFromTracker.push_back(pMKF);
 	lock.unlock();
   
-  ROS_INFO_STREAM("BA RUN STATE: " << mBundleAdjuster.Running());
+  //ROS_INFO_STREAM("BA RUN STATE: " << mBundleAdjuster.Running());
   
   if(mBundleAdjuster.Running())   // Tell the mapmaker to stop doing low-priority stuff and concentrate on this KF first.
     mBundleAdjuster.RequestAbort();
