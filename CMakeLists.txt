@@ -84,110 +84,69 @@ catkin_package(
           GVars3
 )
 
-set(MCPTAM_SRC
-    src/Main.cc
+set(MCPTAM_LIB_SRC
+    src/BundleAdjusterBase.cc
+    src/BundleAdjusterCalib.cc
+    src/BundleAdjusterMulti.cc
+    src/BundleAdjusterSingle.cc
+    src/CalibCornerPatch.cc
+    src/CalibGridCorner.cc
+    src/CalibImageTaylor.cc
+    src/CameraCalibrator.cc
+    src/CameraGroupSubscriber.cc
+    src/ChainBundle.cc
     src/GLWindow2.cc
     src/GLWindowMenu.cc
-    src/VideoSourceMulti.cc
-    src/CameraGroupSubscriber.cc
-    src/SystemBase.cc
-    src/SystemFrontendBase.cc
-    src/System.cc
-    src/TaylorCamera.cc
     src/KeyFrame.cc
-    src/MapPoint.cc
+    src/KeyFrameViewer.cc
     src/Map.cc
-    src/SmallBlurryImage.cc
-    src/ShiTomasi.cc
     src/MapMaker.cc
     src/MapMakerBase.cc
+    src/MapMakerCalib.cc
+    src/MapMakerClient.cc
     src/MapMakerClientBase.cc
+    src/MapMakerServer.cc
     src/MapMakerServerBase.cc
-    src/PatchFinder.cc
-    src/Relocaliser.cc
-    src/Tracker.cc
-    src/KeyFrameViewer.cc
-    src/BundleAdjusterBase.cc
+    src/MapPoint.cc
     src/MiniPatch.cc
-    src/BundleAdjusterMulti.cc
-    src/ChainBundle.cc
+    src/NetworkManager.cc
+    src/PatchFinder.cc
+    src/PoseCalibrator.cc
+    src/Relocaliser.cc
+    src/ShiTomasi.cc
+    src/SmallBlurryImage.cc
+    src/System.cc
+    src/SystemBase.cc
+    src/SystemClient.cc
+    src/SystemFrontendBase.cc
+    src/SystemServer.cc
+    src/TaylorCamera.cc
+    src/Tracker.cc
+    src/TrackerCalib.cc
+    src/VideoSourceMulti.cc
+    src/VideoSourceSingle.cc
+)
+
+set(MCPTAM_SRC
+    src/Main.cc
 )
 
 set(MCPTAM_CLIENT_SRC
     src/MainClient.cc
-    src/GLWindow2.cc
-    src/GLWindowMenu.cc
-    src/VideoSourceMulti.cc
-    src/CameraGroupSubscriber.cc
-    src/SystemBase.cc
-    src/SystemFrontendBase.cc
-    src/SystemClient.cc
-    src/TaylorCamera.cc
-    src/KeyFrame.cc
-    src/MapPoint.cc
-    src/Map.cc
-    src/SmallBlurryImage.cc
-    src/ShiTomasi.cc
-    src/MapMakerClient.cc
-    src/MapMakerBase.cc
-    src/MapMakerClientBase.cc
-    src/NetworkManager.cc
-    src/PatchFinder.cc
-    src/Relocaliser.cc
-    src/MiniPatch.cc
-    src/Tracker.cc
-    src/KeyFrameViewer.cc
 )
 
 set(MCPTAM_SERVER_SRC
     src/MainServer.cc
-    src/GLWindow2.cc
-    src/GLWindowMenu.cc
-    src/VideoSourceMulti.cc
-    src/CameraGroupSubscriber.cc
-    src/SystemBase.cc
-    src/SystemServer.cc
-    src/TaylorCamera.cc
-    src/KeyFrame.cc
-    src/MapPoint.cc
-    src/Map.cc
-    src/SmallBlurryImage.cc
-    src/ShiTomasi.cc
-    src/MapMakerServer.cc
-    src/MapMakerBase.cc
-    src/MapMakerServerBase.cc
-    src/NetworkManager.cc
-    src/PatchFinder.cc
-    src/KeyFrameViewer.cc
-    src/MiniPatch.cc
-    src/BundleAdjusterBase.cc
-    src/BundleAdjusterMulti.cc
-    src/ChainBundle.cc
+)
+
+set(POSE_CALIBRATOR_SRC
+    src/MainPoseCalibrator.cc
 )
 
 set(CAMERA_CALIBRATOR_SRC
     src/MainCameraCalibrator.cc
-    src/GLWindow2.cc
-    src/GLWindowMenu.cc
-    src/VideoSourceSingle.cc
-    src/CameraCalibrator.cc
-    src/CalibImageTaylor.cc
-    src/CalibCornerPatch.cc
-    src/TaylorCamera.cc
-    src/CalibGridCorner.cc
 )
 
-set(CAMERA_CALIBRATOR_LIBS
-    ${catkin_LIBRARIES}
-    ${Boost_LIBRARIES}
-    ${SUITESPARSE_LIBRARIES}
-    ${CVD_LIBRARY}
-    ${OPENGL_gl_LIBRARY}
-    ${OpenCV_LIBS}
-    ${GVars3_LIBRARIES}
-    ${LAPACK_LIBRARIES}
-    ${BLAS_LIBRARIES}
-)
 
 set(MCPTAM_LIBS
     ${catkin_LIBRARIES}
@@ -204,75 +163,29 @@ set(MCPTAM_LIBS
     ${BLAS_LIBRARIES}
 )
 
-set(POSE_CALIBRATOR_SRC
-    src/MainPoseCalibrator.cc
-    src/GLWindow2.cc
-    src/GLWindowMenu.cc
-    src/VideoSourceMulti.cc
-    src/CameraGroupSubscriber.cc
-    src/SystemBase.cc
-    src/PoseCalibrator.cc
-    src/CalibImageTaylor.cc
-    src/CalibCornerPatch.cc
-    src/CalibGridCorner.cc
-    src/TrackerCalib.cc
-    src/MapMakerCalib.cc
-    src/MapMaker.cc
-    src/MapMakerBase.cc
-    src/MapMakerClientBase.cc
-    src/MapMakerServerBase.cc
-    src/TaylorCamera.cc
-    src/KeyFrame.cc
-    src/MapPoint.cc
-    src/Map.cc
-    src/SmallBlurryImage.cc
-    src/ShiTomasi.cc
-    src/PatchFinder.cc
-    src/Relocaliser.cc
-    src/Tracker.cc
-    src/KeyFrameViewer.cc
-    src/BundleAdjusterBase.cc
-    src/BundleAdjusterSingle.cc
-    src/BundleAdjusterCalib.cc
-    src/ChainBundle.cc
-    src/MiniPatch.cc
-    )
+# create a library of all the non-main functions
+add_library(MCPTAM_FUNCTIONS_LIB ${MCPTAM_LIB_SRC})
 
-set(POSE_CALIBRATOR_LIBS
-    ${catkin_LIBRARIES}
-    ${Boost_LIBRARIES}
-    ${SUITESPARSE_LIBRARIES}
-    ${CVD_LIBRARY}
-    ${OPENGL_gl_LIBRARY}
-    ${OpenCV_LIBS}
-    ${GVars3_LIBRARIES}
-    ${G2O_STUFF_LIBRARY}
-    ${G2O_CORE_LIBRARY}
-    ${G2O_SOLVER_CHOLMOD}
-    ${LAPACK_LIBRARIES}
-    ${BLAS_LIBRARIES}
-)
-
+# add executables and link them to the libraries
 add_executable(mcptam ${MCPTAM_SRC} )
 add_dependencies(mcptam ${PROJECT_NAME}_gencpp)
-target_link_libraries(mcptam ${MCPTAM_LIBS})
+target_link_libraries(mcptam ${MCPTAM_LIBS} ${MCPTAM_FUNCTIONS_LIB})
 
 add_executable(mcptam_client ${MCPTAM_CLIENT_SRC})
 add_dependencies(mcptam_client ${PROJECT_NAME}_gencpp)
-target_link_libraries(mcptam_client ${MCPTAM_LIBS})
+target_link_libraries(mcptam_client ${MCPTAM_LIBS} ${MCPTAM_FUNCTIONS_LIB})
 
 add_executable(mcptam_server ${MCPTAM_SERVER_SRC})
 add_dependencies(mcptam_server ${PROJECT_NAME}_gencpp)
-target_link_libraries(mcptam_server ${MCPTAM_LIBS})
+target_link_libraries(mcptam_server ${MCPTAM_LIBS} ${MCPTAM_FUNCTIONS_LIB})
 
 add_executable(camera_calibrator ${CAMERA_CALIBRATOR_SRC})
 add_dependencies(camera_calibrator ${PROJECT_NAME}_gencpp)
-target_link_libraries(camera_calibrator ${CAMERA_CALIBRATOR_LIBS})
+target_link_libraries(camera_calibrator ${MCPTAM_LIBS} ${MCPTAM_FUNCTIONS_LIB})
 
 add_executable(pose_calibrator ${POSE_CALIBRATOR_SRC})
 add_dependencies(pose_calibrator ${PROJECT_NAME}_gencpp)
-target_link_libraries(pose_calibrator ${POSE_CALIBRATOR_LIBS})
-
+target_link_libraries(pose_calibrator ${MCPTAM_LIBS} ${MCPTAM_FUNCTIONS_LIB})
 
 install(TARGETS mcptam mcptam_client mcptam_server camera_calibrator pose_calibrator
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
