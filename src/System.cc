@@ -1,13 +1,13 @@
 /*************************************************************************
- *  
- *  
- *  Copyright 2014  Adam Harmat (McGill University) 
+ *
+ *
+ *  Copyright 2014  Adam Harmat (McGill University)
  *                      [adam.harmat@mail.mcgill.ca]
  *                  Michael Tribou (University of Waterloo)
  *                      [mjtribou@uwaterloo.ca]
  *
  *  Multi-Camera Parallel Tracking and Mapping (MCPTAM) is free software:
- *  you can redistribute it and/or modify it under the terms of the GNU 
+ *  you can redistribute it and/or modify it under the terms of the GNU
  *  General Public License as published by the Free Software Foundation,
  *  either version 3 of the License, or (at your option) any later
  *  version.
@@ -19,11 +19,11 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *  
+ *
  *  MCPTAM is based on the Parallel Tracking and Mapping (PTAM) software.
  *  Copyright 2008 Isis Innovation Limited
- *  
- *  
+ *
+ *
  ************************************************************************/
 
 
@@ -69,13 +69,13 @@ System::System()
     GUI.RegisterCommand("Reset", GUICommandCallBack, this);
     GUI.RegisterCommand("KeyPress", GUICommandCallBack, this);
     GUI.RegisterCommand("InitTracker", GUICommandCallBack, this);
-    
+
     // Debug commands for menu
     GUI.RegisterCommand("ScaleMapUp", GUICommandCallBack, this);
     GUI.RegisterCommand("ScaleMapDown", GUICommandCallBack, this);
     GUI.RegisterCommand("ExportMapToFile", GUICommandCallBack, this);
     GUI.RegisterCommand("ManualAddMKF", GUICommandCallBack, this);
-    
+
     // Add menu groupings and buttons to the GL window
     /* Menu
     Root
@@ -113,7 +113,7 @@ System::System()
 
     GUI.ParseLine("GLWindow.AddMenu Menu Menu");
     GUI.ParseLine("Menu.ShowMenu Root");
-    
+
     GUI.ParseLine("DrawMasks=0");
     GUI.ParseLine("DrawCandidates=0");
     GUI.ParseLine("DrawOnlyLevel=0");
@@ -122,13 +122,13 @@ System::System()
     GUI.ParseLine("LevelZeroPoints=1");
     GUI.ParseLine("AddingMKFs=1");
     GUI.ParseLine("CrossCamera=1");
-    
+
     bool bLevelZeroPoints;
     mNodeHandlePriv.param<bool>("level_zero_points", bLevelZeroPoints, true);
-    
+
     static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN|SILENT);
     *gvnLevelZeroPoints = bLevelZeroPoints;
-    
+
     // Main Menu
     GUI.ParseLine("Menu.AddMenuButton Root Reset Reset Root");
     GUI.ParseLine("Menu.AddMenuButton Root Init InitTracker Root");
@@ -164,16 +164,16 @@ System::System()
     GUI.ParseLine("Menu.AddMenuButton View \"Show Prev\" ShowPrevKeyFrame View");
     GUI.ParseLine("Menu.AddMenuSlider View \"Level\" DrawLevel 0 3 View");
   }
-  
+
   // Create the BundleAdjuster, MapMaker, and Tracker objects
   mpBundleAdjuster = new BundleAdjusterMulti(*mpMap, mmCameraModels, true, false);
   mpMapMaker = new MapMaker(*mpMap, mmCameraModels, *mpBundleAdjuster);
   mpTracker = new Tracker(*mpMap, *mpMapMaker, mmCameraModels, mmPoses, mmDrawOffsets, mpGLWindow);
   mpKeyFrameViewer = new KeyFrameViewer(*mpMap, *mpGLWindow, mmDrawOffsets, mpVideoSourceMulti->GetSizes());
-  ImageBWMap masksMap = LoadMasks(); 
+  ImageBWMap masksMap = LoadMasks();
   mpTracker->SetMasks(masksMap);
   mbDone = false;
- }
+}
 
 System::~System()
 {
@@ -185,27 +185,27 @@ System::~System()
 
 void System::Run()
 {
-  ImageBWMap mFramesBW; 
-  
+  ImageBWMap mFramesBW;
+
   ros::Time grabStartTime;
   ros::Time grabEndTime;
   ros::Time trackStartTime;
   bool bLastGrabSuccess = true;
-  
+
   mnGrabAttempts = 0;
   mnGrabSuccesses = 0;
-  
+
   // Loop until instructed to stop
   while(!mbDone && ros::ok())
   {
     if(mpGLWindow)
     {
        // Required before drawing
-      mpGLWindow->SetupViewport();  
+      mpGLWindow->SetupViewport();
       mpGLWindow->SetupVideoOrtho();
       mpGLWindow->SetupVideoRasterPosAndZoom();
     }
-  
+
     // Grab new video frame...
     ++mnGrabAttempts;
     if(bLastGrabSuccess)
@@ -213,42 +213,42 @@ void System::Run()
     ros::Time timestamp;
     bLastGrabSuccess = mpVideoSourceMulti->GetAndFillFrameBW(ros::WallDuration(0.2), mFramesBW, timestamp);
     grabEndTime = ros::Time::now();
-    
+
     static gvar3<std::string> gvsCurrentSubMenu("Menu.CurrentSubMenu", "", HIDDEN|SILENT);
     bool bDrawKeyFrames = *gvsCurrentSubMenu == "View";
-    
+
     if(bLastGrabSuccess)
     {
       ++mnGrabSuccesses;
-      
+
       if(mpGLWindow)
       {
         // Clear screen with black
         glClearColor(0,0,0,1);
         glClear(GL_COLOR_BUFFER_BIT);
       }
-  
+
       mqFrameGrabDurations.push_back(grabEndTime - grabStartTime);
       if(mqFrameGrabDurations.size() > MAX_STATS_QUEUE_SIZE)
         mqFrameGrabDurations.pop_front();
-        
+
       mqFrameDelayDurations.push_back(grabEndTime - timestamp);
       if(mqFrameDelayDurations.size() > MAX_STATS_QUEUE_SIZE)
         mqFrameDelayDurations.pop_front();
-      
+
       trackStartTime = ros::Time::now();
       // Perform the actual tracking, only draw if we're not drawing keyframes and mpGLWindow is set!
       mpTracker->TrackFrame(mFramesBW, timestamp, !bDrawKeyFrames && mpGLWindow);
-    
+
       // Calculate timings for the loop and tracking steps
       mqTotalDurations.push_back(ros::Time::now() - trackStartTime);
       if(mqTotalDurations.size() > MAX_STATS_QUEUE_SIZE)
         mqTotalDurations.pop_front();
-      
+
       mqLoopTimes.push(ros::Time::now());
       if(mqLoopTimes.size() > MAX_STATS_QUEUE_SIZE)
         mqLoopTimes.pop();
-        
+
       // Send out the tracker state and pose messages from the tracking result
       PublishState();
       PublishPose();
@@ -258,29 +258,29 @@ void System::Run()
     {
       // "System: didn't get new frame"
     }
-      
+
     if(bDrawKeyFrames && mpGLWindow)
     {
       // Clear screen with black
       glClearColor(0,0,0,0);
       glClear(GL_COLOR_BUFFER_BIT);
-        
+
       mpKeyFrameViewer->Draw();
     }
     else
     {
       // Show the main menu
     }
-   
+
     // Update the GUI with the caption info
     std::stringstream captionStream;
     if(bDrawKeyFrames)
       captionStream << mpKeyFrameViewer->GetMessageForUser();
     else
       captionStream << mpTracker->GetMessageForUser();
-      
+
     PublishSystemInfo(captionStream);
-      
+
     if(mpGLWindow)
     {
       mpGLWindow->DrawCaption(captionStream.str());
@@ -288,38 +288,38 @@ void System::Run()
       mpGLWindow->swap_buffers();
       mpGLWindow->HandlePendingEvents();
     }
-    
+
     // Handle any remaining commands from the GUI interface
     while(!mqCommands.empty())
     {
       GUICommandHandler(mqCommands.front().command, mqCommands.front().params);
       mqCommands.pop();
     }
-    
+
     mCallbackQueueROS.callAvailable();
   }
 }
 
-void System::GUICommandHandler(std::string command, std::string params)  
+void System::GUICommandHandler(std::string command, std::string params)
 {
   if(command=="quit" || command == "exit")
   {
     mbDone = true;
     return;
   }
-  
+
   if(command=="ShowNextKeyFrame")
   {
     mpKeyFrameViewer->Next();
     return;
   }
-  
+
   if(command=="ShowPrevKeyFrame")
   {
     mpKeyFrameViewer->Prev();
     return;
   }
-  
+
   if(command=="ScaleMapUp")
   {
     mpMapMaker->RequestRescaling(2.0);
@@ -358,7 +358,7 @@ void System::GUICommandHandler(std::string command, std::string params)
     }
     return;
   }
-  
+
   if(command=="Reset")
   {
     mpTracker->Reset(false, true);
@@ -388,16 +388,16 @@ void System::GUICommandHandler(std::string command, std::string params)
     {
       mpTracker->AddNext();
     }
-    
+
     return;
   }
-  
+
   if(command=="InitTracker")
   {
     mpTracker->RequestInit(true);
     return;
   }
-  
+
   ROS_FATAL_STREAM("System: Unhandled command in GUICommandHandler: " << command);
   ros::shutdown();
 }

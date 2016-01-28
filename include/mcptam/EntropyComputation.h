@@ -4,7 +4,7 @@
  * \brief Functions for entropy computations
  *
  * Copyright 2015   Arun Das, University of Waterloo (adas@uwaterloo.ca)
- * 
+ *
  *
  ****************************************************************************************/
 
@@ -19,7 +19,7 @@
 #include <mcptam/Map.h>
 #include <mcptam/Utility.h>
 #include <mcptam/TrackerState.h>
-#include <mcptam/Tracker.h> 
+#include <mcptam/Tracker.h>
 
 #ifndef __ENTROPY_COMPUTATION_H
 #define __ENTROPY_COMPUTATION_H
@@ -33,12 +33,10 @@ inline double compute_point_entropy_scalar(double point_covariance)
 		return -1.0;
 }
 
-
 /// evaluates a map point and computes the expected entropy reduction based on the current keyframe observation in the tracker.
-  double EvaluatePoint(Tracker* tracker, MapPoint& point, KeyFrame& tracker_kf,double priorPointCovariance, int level, double& prevEntropy);
-  
-  /// evaluates the tracker covariance and returns the entropy for the x y and z directions in a vector
-  TooN::Vector<3> EvaluateTracker(Tracker* tracker);
- 
+double EvaluatePoint(Tracker* tracker, MapPoint& point, KeyFrame& tracker_kf,double priorPointCovariance, int level, double& prevEntropy);
 
- #endif
+/// evaluates the tracker covariance and returns the entropy for the x y and z directions in a vector
+TooN::Vector<3> EvaluateTracker(Tracker* tracker);
+
+#endif
