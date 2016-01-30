@@ -38,8 +38,8 @@
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/SetCameraInfo.h>
 #include <std_msgs/Empty.h>
-
-using namespace TooN;
+#include <vector>
+#include <string>
 
 VideoSourceMulti::VideoSourceMulti(bool bGetPoseSeparately) : mWork(mIOService), mNodeHandlePriv("~")
 {
@@ -69,8 +69,8 @@ VideoSourceMulti::VideoSourceMulti(bool bGetPoseSeparately) : mWork(mIOService),
     for (unsigned j = 0; j < vCamGroupStrings[i].size(); ++j)
       ROS_INFO_STREAM("VideoSourceMulti: Creating camera group from " << vCamGroupStrings[i][j]);
 
-    mvpCamGroups.push_back(new CameraGroupSubscriber(
-                             vCamGroupStrings[i], bGetPoseSeparately));  // new subscriber group (with pose subscription)
+    // new subscriber group (with pose subscription)
+    mvpCamGroups.push_back(new CameraGroupSubscriber(vCamGroupStrings[i], bGetPoseSeparately));
     mvCamNames.insert(mvCamNames.end(), vCamGroupStrings[i].begin(), vCamGroupStrings[i].end());
   }
 
@@ -179,7 +179,7 @@ void VideoSourceMulti::RecordInfo(sensor_msgs::CameraInfo infoMsg, std::string c
   double a3 = infoMsg.D[2];
   double a4 = infoMsg.D[3];
 
-  mmParams[cameraName] = makeVector(a0, a2, a3, a4, xc, yc, c, d, e);
+  mmParams[cameraName] = TooN::makeVector(a0, a2, a3, a4, xc, yc, c, d, e);
   mmBinnings[cameraName] = CVD::ImageRef(infoMsg.binning_x, infoMsg.binning_y);
   mmCalibSizes[cameraName] = CVD::ImageRef(infoMsg.width, infoMsg.height);
 
@@ -197,13 +197,13 @@ void VideoSourceMulti::RecordInfo(sensor_msgs::CameraInfo infoMsg, std::string c
 
     // Check the rotation matrix to see if it is a proper rotation
     TooN::Matrix<3> m3Result = m3Rot * m3Rot.T();  // this should be close to identity
-    TooN::Vector<3> v3Ones = makeVector(1, 1, 1);
+    TooN::Vector<3> v3Ones = TooN::makeVector(1, 1, 1);
     TooN::Vector<3> v3Diff = v3Ones - m3Result * v3Ones;  // should be close to zero
 
     if (v3Diff * v3Diff > 1e-4)
     {
-      m3Rot = Identity;
-      v3Trans = Zeros;
+      m3Rot = TooN::Identity;
+      v3Trans = TooN::Zeros;
       ROS_WARN_STREAM("VideoSourceMulti: The rotation matrix inside the CameraInfo message of " << cameraName
                       << " is invalid!");
       ROS_WARN_STREAM("VideoSourceMulti: Perhaps you meant to get the camera pose separately but forgot to set the "

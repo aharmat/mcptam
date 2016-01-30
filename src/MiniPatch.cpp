@@ -28,6 +28,9 @@
 
 // Copyright 2008 Isis Innovation Limited
 #include <mcptam/MiniPatch.h>
+#include <algorithm>
+#include <vector>
+
 
 // Scoring function
 inline int MiniPatch::SSDAtPoint(CVD::BasicImage<CVD::byte> &im, const CVD::ImageRef &ir)
@@ -79,8 +82,8 @@ bool MiniPatch::FindPatch(CVD::ImageRef &irPos, CVD::BasicImage<CVD::byte> &im, 
     if (nTopRow < 0)
       nTopRow = 0;
 
-    if (nTopRow >= (int)pvRowLUT->size())
-      nTopRow = (int)pvRowLUT->size() - 1;
+    if (nTopRow >= static_cast<int>(pvRowLUT->size()))
+      nTopRow = static_cast<int>(pvRowLUT->size()) - 1;
 
     i = vCorners.begin() + (*pvRowLUT)[nTopRow];
   }

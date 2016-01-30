@@ -54,8 +54,12 @@
 #include <cvd/vector_image_ref.h>
 #include <cvd/draw.h>
 #include <cvd/morphology.h>
-
-using namespace TooN;
+#include <string>
+#include <algorithm>
+#include <tuple>
+#include <utility>
+#include <vector>
+#include <limits>
 
 // ----------------------------------------------- KeyFrame ------------------------------------------------------
 
@@ -541,7 +545,6 @@ void KeyFrame::MakeKeyFrame_Rest()
 
     ROS_DEBUG_STREAM("MakeKeyFrame_Rest: after imageprev stuff, level "
                      << l << " num candidates: " << lev.vCandidates.size());
-
   }  // end loop over levels
 
   // Also, make a SmallBlurryImage of the keyframe: The relocaliser uses these.
@@ -570,13 +573,13 @@ void KeyFrame::GetPointDepthsAndWeights(std::vector<std::pair<double, double>>& 
     if (point.mbBad)
       continue;
 
-    Vector<3> v3CamPos = mse3CamFromWorld * point.mv3WorldPos;
+    TooN::Vector<3> v3CamPos = mse3CamFromWorld * point.mv3WorldPos;
 
     ROS_ASSERT(point.mnMEstimatorInlierCount > 0);  // should be set to 1 when point is created
 
     // The weight is simply the ratio of inlier to all observations
-    double weight =
-      point.mnMEstimatorInlierCount / (double)(point.mnMEstimatorInlierCount + point.mnMEstimatorOutlierCount);
+    double weight = point.mnMEstimatorInlierCount / static_cast<double>((point.mnMEstimatorInlierCount
+                        + point.mnMEstimatorOutlierCount));
     vDepthsAndWeights.push_back(std::make_pair(norm(v3CamPos), weight));
   }
 }
@@ -707,9 +710,9 @@ void KeyFrame::RefreshSceneDepthMean(std::vector<std::pair<double, double>>& vDe
 // Euclidean distance to the other keyframe
 double KeyFrame::LinearDist(KeyFrame& other)
 {
-  Vector<3> v3KF1_CamPos = mse3CamFromWorld.inverse().get_translation();
-  Vector<3> v3KF2_CamPos = other.mse3CamFromWorld.inverse().get_translation();
-  Vector<3> v3Diff = v3KF2_CamPos - v3KF1_CamPos;
+  TooN::Vector<3> v3KF1_CamPos = mse3CamFromWorld.inverse().get_translation();
+  TooN::Vector<3> v3KF2_CamPos = other.mse3CamFromWorld.inverse().get_translation();
+  TooN::Vector<3> v3Diff = v3KF2_CamPos - v3KF1_CamPos;
   double dist = sqrt(v3Diff * v3Diff);
   return dist;
 }
@@ -725,22 +728,22 @@ double KeyFrame::LinearDist(KeyFrame& other)
 // keyframes share compared to the total they observe, or something similar.
 double KeyFrame::Distance(KeyFrame& other)
 {
-  SE3<> se3KF1_inv = mse3CamFromWorld.inverse();
-  SE3<> se3KF2_inv = other.mse3CamFromWorld.inverse();
+  TooN::SE3<> se3KF1_inv = mse3CamFromWorld.inverse();
+  TooN::SE3<> se3KF2_inv = other.mse3CamFromWorld.inverse();
 
-  Vector<3> v3KF1_CamPos = se3KF1_inv.get_translation();
-  Vector<3> v3KF2_CamPos = se3KF2_inv.get_translation();
-  Vector<3> v3Diff = v3KF2_CamPos - v3KF1_CamPos;  // Vector between keyframe bases
+  TooN::Vector<3> v3KF1_CamPos = se3KF1_inv.get_translation();
+  TooN::Vector<3> v3KF2_CamPos = se3KF2_inv.get_translation();
+  TooN::Vector<3> v3Diff = v3KF2_CamPos - v3KF1_CamPos;  // Vector between keyframe bases
 
-  Vector<3> v3KF1_MeanInCam = Zeros;
+  TooN::Vector<3> v3KF1_MeanInCam = TooN::Zeros;
   v3KF1_MeanInCam[2] = mdSceneDepthMean;  // mean scene depth point in camera frame
-  Vector<3> v3KF2_MeanInCam = Zeros;
+  TooN::Vector<3> v3KF2_MeanInCam = TooN::Zeros;
   v3KF2_MeanInCam[2] = other.mdSceneDepthMean;  // mean scene depth point in camera frame
 
   // Convert mean depth points to world frame
-  Vector<3> v3KF1_MeanInWorld = se3KF1_inv * v3KF1_MeanInCam;
-  Vector<3> v3KF2_MeanInWorld = se3KF2_inv * v3KF2_MeanInCam;
-  Vector<3> v3MeanDiff = v3KF2_MeanInWorld - v3KF1_MeanInWorld;  // Vector between mean depth points
+  TooN::Vector<3> v3KF1_MeanInWorld = se3KF1_inv * v3KF1_MeanInCam;
+  TooN::Vector<3> v3KF2_MeanInWorld = se3KF2_inv * v3KF2_MeanInCam;
+  TooN::Vector<3> v3MeanDiff = v3KF2_MeanInWorld - v3KF1_MeanInWorld;  // Vector between mean depth points
 
   // The final distance is a weighted combination of these two Euclidean distances
   double dDist = sqrt(v3Diff * v3Diff) + sqrt(v3MeanDiff * v3MeanDiff) * KeyFrame::sdDistanceMeanDiffFraction;
@@ -905,9 +908,9 @@ void MultiKeyFrame::RefreshSceneDepthMean()
 // Calculates the Euclidean linear distance between the current MultiKeyFrame and the argument
 double MultiKeyFrame::LinearDist(MultiKeyFrame& other)
 {
-  Vector<3> v3KF1_BasePos = mse3BaseFromWorld.inverse().get_translation();
-  Vector<3> v3KF2_BasePos = other.mse3BaseFromWorld.inverse().get_translation();
-  Vector<3> v3Diff = v3KF1_BasePos - v3KF2_BasePos;
+  TooN::Vector<3> v3KF1_BasePos = mse3BaseFromWorld.inverse().get_translation();
+  TooN::Vector<3> v3KF2_BasePos = other.mse3BaseFromWorld.inverse().get_translation();
+  TooN::Vector<3> v3Diff = v3KF1_BasePos - v3KF2_BasePos;
   double dist = sqrt(v3Diff * v3Diff);
   return dist;
 }
@@ -941,7 +944,7 @@ double MultiKeyFrame::Distance(MultiKeyFrame& other)
 
 // ------------------------------------------- Other stuff -------------------------------------------------------------
 // Some useful globals defined in LevelHelpers.h live here:
-Vector<3> gavLevelColors[LEVELS];
+TooN::Vector<3> gavLevelColors[LEVELS];
 
 // These globals are filled in here. A single static instance of this struct is run before main()
 struct LevelHelpersFiller  // Code which should be initialised on init goes here; this runs before main()
@@ -951,15 +954,15 @@ struct LevelHelpersFiller  // Code which should be initialised on init goes here
     for (int i = 0; i < LEVELS; i++)
     {
       if (i == 0)
-        gavLevelColors[i] = makeVector(1.0, 0.0, 0.0);
+        gavLevelColors[i] = TooN::makeVector(1.0, 0.0, 0.0);
       else if (i == 1)
-        gavLevelColors[i] = makeVector(1.0, 1.0, 0.0);
+        gavLevelColors[i] = TooN::makeVector(1.0, 1.0, 0.0);
       else if (i == 2)
-        gavLevelColors[i] = makeVector(0.0, 1.0, 0.0);
+        gavLevelColors[i] = TooN::makeVector(0.0, 1.0, 0.0);
       else if (i == 3)
-        gavLevelColors[i] = makeVector(0.0, 0.0, 1.0);
+        gavLevelColors[i] = TooN::makeVector(0.0, 0.0, 1.0);
       else
-        gavLevelColors[i] = makeVector(1.0, 1.0, 0.7);  // In case I ever run with LEVELS > 4
+        gavLevelColors[i] = TooN::makeVector(1.0, 1.0, 0.7);  // In case I ever run with LEVELS > 4
     }
   }
 };

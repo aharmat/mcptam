@@ -38,6 +38,10 @@
 #include <mcptam/MapPoint.h>
 #include <mcptam/Utility.h>
 #include <boost/thread/thread.hpp>
+#include <utility>
+#include <string>
+#include <vector>
+#include <set>
 
 void printNetworkOutlier(mcptam::NetworkOutlier& outlier_msg, KeyFrame* pKF, MapPoint* pPoint, int nSeq,
                          std::string action = "")
@@ -50,25 +54,25 @@ void printNetworkMeasurement(mcptam::NetworkMeasurement& meas_msg, std::string c
                              int nSeq)
 {
   std::cerr << "(" << nSeq << ") " << mkfParentId << "::" << cameraName << " <==> " << meas_msg.mapPointId
-            << " level: " << (int)meas_msg.nLevel;
+            << " level: " << static_cast<int>(meas_msg.nLevel);
   std::cerr << " v2RootPos: [" << meas_msg.v2RootPos[0] << ", " << meas_msg.v2RootPos[1]
-            << "] source: " << (int)meas_msg.eSource << std::endl;
+            << "] source: " << static_cast<int>(meas_msg.eSource) << std::endl;
 }
 
 void printNetworkMeasurement(mcptam::NetworkMeasurement& meas_msg, KeyFrame* pKF, MapPoint* pPoint, int nSeq)
 {
-  std::cerr << "(" << nSeq << ") " << pKF << " <==> " << pPoint << " level: " << (int)meas_msg.nLevel;
+  std::cerr << "(" << nSeq << ") " << pKF << " <==> " << pPoint << " level: " << static_cast<int>(meas_msg.nLevel);
   std::cerr << " v2RootPos: [" << meas_msg.v2RootPos[0] << ", " << meas_msg.v2RootPos[1]
-            << "] source: " << (int)meas_msg.eSource << std::endl;
+            << "] source: " << static_cast<int>(meas_msg.eSource) << std::endl;
 }
 
 void printNetworkMeasurement(mcptam::NetworkMeasurement& meas_msg, std::string mkfParentId, KeyFrame* pKF,
                              MapPoint* pPoint, int nSeq)
 {
   std::cerr << "(" << nSeq << ") " << mkfParentId << "::" << pKF->mCamName << " [" << pKF << "] <==> "
-            << meas_msg.mapPointId << " [" << pPoint << "] level: " << (int)meas_msg.nLevel;
+            << meas_msg.mapPointId << " [" << pPoint << "] level: " << static_cast<int>(meas_msg.nLevel);
   std::cerr << " v2RootPos: [" << meas_msg.v2RootPos[0] << ", " << meas_msg.v2RootPos[1]
-            << "] source: " << (int)meas_msg.eSource << std::endl;
+            << "] source: " << static_cast<int>(meas_msg.eSource) << std::endl;
 }
 
 void printNetworkMapPoint(mcptam::NetworkMapPoint& point_msg, MapPoint* pPoint, int nSeq, std::string action = "")

@@ -43,9 +43,9 @@
 #include <mcptam/Tracker.h>
 #include <mcptam/Types.h>
 #include <gvars3/instances.h>
+#include <string>
 
-using namespace GVars3;
-using namespace TooN;
+using GVars3::GUI;
 
 SystemClient::SystemClient() : SystemFrontendBase("mcptam_client", false)
 {
@@ -61,7 +61,7 @@ SystemClient::SystemClient() : SystemFrontendBase("mcptam_client", false)
 
     // Add menu groupings and buttons to the GL window
     /* Menu
-    Root
+    RootGUI
       |
       +-> Reset
       +-> Init

@@ -33,8 +33,9 @@
 #include <mcptam/Map.h>
 #include <mcptam/KeyFrame.h>
 #include <cvd/utility.h>
-
-using namespace TooN;
+#include <string>
+#include <limits>
+#include <utility>
 
 // Static member
 double Relocaliser::sdRecoveryMaxScore = 1e5;  // 9e6;
@@ -48,10 +49,9 @@ Relocaliser::Relocaliser(Map &map, TaylorCameraMap cameras)
   : mMap(map)
   , mmCameraModels(cameras)
 {
-
 };
 
-SE3<> Relocaliser::BestPose()
+TooN::SE3<> Relocaliser::BestPose()
 {
   return mse3Best;
 }
@@ -71,11 +71,11 @@ bool Relocaliser::AttemptRecovery(KeyFrame &kfCurrent)
     return false;
 
   // And estimate a camera rotation from a 3DOF image alignment
-  std::pair<SE2<>, double> result_pair = kfCurrent.mpSBI->IteratePosRelToTarget(*(mpBestKF->mpSBI), 6);
+  std::pair<TooN::SE2<>, double> result_pair = kfCurrent.mpSBI->IteratePosRelToTarget(*(mpBestKF->mpSBI), 6);
   mse2 = result_pair.first;
   double dScore = result_pair.second;
 
-  SE3<> se3KeyFramePos = mpBestKF->mse3CamFromWorld;
+  TooN::SE3<> se3KeyFramePos = mpBestKF->mse3CamFromWorld;
 
   mse3Best =
     SmallBlurryImage::SE3fromSE2(mse2, mmCameraModels[kfCurrent.mCamName], mmCameraModels[mpBestKF->mCamName]) *

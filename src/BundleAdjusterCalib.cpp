@@ -42,8 +42,12 @@
 #include <mcptam/Map.h>
 #include <mcptam/MapPoint.h>
 #include <mcptam/KeyFrame.h>
-
-using namespace TooN;
+#include <string>
+#include <tuple>
+#include <map>
+#include <utility>
+#include <vector>
+#include <set>
 
 BundleAdjusterCalib::BundleAdjusterCalib(Map& map, TaylorCameraMap& cameras, bool bApplyUpdates)
   : BundleAdjusterBase(map, cameras), mbApplyUpdates(bApplyUpdates)
@@ -104,7 +108,7 @@ int BundleAdjusterCalib::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std:
   mmCamName_BundleID.clear();
   mmBundleID_CamName.clear();
 
-  if ((int)spMapPoints.size() < BundleAdjusterBase::snMinMapPoints)
+  if (static_cast<int>(spMapPoints.size()) < BundleAdjusterBase::snMinMapPoints)
   {
     ROS_INFO_STREAM("BundleAdjusterCalib: Not enough good map points, got " << spMapPoints.size() << ", need "
                     << BundleAdjusterBase::snMinMapPoints);
@@ -123,7 +127,7 @@ int BundleAdjusterCalib::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std:
   for (SE3Map::iterator se3_it = ++mRelativePoses.begin(); se3_it != mRelativePoses.end(); ++se3_it)
   {
     std::string camName = se3_it->first;
-    SE3<>& se3Pose = se3_it->second;
+    TooN::SE3<>& se3Pose = se3_it->second;
 
     ROS_DEBUG_STREAM("From ExtractRelativePoses, " << camName << std::endl
                      << se3Pose);
@@ -243,7 +247,7 @@ int BundleAdjusterCalib::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std:
       mkf.mse3BaseFromWorld = calibBundle.GetPose(mkf_it->second);
 
       KeyFrame& firstKeyFrame = *(mkf.mmpKeyFrames.begin()->second);
-      firstKeyFrame.mse3CamFromBase = SE3<>();
+      firstKeyFrame.mse3CamFromBase = TooN::SE3<>();
       firstKeyFrame.mse3CamFromWorld = mkf.mse3BaseFromWorld;
 
       // Start at next keyframe

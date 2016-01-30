@@ -39,9 +39,7 @@
 #include <sensor_msgs/SetCameraInfo.h>
 #include <TooN/TooN.h>
 #include <TooN/se3.h>
-
-using namespace TooN;
-
+#include <string>
 VideoSourceSingle::VideoSourceSingle(bool bGetPoseSeparately)
   : mCVPtr(new cv_bridge::CvImage), mNodeHandlePriv("~"), mbGetPoseSeparately(bGetPoseSeparately)
 {
@@ -148,7 +146,7 @@ void VideoSourceSingle::InfoCallback(const sensor_msgs::CameraInfo::ConstPtr& in
                     "values.");
 
     // The calibration is not a valid one, use the default set of parameters
-    TooN::Vector<9> v9Params = Zeros;
+    TooN::Vector<9> v9Params = TooN::Zeros;
     SaveParams(v9Params);
   }
   else
@@ -188,7 +186,7 @@ void VideoSourceSingle::InfoCallback(const sensor_msgs::CameraInfo::ConstPtr& in
     double a3 = infoMsg->D[2];
     double a4 = infoMsg->D[3];
 
-    mv9Params = makeVector(a0, a2, a3, a4, xc, yc, c, d, e);
+    mv9Params = TooN::makeVector(a0, a2, a3, a4, xc, yc, c, d, e);
 
     if (!mbGetPoseSeparately)
     {
@@ -205,7 +203,7 @@ void VideoSourceSingle::InfoCallback(const sensor_msgs::CameraInfo::ConstPtr& in
 
       // Check the rotation matrix to see if it is a proper rotation
       TooN::Matrix<3> m3Result = m3Rot * m3Rot.T();         // this should be close to identity
-      TooN::Vector<3> v3Ones = Ones;                        // makeVector(1,1,1);
+      TooN::Vector<3> v3Ones = TooN::Ones;
       TooN::Vector<3> v3Diff = v3Ones - m3Result * v3Ones;  // should be close to zero
 
       if (v3Diff * v3Diff > 1e-4)
@@ -218,7 +216,7 @@ void VideoSourceSingle::InfoCallback(const sensor_msgs::CameraInfo::ConstPtr& in
                         "messed up.");
 
         m3Rot = TooN::Identity;
-        v3Trans = Zeros;
+        v3Trans = TooN::Zeros;
         ROS_WARN_STREAM("VideoSourceSingle: Invalid rotation matrix. Defaulting to IDENTITY transformation.");
       }
 

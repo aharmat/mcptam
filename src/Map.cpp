@@ -39,6 +39,7 @@
 #include <mcptam/Map.h>
 #include <mcptam/MapPoint.h>
 #include <mcptam/KeyFrame.h>
+#include <set>
 
 Map::Map()
 {

@@ -42,6 +42,13 @@
 #include <mcptam/Map.h>
 #include <mcptam/MapPoint.h>
 #include <mcptam/KeyFrame.h>
+#include <string>
+#include <tuple>
+#include <map>
+#include <utility>
+#include <vector>
+#include <set>
+
 
 BundleAdjusterSingle::BundleAdjusterSingle(Map& map, TaylorCameraMap& cameras, bool bApplyUpdates)
   : BundleAdjusterBase(map, cameras), mbApplyUpdates(bApplyUpdates)
@@ -61,7 +68,7 @@ int BundleAdjusterSingle::BundleAdjust(std::set<MultiKeyFrame*> spAdjustSet, std
   mmKF_BundleID.clear();
   mmBundleID_KF.clear();
 
-  if ((int)spMapPoints.size() < BundleAdjusterBase::snMinMapPoints)
+  if (static_cast<int>(spMapPoints.size()) < BundleAdjusterBase::snMinMapPoints)
   {
     ROS_INFO_STREAM("BundleAdjusterSingle: Not enough good map points, got " << spMapPoints.size() << ", need "
                     << BundleAdjusterBase::snMinMapPoints);

@@ -60,6 +60,11 @@
 #include <TooN/wls.h>
 #include <TooN/SVD.h>
 
+#include <utility>
+#include <limits>
+#include <string>
+#include <vector>
+
 TrackerCalib::TrackerCalib(Map& map, MapMakerClientBase& mapMaker, TaylorCameraMap cameras, std::string cameraName,
                            CVD::ImageRef irOffset, CVD::ImageRef irPatternSize, double dSquareSize, GLWindow2* pWindow)
 // Tracker wants pose and draw offset maps, but we only have one camera so those don't really make sense. Generate

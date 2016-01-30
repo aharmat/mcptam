@@ -47,9 +47,16 @@
 #include <TooN/SVD.h>
 #include <TooN/SymEigen.h>
 #include <gvars3/instances.h>
+#include <string>
+#include <algorithm>
+#include <tuple>
+#include <utility>
+#include <list>
+#include <vector>
+#include <set>
+#include <limits>
 
-using namespace TooN;
-using namespace GVars3;
+
 
 // Static members
 int MapMakerServerBase::snMinMapPoints = 20;
@@ -119,15 +126,16 @@ void MapMakerServerBase::Reset()
 }
 
 // Finds the 3D position of a point (in reference frame B) given the inputs
-Vector<3> MapMakerServerBase::ReprojectPoint(SE3<> se3AfromB, const Vector<3>& v3A, const Vector<3>& v3B)
+TooN::Vector<3> MapMakerServerBase::ReprojectPoint(TooN::SE3<> se3AfromB, const TooN::Vector<3>& v3A,
+                                                     const TooN::Vector<3>& v3B)
 {
   // Algorithm from Hartley & Zisserman's Multiple View Geometry book section 12.2
 
-  Matrix<3, 4> PDash;
+  TooN::Matrix<3, 4> PDash;
   PDash.slice<0, 0, 3, 3>() = se3AfromB.get_rotation().get_matrix();
   PDash.slice<0, 3, 3, 1>() = se3AfromB.get_translation().as_col();
 
-  Matrix<4> A;
+  TooN::Matrix<4> A;
   A[0][0] = -v3B[2];
   A[0][1] = 0.0;
   A[0][2] = v3B[0];
@@ -139,8 +147,8 @@ Vector<3> MapMakerServerBase::ReprojectPoint(SE3<> se3AfromB, const Vector<3>& v
   A[2] = v3A[0] * PDash[2] - v3A[2] * PDash[0];
   A[3] = v3A[1] * PDash[2] - v3A[2] * PDash[1];
 
-  SVD<4, 4> svd(A);
-  Vector<4> v4Smallest = svd.get_VT()[3];
+  TooN::SVD<4, 4> svd(A);
+  TooN::Vector<4> v4Smallest = svd.get_VT()[3];
   if (v4Smallest[3] == 0.0)
     v4Smallest[3] = 0.00001;
 
@@ -153,7 +161,7 @@ bool MapMakerServerBase::InitFromMultiKeyFrame(MultiKeyFrame* pMKF, bool bPutPla
   ROS_INFO("MapMakerServerBase::InitFromMultiKeyFrame");
 
   pMKF->mbFixed = true;
-  pMKF->mse3BaseFromWorld = SE3<>();
+  pMKF->mse3BaseFromWorld = TooN::SE3<>();
 
   for (KeyFramePtrMap::iterator it = pMKF->mmpKeyFrames.begin(); it != pMKF->mmpKeyFrames.end(); it++)
   {
@@ -173,7 +181,7 @@ bool MapMakerServerBase::InitFromMultiKeyFrame(MultiKeyFrame* pMKF, bool bPutPla
   int nLevelLimit;
   int nLevelPoints;
   int nLevelPointsLeft;
-  static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN | SILENT);
+  static GVars3::gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, GVars3::HIDDEN | GVars3::SILENT);
 
   ROS_INFO_STREAM("==== STARTING INIT POINT CREATION, MODE: " << MapMakerServerBase::ssInitPointMode << "  =========");
 
@@ -208,7 +216,7 @@ bool MapMakerServerBase::InitFromMultiKeyFrame(MultiKeyFrame* pMKF, bool bPutPla
     ROS_INFO_STREAM("Made " << mMap.mlpPoints.size() - nNumPointsBefore << " points with Init Depth");
   }
 
-  if ((int)mMap.mlpPoints.size() < MapMakerServerBase::snMinMapPoints)
+  if (static_cast<int>(mMap.mlpPoints.size()) < MapMakerServerBase::snMinMapPoints)
   {
     ROS_ERROR_STREAM("MapMakerServerBase: Epipolar matching and init depth method didn't make enough map points: "
                      << mMap.mlpPoints.size() << "  Minimum is: " << MapMakerServerBase::snMinMapPoints);
@@ -378,7 +386,7 @@ bool MapMakerServerBase::AddMultiKeyFrameAndCreatePoints(MultiKeyFrame* pMKF)
   AddStereoMapPoints(*pMKF, 2, std::numeric_limits<int>::max(), -1.0, KF_ONLY_OTHER);
   nLargePointsAdded = mMap.mlpPoints.size() - nStartMapSize;
 
-  static gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, HIDDEN | SILENT);
+  static GVars3::gvar3<int> gvnLevelZeroPoints("LevelZeroPoints", 0, GVars3::HIDDEN | GVars3::SILENT);
 
   if (!MapMakerServerBase::sbLargePointTest || nLargePointsAdded > 0)  // ok, new MKF good
   {
@@ -521,10 +529,10 @@ void MapMakerServerBase::AddInitDepthMapPoints(MultiKeyFrame& mkfSrc, int nLevel
 
     std::cout << "AddInitDepthMapPoints, processing " << level.vCandidates.size() << " candidates" << std::endl;
 
-    for (unsigned int i = 0; i < level.vCandidates.size() && (int)i < nLimit; ++i)
+    for (unsigned int i = 0; i < level.vCandidates.size() && static_cast<int>(i) < nLimit; ++i)
     {
-      Vector<2> v2RootPos = LevelZeroPos(level.vCandidates[i].irLevelPos, nLevel);
-      Vector<3> v3UnProj = cameraSrc.UnProject(v2RootPos) *
+      TooN::Vector<2> v2RootPos = LevelZeroPos(level.vCandidates[i].irLevelPos, nLevel);
+      TooN::Vector<3> v3UnProj = cameraSrc.UnProject(v2RootPos) *
                            dInitDepth;  // This unprojects the noisy image location to a depth of dInitDepth
 
       MapPoint* pPointNew = new MapPoint;
@@ -532,7 +540,7 @@ void MapMakerServerBase::AddInitDepthMapPoints(MultiKeyFrame& mkfSrc, int nLevel
       pPointNew->mpPatchSourceKF = &kfSrc;
       pPointNew->mbFixed = false;
       pPointNew->mnSourceLevel = nLevel;
-      pPointNew->mv3Normal_NC = makeVector(0, 0, -1);
+      pPointNew->mv3Normal_NC = TooN::makeVector(0, 0, -1);
       pPointNew->mirCenter = level.vCandidates[i].irLevelPos;
       pPointNew->mv3Center_NC = cameraSrc.UnProject(v2RootPos);
       pPointNew->mv3OneRightFromCenter_NC = cameraSrc.UnProject(v2RootPos + vec(CVD::ImageRef(nLevelScale, 0)));
@@ -587,7 +595,7 @@ void MapMakerServerBase::ApplyGlobalScaleToMap(double dScale)
 }
 
 // Rotates/translates the whole map and all keyFrames
-void MapMakerServerBase::ApplyGlobalTransformationToMap(SE3<> se3NewFromOld)
+void MapMakerServerBase::ApplyGlobalTransformationToMap(TooN::SE3<> se3NewFromOld)
 {
   for (MultiKeyFramePtrList::iterator it = mMap.mlpMultiKeyFrames.begin(); it != mMap.mlpMultiKeyFrames.end(); ++it)
   {
@@ -609,7 +617,7 @@ void MapMakerServerBase::ApplyGlobalTransformationToMap(SE3<> se3NewFromOld)
 }
 
 // Used for comparing scoring tuples in AddPointEpipolar
-bool compScores(const std::tuple<int, int, Vector<2>>& one, const std::tuple<int, int, Vector<2>>& two)
+bool compScores(const std::tuple<int, int, TooN::Vector<2>>& one, const std::tuple<int, int, TooN::Vector<2>>& two)
 {
   return std::get<0>(one) < std::get<0>(two);
 }
@@ -620,7 +628,7 @@ bool compScores(const std::tuple<int, int, Vector<2>>& one, const std::tuple<int
 bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, int nLevel, int nCandidate)
 {
   // debug
-  static gvar3<int> gvnCrossCamera("CrossCamera", 1, HIDDEN | SILENT);
+  static GVars3::gvar3<int> gvnCrossCamera("CrossCamera", 1, GVars3::HIDDEN | GVars3::SILENT);
   if (!*gvnCrossCamera && kfSrc.mCamName != kfTarget.mCamName)
     return false;
 
@@ -630,17 +638,17 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
   int nLevelScale = LevelScale(nLevel);
   Candidate& candidate = kfSrc.maLevels[nLevel].vCandidates[nCandidate];
   CVD::ImageRef irLevelPos = candidate.irLevelPos;
-  Vector<2> v2RootPos = LevelZeroPos(irLevelPos, nLevel);  // The pixel coords of the candidate at level zero
+  TooN::Vector<2> v2RootPos = LevelZeroPos(irLevelPos, nLevel);  // The pixel coords of the candidate at level zero
 
-  Vector<3> v3Ray_SC =
+  TooN::Vector<3> v3Ray_SC =
     cameraSrc.UnProject(v2RootPos);  // The pixel coords unprojected into a 3d half-line in the source kf frame
-  Vector<3> v3LineDirn_TC =
+  TooN::Vector<3> v3LineDirn_TC =
     kfTarget.mse3CamFromWorld.get_rotation() * (kfSrc.mse3CamFromWorld.get_rotation().inverse() *
         v3Ray_SC);  // The direction of that line in the target kf frame
-  Vector<3> v3CamCenter_TC =
+  TooN::Vector<3> v3CamCenter_TC =
     kfTarget.mse3CamFromWorld *
     kfSrc.mse3CamFromWorld.inverse().get_translation();  // The position of the source kf in the target kf frame
-  Vector<3> v3CamCenter_SC =
+  TooN::Vector<3> v3CamCenter_SC =
     kfSrc.mse3CamFromWorld *
     kfTarget.mse3CamFromWorld.inverse().get_translation();  // The position of the target kf in the source kf frame
 
@@ -677,17 +685,17 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
 
   ROS_DEBUG_STREAM("dStartDepth: " << dStartDepth << " dEndDepth: " << dEndDepth);
 
-  Vector<3> v3RayStart_TC =
+  TooN::Vector<3> v3RayStart_TC =
     v3CamCenter_TC + dStartDepth * v3LineDirn_TC;  // The start of the epipolar line segment in the target kf frame
-  Vector<3> v3RayEnd_TC =
+  TooN::Vector<3> v3RayEnd_TC =
     v3CamCenter_TC + dEndDepth * v3LineDirn_TC;  // The end of the epipolar line segment in the target kf frame
 
   // Project epipolar line segment start and end points onto unit sphere and check for minimum distance between them
-  Vector<3> v3A = v3RayStart_TC;
+  TooN::Vector<3> v3A = v3RayStart_TC;
   normalize(v3A);
-  Vector<3> v3B = v3RayEnd_TC;
+  TooN::Vector<3> v3B = v3RayEnd_TC;
   normalize(v3B);
-  Vector<3> v3BetweenEndpoints = v3A - v3B;
+  TooN::Vector<3> v3BetweenEndpoints = v3A - v3B;
 
   if (v3BetweenEndpoints * v3BetweenEndpoints < 0.00000001)
   {
@@ -705,21 +713,21 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
   // epipolar plane too).
 
   // Find the normal of the epipolar plane
-  Vector<3> v3PlaneNormal = v3A ^ v3B;
+  TooN::Vector<3> v3PlaneNormal = v3A ^ v3B;
   normalize(v3PlaneNormal);
-  Vector<3> v3PlaneI =
+  TooN::Vector<3> v3PlaneI =
     v3A;  // Lets call the vector we got from the start of the epipolar line segment the new coordinate frame's x axis
-  Vector<3> v3PlaneJ = v3PlaneNormal ^ v3PlaneI;  // Get the y axis
+  TooN::Vector<3> v3PlaneJ = v3PlaneNormal ^ v3PlaneI;  // Get the y axis
 
   // This will convert a 3D point to the epipolar plane's coordinate frame
-  Matrix<3> m3ToPlaneCoords;
+  TooN::Matrix<3> m3ToPlaneCoords;
   m3ToPlaneCoords[0] = v3PlaneI;
   m3ToPlaneCoords[1] = v3PlaneJ;
   m3ToPlaneCoords[2] = v3PlaneNormal;
 
-  Vector<2> v2PlaneB = (m3ToPlaneCoords * v3B).slice<0, 2>();  // The vector we got from the end of the epipolar line
-  // segment, in epipolar plane coordinates
-  Vector<2> v2PlaneI = makeVector(1, 0);
+  TooN::Vector<2> v2PlaneB = (m3ToPlaneCoords * v3B).slice<0, 2>();  // The vector we got from the end of the epipolar
+  // line segment, in epipolar plane coordinates
+  TooN::Vector<2> v2PlaneI = TooN::makeVector(1, 0);
 
   double dMaxAngleAlongCircle =
     acos(v2PlaneB * v2PlaneI);  // The angle between point B (now a 2D point in the plane) and the x axis
@@ -729,24 +737,25 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
   int nSteps = ceil(dMaxAngleAlongCircle / dAngleStep);
   dAngleStep = dMaxAngleAlongCircle / nSteps;
 
-  Vector<2> v2RayStartInPlane = (m3ToPlaneCoords * v3RayStart_TC).slice<0, 2>();
-  Vector<2> v2RayEndInPlane = (m3ToPlaneCoords * v3RayEnd_TC).slice<0, 2>();
-  Vector<2> v2RayDirInPlane = v2RayEndInPlane - v2RayStartInPlane;
+  TooN::Vector<2> v2RayStartInPlane = (m3ToPlaneCoords * v3RayStart_TC).slice<0, 2>();
+  TooN::Vector<2> v2RayEndInPlane = (m3ToPlaneCoords * v3RayEnd_TC).slice<0, 2>();
+  TooN::Vector<2> v2RayDirInPlane = v2RayEndInPlane - v2RayStartInPlane;
   normalize(v2RayDirInPlane);
 
-  std::vector<std::pair<Vector<3>, Vector<3>>> vMapPointPositions;  // first in world frame, second in camera frame
-  SE3<> se3WorldFromTargetCam = kfTarget.mse3CamFromWorld.inverse();
+  // First in world frame, second in camera frame
+  std::vector<std::pair<TooN::Vector<3>, TooN::Vector<3>>> vMapPointPositions;
+  TooN::SE3<> se3WorldFromTargetCam = kfTarget.mse3CamFromWorld.inverse();
   for (int i = 0; i < nSteps + 1; ++i)  // stepping along circle
   {
     double dAngle = i * dAngleStep;                                  // current angle
-    Vector<2> v2CirclePoint = makeVector(cos(dAngle), sin(dAngle));  // point on circle
+    TooN::Vector<2> v2CirclePoint = TooN::makeVector(cos(dAngle), sin(dAngle));  // point on circle
 
     // Backproject onto view ray, this is the depth along view ray where we intersect
     double dAlpha = (v2RayStartInPlane[0] * v2CirclePoint[1] - v2RayStartInPlane[1] * v2CirclePoint[0]) /
                     (v2RayDirInPlane[1] * v2CirclePoint[0] - v2RayDirInPlane[0] * v2CirclePoint[1]);
 
-    Vector<3> v3PointPos_TC = v3RayStart_TC + dAlpha * v3LineDirn_TC;
-    Vector<3> v3PointPos = se3WorldFromTargetCam * v3PointPos_TC;
+    TooN::Vector<3> v3PointPos_TC = v3RayStart_TC + dAlpha * v3LineDirn_TC;
+    TooN::Vector<3> v3PointPos = se3WorldFromTargetCam * v3PointPos_TC;
     vMapPointPositions.push_back(std::make_pair(v3PointPos, v3PointPos_TC));
   }
 
@@ -754,7 +763,7 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
   MapPoint point;
   point.mpPatchSourceKF = &kfSrc;
   point.mnSourceLevel = nLevel;
-  point.mv3Normal_NC = makeVector(0, 0, -1);
+  point.mv3Normal_NC = TooN::makeVector(0, 0, -1);
   point.mirCenter = irLevelPos;
   point.mv3Center_NC = cameraSrc.UnProject(v2RootPos);
   point.mv3OneRightFromCenter_NC = cameraSrc.UnProject(v2RootPos + vec(CVD::ImageRef(nLevelScale, 0)));
@@ -768,16 +777,16 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
   int nMaxZMSSD = finder.mnMaxSSD + 1;
   int nBestZMSSD = nMaxZMSSD;
   int nBest = -1;
-  Vector<2> v2BestMatch = Zeros;
+  TooN::Vector<2> v2BestMatch = TooN::Zeros;
 
-  std::vector<std::tuple<int, int, Vector<2>>> vScoresIndicesBestMatches;
+  std::vector<std::tuple<int, int, TooN::Vector<2>>> vScoresIndicesBestMatches;
 
   for (unsigned i = 0; i < vMapPointPositions.size(); ++i)  // go through all our hypothesized map points
   {
     point.mv3WorldPos = vMapPointPositions[i].first;
     point.RefreshPixelVectors();
 
-    Vector<2> v2Image = cameraTarget.Project(vMapPointPositions[i].second);
+    TooN::Vector<2> v2Image = cameraTarget.Project(vMapPointPositions[i].second);
 
     if (cameraTarget.Invalid())
       continue;
@@ -789,7 +798,7 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
     if (kfTarget.maLevels[0].mask.totalsize() > 0 && kfTarget.maLevels[0].mask[CVD::ir(v2Image)] == 0)
       continue;
 
-    Matrix<2> m2CamDerivs = cameraTarget.GetProjectionDerivs();
+    TooN::Matrix<2> m2CamDerivs = cameraTarget.GetProjectionDerivs();
 
     int nSearchLevel = finder.CalcSearchLevelAndWarpMatrix(point, kfTarget.mse3CamFromWorld, m2CamDerivs);
     if (nSearchLevel == -1)
@@ -855,18 +864,18 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
 
   // Now all the points in vScoresIndicesBestMatches can be considered potential matches
 
-  Vector<2> v2SubPixPos = makeVector(-1, -1);
+  TooN::Vector<2> v2SubPixPos = TooN::makeVector(-1, -1);
   bool bGotGoodSubpix = false;
   for (unsigned i = 0; i < vScoresIndicesBestMatches.size(); ++i)  // go through all potential good matches
   {
     int nCurrBest = std::get<1>(vScoresIndicesBestMatches[i]);
-    Vector<2> v2CurrBestMatch = std::get<2>(vScoresIndicesBestMatches[i]);
+    TooN::Vector<2> v2CurrBestMatch = std::get<2>(vScoresIndicesBestMatches[i]);
 
     point.mv3WorldPos = vMapPointPositions[nCurrBest].first;
     point.RefreshPixelVectors();
 
     cameraTarget.Project(vMapPointPositions[nCurrBest].second);
-    Matrix<2> m2CamDerivs = cameraTarget.GetProjectionDerivs();
+    TooN::Matrix<2> m2CamDerivs = cameraTarget.GetProjectionDerivs();
 
     finder.CalcSearchLevelAndWarpMatrix(point, kfTarget.mse3CamFromWorld, m2CamDerivs);
     finder.MakeTemplateCoarseCont(point);
@@ -890,7 +899,7 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
     return false;
 
   // Now triangulate the 3d point...
-  Vector<3> v3New;
+  TooN::Vector<3> v3New;
   v3New = kfTarget.mse3CamFromWorld.inverse() *
           ReprojectPoint(kfSrc.mse3CamFromWorld * kfTarget.mse3CamFromWorld.inverse(), cameraSrc.UnProject(v2RootPos),
                          cameraTarget.UnProject(v2SubPixPos));
@@ -902,7 +911,7 @@ bool MapMakerServerBase::AddPointEpipolar(KeyFrame& kfSrc, KeyFrame& kfTarget, i
   // Patch source stuff:
   pPointNew->mpPatchSourceKF = &kfSrc;
   pPointNew->mnSourceLevel = nLevel;
-  pPointNew->mv3Normal_NC = makeVector(0, 0, -1);
+  pPointNew->mv3Normal_NC = TooN::makeVector(0, 0, -1);
   pPointNew->mirCenter = irLevelPos;
   pPointNew->mv3Center_NC = cameraSrc.UnProject(v2RootPos);
   pPointNew->mv3OneRightFromCenter_NC = cameraSrc.UnProject(v2RootPos + vec(CVD::ImageRef(nLevelScale, 0)));
@@ -959,15 +968,15 @@ bool MapMakerServerBase::ReFind_Common(KeyFrame& kf, MapPoint& point)
     return false;
 
   // debug
-  static gvar3<int> gvnCrossCamera("CrossCamera", 1, HIDDEN | SILENT);
+  static GVars3::gvar3<int> gvnCrossCamera("CrossCamera", 1, GVars3::HIDDEN | GVars3::SILENT);
   if (!*gvnCrossCamera && kf.mCamName != point.mpPatchSourceKF->mCamName)
     return false;
 
   static PatchFinder finder;
-  Vector<3> v3Cam = kf.mse3CamFromWorld * point.mv3WorldPos;
+  TooN::Vector<3> v3Cam = kf.mse3CamFromWorld * point.mv3WorldPos;
 
   TaylorCamera& camera = mmCameraModels[kf.mCamName];
-  Vector<2> v2Image = camera.Project(v3Cam);
+  TooN::Vector<2> v2Image = camera.Project(v3Cam);
 
   if (camera.Invalid())
   {
@@ -982,7 +991,7 @@ bool MapMakerServerBase::ReFind_Common(KeyFrame& kf, MapPoint& point)
     return false;
   }
 
-  Matrix<2> m2CamDerivs = camera.GetProjectionDerivs();
+  TooN::Matrix<2> m2CamDerivs = camera.GetProjectionDerivs();
   finder.MakeTemplateCoarse(point, kf.mse3CamFromWorld, m2CamDerivs);
 
   if (finder.TemplateBad())
@@ -1106,18 +1115,18 @@ void MapMakerServerBase::ReFindFromFailureQueue()
 }
 
 // Find a dominant plane in the map, find an SE3<> to put it as the z=0 plane
-SE3<> MapMakerServerBase::CalcPlaneAligner()
+TooN::SE3<> MapMakerServerBase::CalcPlaneAligner()
 {
   unsigned int nPoints = mMap.mlpPoints.size();
   if (nPoints < 10)
   {
     ROS_INFO("MapMakerServerBase: CalcPlane: too few points to calc plane.");
-    return SE3<>();
+    return TooN::SE3<>();
   };
 
   int nRansacs = 100;
-  Vector<3> v3BestMean = Zeros;
-  Vector<3> v3BestNormal = Zeros;
+  TooN::Vector<3> v3BestMean = TooN::Zeros;
+  TooN::Vector<3> v3BestNormal = TooN::Zeros;
   double dBestDistSquared = 9999999999999999.9;
 
   std::vector<MapPoint*> vpPoints;
@@ -1128,19 +1137,20 @@ SE3<> MapMakerServerBase::CalcPlaneAligner()
 
   for (int i = 0; i < nRansacs; i++)
   {
-    int nA = rand() % nPoints;
+    int nA = rand_r(&seed) % nPoints;
     int nB = nA;
     int nC = nA;
     while (nB == nA)
-      nB = rand() % nPoints;
+      nB = rand_r(&seed) % nPoints;
     while (nC == nA || nC == nB)
-      nC = rand() % nPoints;
+      nC = rand_r(&seed) % nPoints;
 
-    Vector<3> v3Mean = 0.33333333 * (vpPoints[nA]->mv3WorldPos + vpPoints[nB]->mv3WorldPos + vpPoints[nC]->mv3WorldPos);
+    TooN::Vector<3> v3Mean = 0.33333333 * (vpPoints[nA]->mv3WorldPos + vpPoints[nB]->mv3WorldPos
+                                                + vpPoints[nC]->mv3WorldPos);
 
-    Vector<3> v3CA = vpPoints[nC]->mv3WorldPos - vpPoints[nA]->mv3WorldPos;
-    Vector<3> v3BA = vpPoints[nB]->mv3WorldPos - vpPoints[nA]->mv3WorldPos;
-    Vector<3> v3Normal = v3CA ^ v3BA;
+    TooN::Vector<3> v3CA = vpPoints[nC]->mv3WorldPos - vpPoints[nA]->mv3WorldPos;
+    TooN::Vector<3> v3BA = vpPoints[nB]->mv3WorldPos - vpPoints[nA]->mv3WorldPos;
+    TooN::Vector<3> v3Normal = v3CA ^ v3BA;
     if (v3Normal * v3Normal == 0)
       continue;
     normalize(v3Normal);
@@ -1148,7 +1158,7 @@ SE3<> MapMakerServerBase::CalcPlaneAligner()
     double dSumError = 0.0;
     for (unsigned int i = 0; i < nPoints; i++)
     {
-      Vector<3> v3Diff = vpPoints[i]->mv3WorldPos - v3Mean;
+      TooN::Vector<3> v3Diff = vpPoints[i]->mv3WorldPos - v3Mean;
       double dDistSq = v3Diff * v3Diff;
       if (dDistSq == 0.0)
         continue;
@@ -1167,10 +1177,10 @@ SE3<> MapMakerServerBase::CalcPlaneAligner()
   }
 
   // Done the ransacs, now collect the supposed inlier set
-  std::vector<Vector<3>> vInliers;
+  std::vector<TooN::Vector<3>> vInliers;
   for (unsigned int i = 0; i < nPoints; i++)
   {
-    Vector<3> v3Diff = vpPoints[i]->mv3WorldPos - v3BestMean;
+    TooN::Vector<3> v3Diff = vpPoints[i]->mv3WorldPos - v3BestMean;
     double dDistSq = v3Diff * v3Diff;
     if (dDistSq == 0.0)
       continue;
@@ -1180,21 +1190,21 @@ SE3<> MapMakerServerBase::CalcPlaneAligner()
   }
 
   // With these inliers, calculate mean and cov
-  Vector<3> v3MeanOfInliers = Zeros;
+  TooN::Vector<3> v3MeanOfInliers = TooN::Zeros;
   for (unsigned int i = 0; i < vInliers.size(); i++)
     v3MeanOfInliers += vInliers[i];
   v3MeanOfInliers *= (1.0 / vInliers.size());
 
-  Matrix<3> m3Cov = Zeros;
+  TooN::Matrix<3> m3Cov = TooN::Zeros;
   for (unsigned int i = 0; i < vInliers.size(); i++)
   {
-    Vector<3> v3Diff = vInliers[i] - v3MeanOfInliers;
+    TooN::Vector<3> v3Diff = vInliers[i] - v3MeanOfInliers;
     m3Cov += v3Diff.as_col() * v3Diff.as_row();
   };
 
   // Find the principal component with the minimal variance: this is the plane normal
-  SymEigen<3> sym(m3Cov);
-  Vector<3> v3Normal = sym.get_evectors()[0];
+  TooN::SymEigen<3> sym(m3Cov);
+  TooN::Vector<3> v3Normal = sym.get_evectors()[0];
 
   // If mean of inliers Z is negative, we want positive plane normal to put camera above plane
   // If mean of inliers Z is positive, we want negative plane normal to put camera above plane
@@ -1203,15 +1213,15 @@ SE3<> MapMakerServerBase::CalcPlaneAligner()
   else if (v3MeanOfInliers[2] > 0 && v3Normal[2] > 0)
     v3Normal *= -1.0;
 
-  Matrix<3> m3Rot = Identity;
+  TooN::Matrix<3> m3Rot = TooN::Identity;
   m3Rot[2] = v3Normal;
   m3Rot[0] = m3Rot[0] - (v3Normal * (m3Rot[0] * v3Normal));
   normalize(m3Rot[0]);
   m3Rot[1] = m3Rot[2] ^ m3Rot[0];
 
-  SE3<> se3Aligner;
+  TooN::SE3<> se3Aligner;
   se3Aligner.get_rotation() = m3Rot;
-  Vector<3> v3RMean = se3Aligner * v3MeanOfInliers;
+  TooN::Vector<3> v3RMean = se3Aligner * v3MeanOfInliers;
   se3Aligner.get_translation() = -v3RMean;
 
   return se3Aligner;

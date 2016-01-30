@@ -49,6 +49,10 @@
 #include <pcl/point_types.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <fstream>
+#include <vector>
+#include <string>
+#include <utility>
+#include <limits>
 
 MapMakerBase::MapMakerBase(Map& map, bool bAdvertise) : mMap(map), mNodeHandlePriv("~")
 {

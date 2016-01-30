@@ -41,8 +41,7 @@
 #include <mcptam/LevelHelpers.h>
 #include <gvars3/instances.h>
 #include <opencv2/imgproc/imgproc.hpp>
-
-using namespace GVars3;
+#include <string>
 
 KeyFrameViewer::KeyFrameViewer(Map& map, GLWindow2& glw, ImageRefMap mDrawOffsets, ImageRefMap mSizes)
   : mMap(map), mGLWindow(glw), mmDrawOffsets(mDrawOffsets), mmSizes(mSizes)
@@ -67,14 +66,14 @@ void KeyFrameViewer::Draw()
   }
 
   // Check if nCurrentIdx is still valid, map could have shrunk with removal of MKFs
-  if (nCurrentIdx >= (int)mMap.mlpMultiKeyFrames.size())
+  if (nCurrentIdx >= static_cast<int>(mMap.mlpMultiKeyFrames.size()))
     nCurrentIdx = 0;
 
   // Get corresponding iterator dereference
   MultiKeyFrame& mkf = *(*std::next(mMap.mlpMultiKeyFrames.begin(), nCurrentIdx));
 
-  static gvar3<int> gvnDrawLevel("DrawLevel", 0, HIDDEN | SILENT);
-  static gvar3<int> gvnDrawCandidates("DrawCandidates", 0, HIDDEN | SILENT);
+  static GVars3::gvar3<int> gvnDrawLevel("DrawLevel", 0, GVars3::HIDDEN | GVars3::SILENT);
+  static GVars3::gvar3<int> gvnDrawCandidates("DrawCandidates", 0, GVars3::HIDDEN | GVars3::SILENT);
 
   for (KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); kf_it++)
   {
@@ -135,7 +134,7 @@ void KeyFrameViewer::Next()
   nCurrentIdx++;
   boost::mutex::scoped_lock lock(mMap.mMutex);
 
-  if (nCurrentIdx >= (int)mMap.mlpMultiKeyFrames.size())
+  if (nCurrentIdx >= static_cast<int>(mMap.mlpMultiKeyFrames.size()))
   {
     nCurrentIdx = 0;
   }

@@ -39,8 +39,9 @@
 #include <mcptam/MapPoint.h>
 #include <mcptam/KeyFrame.h>
 #include <mcptam/TrackerData.h>
-
-using namespace TooN;
+#include <map>
+#include <string>
+#include <set>
 
 // Delete owned TrackerData pointers
 MapPoint::~MapPoint()
@@ -65,7 +66,7 @@ void MapPoint::RefreshPixelVectors()
   // Find patch pos in KF camera coords
   // Actually this might not exactly correspond to the patch pos!
   // Treat it as a general point on the plane.
-  Vector<3> v3PlanePoint_C = k.mse3CamFromWorld * mv3WorldPos;
+  TooN::Vector<3> v3PlanePoint_C = k.mse3CamFromWorld * mv3WorldPos;
 
   // Find the height of this above the plane.
   // Assumes the normal is  pointing toward the camera.
@@ -76,9 +77,9 @@ void MapPoint::RefreshPixelVectors()
   double dOneDownRate = fabs(mv3OneDownFromCenter_NC * mv3Normal_NC);
 
   // Find projections onto plane
-  Vector<3> v3CenterOnPlane_C = mv3Center_NC * dCamHeight / dPixelRate;
-  Vector<3> v3OneRightOnPlane_C = mv3OneRightFromCenter_NC * dCamHeight / dOneRightRate;
-  Vector<3> v3OneDownOnPlane_C = mv3OneDownFromCenter_NC * dCamHeight / dOneDownRate;
+  TooN::Vector<3> v3CenterOnPlane_C = mv3Center_NC * dCamHeight / dPixelRate;
+  TooN::Vector<3> v3OneRightOnPlane_C = mv3OneRightFromCenter_NC * dCamHeight / dOneRightRate;
+  TooN::Vector<3> v3OneDownOnPlane_C = mv3OneDownFromCenter_NC * dCamHeight / dOneDownRate;
 
   // Find differences of these projections in the world frame
   mv3PixelRight_W = k.mse3CamFromWorld.get_rotation().inverse() * (v3OneRightOnPlane_C - v3CenterOnPlane_C);

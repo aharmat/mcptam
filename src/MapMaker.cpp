@@ -43,6 +43,10 @@
 #include <mcptam/Map.h>
 #include <mcptam/BundleAdjusterBase.h>
 #include <mcptam/MapMakerTiming.h>
+#include <utility>
+#include <string>
+#include <vector>
+
 
 MapMaker::MapMaker(Map &map, TaylorCameraMap &cameras, BundleAdjusterBase &bundleAdjuster)
   : MapMakerBase(map, true), MapMakerClientBase(map), MapMakerServerBase(map, cameras, bundleAdjuster)
@@ -61,7 +65,6 @@ MapMaker::~MapMaker()
   ROS_DEBUG("MapMaker: Waiting for run thread to die");
   join();  // CVD::Thread function
   ROS_DEBUG("MapMaker: Run thread has died.");
-  ;
 }
 
 // Requests an abort from the bundle adjuster and sets flags that signal a reset is waiting
@@ -339,7 +342,7 @@ void MapMaker::run()
     }
 
     // Very low priorty: re-find measurements marked as vOutliers
-    if (mBundleAdjuster.ConvergedRecent() && mBundleAdjuster.ConvergedFull() && rand() % 20 == 0 &&
+    if (mBundleAdjuster.ConvergedRecent() && mBundleAdjuster.ConvergedFull() && rand_r(&seed) % 20 == 0 &&
         IncomingQueueSize() == 0 && mState == MM_RUNNING)
       ReFindFromFailureQueue();
 

@@ -39,6 +39,8 @@
 #include <cvd/image_interpolate.h>
 #include <TooN/Cholesky.h>
 #include <ros/assert.h>
+#include <algorithm>
+#include <vector>
 
 int PatchFinder::snMaxSSDPerPixel = 250;  // Lower for normal operation (~250), higher for calibration (500)
 
@@ -49,32 +51,30 @@ int PatchFinder::snMaxSSDPerPixel = 250;  // Lower for normal operation (~250), 
 #include <tmmintrin.h>
 #endif
 
-using namespace TooN;
-
 PatchFinder::PatchFinder(int nPatchSize) : mimTemplate(CVD::ImageRef(nPatchSize, nPatchSize))
 {
   mnPatchSize = nPatchSize;
   mirCenter = CVD::ImageRef(nPatchSize / 2, nPatchSize / 2);
   mnMaxSSD = mnPatchSize * mnPatchSize * PatchFinder::snMaxSSDPerPixel;
   // Populate the speed-up caches with bogus values:
-  mm2LastWarpMatrix = 9999.9 * Identity;
+  mm2LastWarpMatrix = 9999.9 * TooN::Identity;
   mpLastTemplateMapPoint = NULL;
 }
 
 // Find the warping matrix and search level
-int PatchFinder::CalcSearchLevelAndWarpMatrix(MapPoint &point, SE3<> se3CFromW, Matrix<2> &m2CamDerivs)
+int PatchFinder::CalcSearchLevelAndWarpMatrix(MapPoint &point, TooN::SE3<> se3CFromW, TooN::Matrix<2> &m2CamDerivs)
 {
   // Calc point pos in new view camera frame
   // Slightly dumb that we re-calculate this here when the tracker's already done this!
-  Vector<3> v3Cam = se3CFromW * point.mv3WorldPos;
+  TooN::Vector<3> v3Cam = se3CFromW * point.mv3WorldPos;
   // Project the source keyframe's one-pixel-right and one-pixel-down vectors into the current view
-  Vector<3> v3MotionRight = se3CFromW.get_rotation() * point.mv3PixelRight_W;
-  Vector<3> v3MotionDown = se3CFromW.get_rotation() * point.mv3PixelDown_W;
+  TooN::Vector<3> v3MotionRight = se3CFromW.get_rotation() * point.mv3PixelRight_W;
+  TooN::Vector<3> v3MotionDown = se3CFromW.get_rotation() * point.mv3PixelDown_W;
   // Calculate in-image derivatives of source image pixel motions:
-  Vector<3> v3_dTheta, v3_dPhi;
+  TooN::Vector<3> v3_dTheta, v3_dPhi;
   TaylorCamera::GetCamSphereDeriv(v3Cam, v3_dTheta, v3_dPhi);
 
-  Vector<2> v2CamSphereMotionRight, v2CamSphereMotionDown;
+  TooN::Vector<2> v2CamSphereMotionRight, v2CamSphereMotionDown;
   v2CamSphereMotionRight[0] = v3_dTheta * v3MotionRight;  // theta component
   v2CamSphereMotionRight[1] = v3_dPhi * v3MotionRight;    // phi component
   v2CamSphereMotionDown[0] = v3_dTheta * v3MotionDown;    // theta component
@@ -117,7 +117,7 @@ int PatchFinder::CalcSearchLevelAndWarpMatrix(MapPoint &point, SE3<> se3CFromW, 
 
 // This is just a convenience function wich caluclates the warp matrix and generates
 // the template all in one call.
-void PatchFinder::MakeTemplateCoarse(MapPoint &point, SE3<> se3CFromW, Matrix<2> &m2CamDerivs)
+void PatchFinder::MakeTemplateCoarse(MapPoint &point, TooN::SE3<> se3CFromW, TooN::Matrix<2> &m2CamDerivs)
 {
   CalcSearchLevelAndWarpMatrix(point, se3CFromW, m2CamDerivs);
   MakeTemplateCoarseCont(point);
@@ -127,7 +127,7 @@ void PatchFinder::MakeTemplateCoarse(MapPoint &point, SE3<> se3CFromW, Matrix<2>
 void PatchFinder::MakeTemplateCoarseCont(MapPoint &point)
 {
   // Get the warping matrix appropriate for use with CVD::transform...
-  Matrix<2> m2 = opts::M2Inverse(mm2WarpInverse) * LevelScale(mnSearchLevel);
+  TooN::Matrix<2> m2 = opts::M2Inverse(mm2WarpInverse) * LevelScale(mnSearchLevel);
   // m2 now represents the number of pixels in the source image for one
   // pixel of template image
 
@@ -142,7 +142,7 @@ void PatchFinder::MakeTemplateCoarseCont(MapPoint &point)
   // Still the same map point? Then compare warping matrix..
   for (int i = 0; !bNeedToRefreshTemplate && i < 2; i++)
   {
-    Vector<2> v2Diff = m2.T()[i] - mm2LastWarpMatrix.T()[i];
+    TooN::Vector<2> v2Diff = m2.T()[i] - mm2LastWarpMatrix.T()[i];
     const double dRefreshLimit = 0.07;  // Sort of works out as half a pixel displacement in src img
     if (v2Diff * v2Diff > dRefreshLimit * dRefreshLimit)
       bNeedToRefreshTemplate = true;
@@ -352,24 +352,24 @@ bool PatchFinder::FindPatchCoarse(CVD::ImageRef irPos, KeyFrame &kf, unsigned in
 void PatchFinder::MakeSubPixTemplate()
 {
   mimJacs.resize(mimTemplate.size() - CVD::ImageRef(2, 2));
-  Matrix<3> m3H = Zeros;  // This stores jTj.
+  TooN::Matrix<3> m3H = TooN::Zeros;  // This stores jTj.
   CVD::ImageRef ir;
   for (ir.x = 1; ir.x < mnPatchSize - 1; ir.x++)
   {
     for (ir.y = 1; ir.y < mnPatchSize - 1; ir.y++)
     {
-      Vector<2> v2Grad;
+      TooN::Vector<2> v2Grad;
       v2Grad[0] = 0.5 * (mimTemplate[ir + CVD::ImageRef(1, 0)] - mimTemplate[ir - CVD::ImageRef(1, 0)]);
       v2Grad[1] = 0.5 * (mimTemplate[ir + CVD::ImageRef(0, 1)] - mimTemplate[ir - CVD::ImageRef(0, 1)]);
       mimJacs[ir - CVD::ImageRef(1, 1)].first = v2Grad[0];
       mimJacs[ir - CVD::ImageRef(1, 1)].second = v2Grad[1];
-      Vector<3> v3Grad = unproject(v2Grad);      // This adds the mean-difference jacobian..
+      TooN::Vector<3> v3Grad = unproject(v2Grad);      // This adds the mean-difference jacobian..
       m3H += v3Grad.as_col() * v3Grad.as_row();  // Populate JTJ.
     }
   }
 
   // Invert JTJ..
-  Cholesky<3> chol(m3H);
+  TooN::Cholesky<3> chol(m3H);
   mm3HInv = chol.get_inverse();
   // TOON2 Does not have a get_rank for cholesky
   // int nRank = chol.get_rank();
@@ -406,16 +406,16 @@ bool PatchFinder::IterateSubPixToConvergence(KeyFrame &kf, int nMaxIts, double d
 double PatchFinder::IterateSubPix(KeyFrame &kf)
 {
   // Search level pos of patch center
-  Vector<2> v2Center = LevelNPos(mv2SubPixPos, mnSearchLevel);
+  TooN::Vector<2> v2Center = LevelNPos(mv2SubPixPos, mnSearchLevel);
   CVD::BasicImage<CVD::byte> &image = kf.maLevels[mnSearchLevel].image;
   if (!image.in_image_with_border(CVD::ir_rounded(v2Center), mnPatchSize / 2 + 1))
     return -1.0;  // Negative return value indicates off edge of image
 
   // Position of top-left corner of patch in search level
-  Vector<2> v2Base = v2Center - vec(mirCenter);
+  TooN::Vector<2> v2Base = v2Center - vec(mirCenter);
 
   // I.C. JT*d accumulator
-  Vector<3> v3Accum = Zeros;
+  TooN::Vector<3> v3Accum = TooN::Zeros;
 
   CVD::ImageRef ir;
 
@@ -432,7 +432,7 @@ double PatchFinder::IterateSubPix(KeyFrame &kf)
   float fMixBR = (dX) * (dY);
 
   // Loop over template image
-  unsigned long nRowOffset =
+  uint64_t nRowOffset =
     &kf.maLevels[mnSearchLevel].image[CVD::ImageRef(0, 1)] - &kf.maLevels[mnSearchLevel].image[CVD::ImageRef(0, 0)];
   for (ir.y = 1; ir.y < mnPatchSize - 1; ir.y++)
   {
@@ -452,7 +452,7 @@ double PatchFinder::IterateSubPix(KeyFrame &kf)
   }
 
   // All done looping over image - find JTJ^-1 * JTd:
-  Vector<3> v3Update = mm3HInv * v3Accum;
+  TooN::Vector<3> v3Update = mm3HInv * v3Accum;
   mv2SubPixPos -= v3Update.slice<0, 2>() * LevelScale(mnSearchLevel);
   mdMeanDiff -= v3Update[2];
 
@@ -483,8 +483,8 @@ double PatchFinder::IterateSubPix(KeyFrame &kf)
 // Horizontal sum of uint16s stored in an XMM register
 inline int SumXMM_16(__m128i &target)
 {
-  unsigned short int sums_store[8];
-  _mm_storeu_si128((__m128i *)sums_store, target);
+  uint16_t sums_store[8];
+  _mm_storeu_si128(reinterpret_cast<__m128i *>(sums_store), target);
   return sums_store[0] + sums_store[1] + sums_store[2] + sums_store[3] + sums_store[4] + sums_store[5] + sums_store[6] +
          sums_store[7];
 }
@@ -492,7 +492,7 @@ inline int SumXMM_16(__m128i &target)
 inline int SumXMM_32(__m128i &target)
 {
   unsigned int sums_store[4];
-  _mm_storeu_si128((__m128i *)sums_store, target);
+  _mm_storeu_si128(reinterpret_cast<__m128i *>(sums_store), target);
   return sums_store[0] + sums_store[1] + sums_store[2] + sums_store[3];
 }
 #endif
@@ -515,7 +515,7 @@ int PatchFinder::ZMSSDAtPoint(CVD::BasicImage<CVD::byte> &image, const CVD::Imag
 #if CVD_HAVE_XMMINTRIN
   if (mnPatchSize == 8)
   {
-    long unsigned int imagepointerincrement;
+    uint64_t imagepointerincrement;
 
     __m128i xImageAsEightBytes;
     __m128i xImageAsWords;
@@ -536,18 +536,18 @@ int PatchFinder::ZMSSDAtPoint(CVD::BasicImage<CVD::byte> &image, const CVD::Imag
     templatepointer = &mimTemplate[CVD::ImageRef(0, 0)];
     imagepointerincrement = &image[irImgBase + CVD::ImageRef(0, 1)] - imagepointer;
 
-    xImageAsEightBytes = _mm_loadl_epi64((__m128i *)imagepointer);
+    xImageAsEightBytes = _mm_loadl_epi64(reinterpret_cast<__m128i *>(imagepointer));
     imagepointer += imagepointerincrement;
     xImageAsWords = _mm_unpacklo_epi8(xImageAsEightBytes, xZero);
     xImageSums = _mm_adds_epu16(xImageAsWords, xImageSums);
     xProduct = _mm_madd_epi16(xImageAsWords, xImageAsWords);
     xImageSqSums = _mm_add_epi32(xProduct, xImageSqSums);
-    xTemplateAsEightBytes = _mm_load_si128((__m128i *)templatepointer);
+    xTemplateAsEightBytes = _mm_load_si128(reinterpret_cast<__m128i *>(templatepointer));
     templatepointer += 16;
     xTemplateAsWords = _mm_unpacklo_epi8(xTemplateAsEightBytes, xZero);
     xProduct = _mm_madd_epi16(xImageAsWords, xTemplateAsWords);
     xCrossSums = _mm_add_epi32(xProduct, xCrossSums);
-    xImageAsEightBytes = _mm_loadl_epi64((__m128i *)imagepointer);
+    xImageAsEightBytes = _mm_loadl_epi64(reinterpret_cast<__m128i *>(imagepointer));
     imagepointer += imagepointerincrement;
     xImageAsWords = _mm_unpacklo_epi8(xImageAsEightBytes, xZero);
     xImageSums = _mm_adds_epu16(xImageAsWords, xImageSums);
@@ -557,18 +557,18 @@ int PatchFinder::ZMSSDAtPoint(CVD::BasicImage<CVD::byte> &image, const CVD::Imag
     xProduct = _mm_madd_epi16(xImageAsWords, xTemplateAsWords);
     xCrossSums = _mm_add_epi32(xProduct, xCrossSums);
 
-    xImageAsEightBytes = _mm_loadl_epi64((__m128i *)imagepointer);
+    xImageAsEightBytes = _mm_loadl_epi64(reinterpret_cast<__m128i *>(imagepointer));
     imagepointer += imagepointerincrement;
     xImageAsWords = _mm_unpacklo_epi8(xImageAsEightBytes, xZero);
     xImageSums = _mm_adds_epu16(xImageAsWords, xImageSums);
     xProduct = _mm_madd_epi16(xImageAsWords, xImageAsWords);
     xImageSqSums = _mm_add_epi32(xProduct, xImageSqSums);
-    xTemplateAsEightBytes = _mm_load_si128((__m128i *)templatepointer);
+    xTemplateAsEightBytes = _mm_load_si128(reinterpret_cast<__m128i *>(templatepointer));
     templatepointer += 16;
     xTemplateAsWords = _mm_unpacklo_epi8(xTemplateAsEightBytes, xZero);
     xProduct = _mm_madd_epi16(xImageAsWords, xTemplateAsWords);
     xCrossSums = _mm_add_epi32(xProduct, xCrossSums);
-    xImageAsEightBytes = _mm_loadl_epi64((__m128i *)imagepointer);
+    xImageAsEightBytes = _mm_loadl_epi64(reinterpret_cast<__m128i *>(imagepointer));
     imagepointer += imagepointerincrement;
     xImageAsWords = _mm_unpacklo_epi8(xImageAsEightBytes, xZero);
     xImageSums = _mm_adds_epu16(xImageAsWords, xImageSums);
@@ -578,18 +578,18 @@ int PatchFinder::ZMSSDAtPoint(CVD::BasicImage<CVD::byte> &image, const CVD::Imag
     xProduct = _mm_madd_epi16(xImageAsWords, xTemplateAsWords);
     xCrossSums = _mm_add_epi32(xProduct, xCrossSums);
 
-    xImageAsEightBytes = _mm_loadl_epi64((__m128i *)imagepointer);
+    xImageAsEightBytes = _mm_loadl_epi64(reinterpret_cast<__m128i *>(imagepointer));
     imagepointer += imagepointerincrement;
     xImageAsWords = _mm_unpacklo_epi8(xImageAsEightBytes, xZero);
     xImageSums = _mm_adds_epu16(xImageAsWords, xImageSums);
     xProduct = _mm_madd_epi16(xImageAsWords, xImageAsWords);
     xImageSqSums = _mm_add_epi32(xProduct, xImageSqSums);
-    xTemplateAsEightBytes = _mm_load_si128((__m128i *)templatepointer);
+    xTemplateAsEightBytes = _mm_load_si128(reinterpret_cast<__m128i *>(templatepointer));
     templatepointer += 16;
     xTemplateAsWords = _mm_unpacklo_epi8(xTemplateAsEightBytes, xZero);
     xProduct = _mm_madd_epi16(xImageAsWords, xTemplateAsWords);
     xCrossSums = _mm_add_epi32(xProduct, xCrossSums);
-    xImageAsEightBytes = _mm_loadl_epi64((__m128i *)imagepointer);
+    xImageAsEightBytes = _mm_loadl_epi64(reinterpret_cast<__m128i *>(imagepointer));
     imagepointer += imagepointerincrement;
     xImageAsWords = _mm_unpacklo_epi8(xImageAsEightBytes, xZero);
     xImageSums = _mm_adds_epu16(xImageAsWords, xImageSums);
@@ -599,18 +599,18 @@ int PatchFinder::ZMSSDAtPoint(CVD::BasicImage<CVD::byte> &image, const CVD::Imag
     xProduct = _mm_madd_epi16(xImageAsWords, xTemplateAsWords);
     xCrossSums = _mm_add_epi32(xProduct, xCrossSums);
 
-    xImageAsEightBytes = _mm_loadl_epi64((__m128i *)imagepointer);
+    xImageAsEightBytes = _mm_loadl_epi64(reinterpret_cast<__m128i *>(imagepointer));
     imagepointer += imagepointerincrement;
     xImageAsWords = _mm_unpacklo_epi8(xImageAsEightBytes, xZero);
     xImageSums = _mm_adds_epu16(xImageAsWords, xImageSums);
     xProduct = _mm_madd_epi16(xImageAsWords, xImageAsWords);
     xImageSqSums = _mm_add_epi32(xProduct, xImageSqSums);
-    xTemplateAsEightBytes = _mm_load_si128((__m128i *)templatepointer);
+    xTemplateAsEightBytes = _mm_load_si128(reinterpret_cast<__m128i *>(templatepointer));
     templatepointer += 16;
     xTemplateAsWords = _mm_unpacklo_epi8(xTemplateAsEightBytes, xZero);
     xProduct = _mm_madd_epi16(xImageAsWords, xTemplateAsWords);
     xCrossSums = _mm_add_epi32(xProduct, xCrossSums);
-    xImageAsEightBytes = _mm_loadl_epi64((__m128i *)imagepointer);
+    xImageAsEightBytes = _mm_loadl_epi64(reinterpret_cast<__m128i *>(imagepointer));
     xImageAsWords = _mm_unpacklo_epi8(xImageAsEightBytes, xZero);
     xImageSums = _mm_adds_epu16(xImageAsWords, xImageSums);
     xProduct = _mm_madd_epi16(xImageAsWords, xImageAsWords);

@@ -43,6 +43,7 @@
 #include <mcptam/Map.h>
 #include <mcptam/BundleAdjusterBase.h>
 #include <std_srvs/Empty.h>
+#include <set>
 
 MapMakerClient::MapMakerClient(Map& map)
   : MapMakerBase(map, false)

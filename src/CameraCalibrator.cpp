@@ -45,9 +45,12 @@
 #include <TooN/Cholesky.h>
 #include <cvd/image_io.h>
 #include <ros/ros.h>
+#include <vector>
+#include <string>
+#include <limits>
+#include <utility>
 
-using namespace TooN;
-using namespace GVars3;
+using GVars3::GUI;
 
 CameraCalibrator::CameraCalibrator()
   : mVideoSource(false), mpGLWindow(InitWindow("CameraCalibrator")), mpCamera(NULL), mNodeHandlePriv("~")
@@ -125,9 +128,9 @@ CameraCalibrator::~CameraCalibrator()
 
 void CameraCalibrator::Run()
 {
-  static gvar3<int> gvnUseExistingCalib("UseExistingCalib", 0, HIDDEN | SILENT);
-  static gvar3<int> gvnDraw3DGrid("Draw3DGrid", 1, HIDDEN | SILENT);
-  static gvar3<int> gvnDrawMask("DrawMask", 0, HIDDEN | SILENT);
+  static GVars3::gvar3<int> gvnUseExistingCalib("UseExistingCalib", 0, GVars3::HIDDEN | GVars3::SILENT);
+  static GVars3::gvar3<int> gvnDraw3DGrid("Draw3DGrid", 1, GVars3::HIDDEN | GVars3::SILENT);
+  static GVars3::gvar3<int> gvnDrawMask("DrawMask", 0, GVars3::HIDDEN | GVars3::SILENT);
 
   int nPrevUseExisting = *gvnUseExistingCalib;
 
@@ -248,7 +251,7 @@ void CameraCalibrator::Reset()
 
   mpCamera = new TaylorCamera(mirSize, mirSize, mirSize);
 
-  static gvar3<int> gvnUseExistingCalib("UseExistingCalib", 0, HIDDEN | SILENT);
+  static GVars3::gvar3<int> gvnUseExistingCalib("UseExistingCalib", 0, GVars3::HIDDEN | GVars3::SILENT);
   if (*gvnUseExistingCalib)
   {
     TooN::Vector<9> v9Params = mVideoSource.GetParams();
@@ -311,7 +314,7 @@ void CameraCalibrator::GUICommandHandler(std::string command, std::string params
       delete mvpCalibImgs[mnImageToShow];
       mvpCalibImgs.erase(mvpCalibImgs.begin() + mnImageToShow);
 
-      if (mnImageToShow == (int)mvpCalibImgs.size())
+      if (mnImageToShow == static_cast<int>(mvpCalibImgs.size()))
         mnImageToShow = 0;
     }
 
@@ -337,7 +340,7 @@ void CameraCalibrator::GUICommandHandler(std::string command, std::string params
   {
     ++mnImageToShow;
 
-    if (mnImageToShow >= (int)mvpCalibImgs.size())
+    if (mnImageToShow >= static_cast<int>(mvpCalibImgs.size()))
       mnImageToShow = 0;
 
     return;
@@ -345,7 +348,7 @@ void CameraCalibrator::GUICommandHandler(std::string command, std::string params
 
   if (command == "CameraCalibrator.SaveCalib")
   {
-    Vector<9> v9Params = mpCamera->GetParams();
+    TooN::Vector<9> v9Params = mpCamera->GetParams();
 
     bool bSuccess = mVideoSource.SaveParams(v9Params);
 
@@ -372,7 +375,7 @@ void CameraCalibrator::GUICommandHandler(std::string command, std::string params
     CVD::ImageRef where;
     ss >> button >> state >> where.x >> where.y;
 
-    Vector<3> v3UnProj = mpCamera->UnProject(vec(where));
+    TooN::Vector<3> v3UnProj = mpCamera->UnProject(vec(where));
     ROS_INFO_STREAM("Clicked: " << where << "  UnProj: " << v3UnProj);
 
     return;
@@ -390,20 +393,20 @@ void CameraCalibrator::InitOptimization(bool bFindCenter)
     int nCenterSearchIterations = 20;
 
     // The center of the image
-    Vector<2> v2DefaultCenter;
+    TooN::Vector<2> v2DefaultCenter;
     v2DefaultCenter[0] = mpCamera->GetImageSize().x / 2.0;
     v2DefaultCenter[1] = mpCamera->GetImageSize().y / 2.0;
 
     // Start at image center for center of projection
-    Vector<2> v2StartCenter = v2DefaultCenter;
+    TooN::Vector<2> v2StartCenter = v2DefaultCenter;
 
     // A reasonable spread to start
-    Vector<2> v2Spread = v2StartCenter / 4;
+    TooN::Vector<2> v2Spread = v2StartCenter / 4;
 
     // Check 25 points at each level
     CVD::ImageRef irNumPoints(5, 5);
-    Vector<2> v2BestPos;
-    Vector<4> v4BestParams;
+    TooN::Vector<2> v2BestPos;
+    TooN::Vector<4> v4BestParams;
     double dMinError;
 
     for (int i = 0; i < nCenterSearchIterations; i++)
@@ -418,7 +421,7 @@ void CameraCalibrator::InitOptimization(bool bFindCenter)
     ROS_INFO_STREAM("CameraCalibrator: Found best center of projection: " << v2BestPos << " with error: " << dMinError);
 
     // Update camera parameters
-    Vector<9> v9CurrParams = mpCamera->GetParams();
+    TooN::Vector<9> v9CurrParams = mpCamera->GetParams();
     v9CurrParams.slice<0, 4>() = v4BestParams;
     v9CurrParams.slice<4, 2>() = v2BestPos;
     mpCamera->SetParams(v9CurrParams);
@@ -445,9 +448,9 @@ bool CameraCalibrator::OptimizeOneStepLM()
   }
 
   // The big jacobian matrices and the error
-  Matrix<> A = Zeros(2 * nPoints, 6 * nViews);
-  Matrix<> B(2 * nPoints, 9);
-  Vector<> epsilon(2 * nPoints);
+  TooN::Matrix<> A = TooN::Zeros(2 * nPoints, 6 * nViews);
+  TooN::Matrix<> B(2 * nPoints, 9);
+  TooN::Vector<> epsilon(2 * nPoints);
 
   double dSumSquaredError = 0.0;
   int nTotalMeas = 0;
@@ -483,11 +486,11 @@ bool CameraCalibrator::OptimizeOneStepLM()
   mdMeanPixelError = sqrt(dSumSquaredError / nTotalMeas);
 
   // The following is textbook implementation (not very efficient though)
-  Matrix<> U = A.T() * A;
-  Matrix<> V = B.T() * B;
-  Matrix<> W = A.T() * B;
-  Vector<> epsilon_A = A.T() * epsilon;
-  Vector<> epsilon_B = B.T() * epsilon;
+  TooN::Matrix<> U = A.T() * A;
+  TooN::Matrix<> V = B.T() * B;
+  TooN::Matrix<> W = A.T() * B;
+  TooN::Vector<> epsilon_A = A.T() * epsilon;
+  TooN::Vector<> epsilon_B = B.T() * epsilon;
 
   // U is now Ustar
   for (int i = 0; i < U.num_rows(); ++i)
@@ -497,21 +500,21 @@ bool CameraCalibrator::OptimizeOneStepLM()
   for (int i = 0; i < V.num_rows(); ++i)
     V[i][i] *= (1.0 + mdLambda);
 
-  V = Cholesky<>(V).get_inverse();  // V is now Vstar_inverse
+  V = TooN::Cholesky<>(V).get_inverse();  // V is now Vstar_inverse
 
-  Matrix<> Y = W * V;
+  TooN::Matrix<> Y = W * V;
 
-  Vector<> vCameraPoseUpdate = Cholesky<>(U - Y * W.T()).backsub(epsilon_A - Y * epsilon_B);
-  Vector<> vCameraParamsUpdate = V * (epsilon_B - W.T() * vCameraPoseUpdate);
+  TooN::Vector<> vCameraPoseUpdate = TooN::Cholesky<>(U - Y * W.T()).backsub(epsilon_A - Y * epsilon_B);
+  TooN::Vector<> vCameraParamsUpdate = V * (epsilon_B - W.T() * vCameraPoseUpdate);
 
   // Save old camera params
-  Vector<9> v9OldParams = mpCamera->GetParams();
+  TooN::Vector<9> v9OldParams = mpCamera->GetParams();
 
   // Apply updates
   for (int n = 0; n < nViews; n++)
   {
     mvpCalibImgs[n]->mse3CamFromWorldNew =
-      SE3<>::exp(vCameraPoseUpdate.slice(n * 6, 6)) * mvpCalibImgs[n]->mse3CamFromWorld;
+      TooN::SE3<>::exp(vCameraPoseUpdate.slice(n * 6, 6)) * mvpCalibImgs[n]->mse3CamFromWorld;
   }
 
   mpCamera->UpdateParams(vCameraParamsUpdate);
@@ -520,7 +523,7 @@ bool CameraCalibrator::OptimizeOneStepLM()
   double dSumSquaredErrorNew = 0.0;
   for (int n = 0; n < nViews; n++)
   {
-    std::vector<Vector<2>> vErrors = mvpCalibImgs[n]->ProjectGetOnlyErrors(*mpCamera, true);
+    std::vector<TooN::Vector<2>> vErrors = mvpCalibImgs[n]->ProjectGetOnlyErrors(*mpCamera, true);
     for (unsigned int i = 0; i < vErrors.size(); i++)
     {
       dSumSquaredErrorNew += vErrors[i] * vErrors[i];
@@ -551,8 +554,9 @@ bool CameraCalibrator::OptimizeOneStepLM()
   return true;
 }
 
-void CameraCalibrator::FindBestCenter(Vector<2> v2StartCenter, Vector<2> v2Spread, CVD::ImageRef irNumPoints,
-                                      Vector<2>& v2BestPos, Vector<4>& v4BestParams, double& dMinError)
+void CameraCalibrator::FindBestCenter(TooN::Vector<2> v2StartCenter, TooN::Vector<2> v2Spread,
+                                      CVD::ImageRef irNumPoints, TooN::Vector<2>& v2BestPos,
+                                      TooN::Vector<4>& v4BestParams, double& dMinError)
 {
   // This will find the best center around v2StartCenter in the box of size v2Spread
   // Will test points spaced at numSteps apart, which should be odd
@@ -564,8 +568,8 @@ void CameraCalibrator::FindBestCenter(Vector<2> v2StartCenter, Vector<2> v2Sprea
   if (irNumPoints[1] % 2 != 1)
     irNumPoints[1]++;
 
-  Vector<2> v2StartPos = v2StartCenter - 0.5 * v2Spread;
-  Vector<2> v2StepSize;
+  TooN::Vector<2> v2StartPos = v2StartCenter - 0.5 * v2Spread;
+  TooN::Vector<2> v2StepSize;
   v2StepSize[0] = v2Spread[0] / (irNumPoints[0] - 1);
   v2StepSize[1] = v2Spread[1] / (irNumPoints[1] - 1);
 
@@ -578,15 +582,15 @@ void CameraCalibrator::FindBestCenter(Vector<2> v2StartCenter, Vector<2> v2Sprea
   {
     for (int x = 0; x < irNumPoints[0]; x++)
     {
-      Vector<2> v2CurrentPos = v2StartPos;
+      TooN::Vector<2> v2CurrentPos = v2StartPos;
       v2CurrentPos[0] += x * v2StepSize[0];
       v2CurrentPos[1] += y * v2StepSize[1];
 
       // Update the calibration image poses and get new camera polynomial coeffs
-      Vector<4> v4NewParams = ComputeParamsUpdatePoses(mvpCalibImgs, v2CurrentPos);
+      TooN::Vector<4> v4NewParams = ComputeParamsUpdatePoses(mvpCalibImgs, v2CurrentPos);
 
       // Update the polynomial coeffs and projection center
-      Vector<9> v9CurrParams = mpCamera->GetParams();
+      TooN::Vector<9> v9CurrParams = mpCamera->GetParams();
       v9CurrParams.slice<0, 4>() = v4NewParams;
       v9CurrParams.slice<4, 2>() = v2CurrentPos;
       mpCamera->SetParams(v9CurrParams);
@@ -595,7 +599,7 @@ void CameraCalibrator::FindBestCenter(Vector<2> v2StartCenter, Vector<2> v2Sprea
       double dSumSquaredError = 0.0;
       for (int n = 0; n < nViews; n++)
       {
-        std::vector<Vector<2>> vErrors = mvpCalibImgs[n]->ProjectGetOnlyErrors(*mpCamera);
+        std::vector<TooN::Vector<2>> vErrors = mvpCalibImgs[n]->ProjectGetOnlyErrors(*mpCamera);
         for (unsigned int i = 0; i < vErrors.size(); i++)
         {
           dSumSquaredError += vErrors[i] * vErrors[i];

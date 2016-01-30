@@ -152,6 +152,8 @@ protected:
   ros::Publisher mCreationTimingPub;
   ros::Publisher mLocalTimingPub;
   ros::Publisher mGlobalTimingPub;
+
+  unsigned int seed = 1;  ///< Seed for threadsafe rand_r
 };
 
 #endif  // MCPTAM_MAPMAKER_H

@@ -61,8 +61,12 @@
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
-using namespace TooN;
-using namespace GVars3;
+#include <set>
+#include <vector>
+#include <tuple>
+#include <string>
+#include <limits>
+#include <utility>
 
 // Static members
 double Tracker::sdRotationEstimatorBlur = 0.75;
@@ -135,7 +139,7 @@ void Tracker::Reset(bool bSavePose, bool bResetMap)
   mnLastMultiKeyFrameDropped = -20;
   mtLastMultiKeyFrameDropped = ros::Time(ros::Time::now().toSec() - 1.0);
   mnFrame = 0;
-  mv6BaseVelocity = Zeros;
+  mv6BaseVelocity = TooN::Zeros;
   mdMSDScaledVelocityMagnitude = 0;
   mbJustRecoveredSoUseCoarse = false;
   mbInitRequested = false;
@@ -144,7 +148,7 @@ void Tracker::Reset(bool bSavePose, bool bResetMap)
   mmSimpleMeas.clear();
 
   mLastProcessTime = ros::Time::now();
-  mse3StartPose = SE3<>();
+  mse3StartPose = TooN::SE3<>();
 
   if (mpCurrentMKF)
   {
@@ -199,7 +203,7 @@ void Tracker::AddNext()
 }
 
 // Generate a new MultiKeyFrame with a given pose and its children KeyFrames with the fixed camera poses
-void Tracker::InitCurrentMKF(const SE3<>& pose)
+void Tracker::InitCurrentMKF(const TooN::SE3<>& pose)
 {
   ROS_ASSERT(mpCurrentMKF == NULL);
 
@@ -301,7 +305,7 @@ void Tracker::TrackFrameSetup(ImageBWMap& imFrames, ros::Time timestamp, bool bD
   timingMsg.sbi = 0;
   ros::WallTime startTime;
 
-  static gvar3<int> gvnGlareMasking("GlareMasking", 0, HIDDEN | SILENT);
+  static GVars3::gvar3<int> gvnGlareMasking("GlareMasking", 0, GVars3::HIDDEN | GVars3::SILENT);
 
   // Go through all received images, and convert them into the tracker's KeyFrames
   // This does things like generate the image pyramid and find FAST corners
@@ -341,8 +345,8 @@ void Tracker::TrackFrameSetup(ImageBWMap& imFrames, ros::Time timestamp, bool bD
     timingMsg.sbi += (ros::WallTime::now() - startTime).toSec();
   }
 
-  static gvar3<int> gvnDrawLevel("DrawLevel", 0, HIDDEN | SILENT);
-  static gvar3<int> gvnDrawMasks("DrawMasks", 0, HIDDEN | SILENT);
+  static GVars3::gvar3<int> gvnDrawLevel("DrawLevel", 0, GVars3::HIDDEN | GVars3::SILENT);
+  static GVars3::gvar3<int> gvnDrawMasks("DrawMasks", 0, GVars3::HIDDEN | GVars3::SILENT);
 
   double dMaxPointCov = mMapMaker.GetMaxCov();
 
@@ -482,7 +486,7 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
       ROS_DEBUG_STREAM("Since last dropped: " << ros::Time::now() - mtLastMultiKeyFrameDropped);
       ROS_DEBUG_STREAM("About to test neednew, mkf depth: " << mpCurrentMKF->mdTotalDepthMean);
 
-      static gvar3<int> gvnAddingMKFs("AddingMKFs", 1, HIDDEN | SILENT);
+      static GVars3::gvar3<int> gvnAddingMKFs("AddingMKFs", 1, GVars3::HIDDEN | GVars3::SILENT);
       // Heuristics to check if a key-frame should be added to the map:
       if (mbAddNext ||  // mMapMaker.Initializing() ||
           (*gvnAddingMKFs && mOverallTrackingQuality == GOOD && mnLostFrames == 0 &&
@@ -548,7 +552,7 @@ bool Tracker::AttemptRecovery()
       continue;
 
     // The pose returned is for a KeyFrame, so we have to calculate the appropriate base MultiKeyFrame pose from it
-    SE3<> se3Best = mRelocaliser.BestPose();
+    TooN::SE3<> se3Best = mRelocaliser.BestPose();
     mse3StartPose = mpCurrentMKF->mse3BaseFromWorld =
                       mpCurrentMKF->mmpKeyFrames[camName]->mse3CamFromBase.inverse() * se3Best;  // CHECK!! GOOD
 
@@ -560,7 +564,7 @@ bool Tracker::AttemptRecovery()
     return false;
 
   UpdateCamsFromWorld();
-  mv6BaseVelocity = Zeros;
+  mv6BaseVelocity = TooN::Zeros;
   mbJustRecoveredSoUseCoarse = true;
   return true;
 }
@@ -578,26 +582,26 @@ void Tracker::RenderGrid()
   // The grid is projected manually, i.e. GL receives projected 2D coords to draw.
   int nHalfCells = 8;
   int nTot = nHalfCells * 2 + 1;
-  CVD::Image<Vector<2>> imVertices(CVD::ImageRef(nTot, nTot));
+  CVD::Image<TooN::Vector<2>> imVertices(CVD::ImageRef(nTot, nTot));
 
-  static gvar3<int> gvnDrawLevel("DrawLevel", 0, HIDDEN | SILENT);
+  static GVars3::gvar3<int> gvnDrawLevel("DrawLevel", 0, GVars3::HIDDEN | GVars3::SILENT);
 
   std::string firstCamName = mvAllCamNames[0];
-  SE3<> se3FirstCamFromWorld = mpCurrentMKF->mmpKeyFrames[firstCamName]->mse3CamFromWorld;
+  TooN::SE3<> se3FirstCamFromWorld = mpCurrentMKF->mmpKeyFrames[firstCamName]->mse3CamFromWorld;
   TaylorCamera& camera = mmCameraModels[firstCamName];
-  Vector<2> v2Offset = vec(mmDrawOffsets[firstCamName]);
-  // Vector<2> v2Extents = LevelNPos(vec(mmSizes[firstCamName]), *gvnDrawLevel);
-  Vector<2> v2Extents = vec(mmSizes[firstCamName]);
+  TooN::Vector<2> v2Offset = vec(mmDrawOffsets[firstCamName]);
+  // TooN::Vector<2> v2Extents = LevelNPos(vec(mmSizes[firstCamName]), *gvnDrawLevel);
+  TooN::Vector<2> v2Extents = vec(mmSizes[firstCamName]);
 
   for (int i = 0; i < nTot; i++)
   {
     for (int j = 0; j < nTot; j++)
     {
-      Vector<3> v3;
+      TooN::Vector<3> v3;
       v3[0] = (i - nHalfCells) * 0.1;
       v3[1] = (j - nHalfCells) * 0.1;
       v3[2] = 0.0;
-      Vector<3> v3Cam = se3FirstCamFromWorld * v3;
+      TooN::Vector<3> v3Cam = se3FirstCamFromWorld * v3;
       if (v3Cam[2] < 0.001)
         v3Cam[2] = 0.001;
 
@@ -790,8 +794,8 @@ int Tracker::TestForCoarse(TDVLevels& vPVSLevels, std::string cameraName, unsign
 
 // Takes one nonlinear step in updating the pose of the current MultiKeyFrame, using the TrackerDatas collected by
 // (potentially) TestForCoarse and SetupFineTracking
-Vector<6> Tracker::PoseUpdateStep(std::vector<TrackerDataPtrVector>& vIterationSets, int nIter, double dOverrideSigma,
-                                  bool bMarkOutliers)
+TooN::Vector<6> Tracker::PoseUpdateStep(std::vector<TrackerDataPtrVector>& vIterationSets, int nIter,
+                                  double dOverrideSigma, bool bMarkOutliers)
 {
   for (unsigned j = 0; j < mvCurrCamNames.size(); ++j)
   {
@@ -821,8 +825,8 @@ Vector<6> Tracker::PoseUpdateStep(std::vector<TrackerDataPtrVector>& vIterationS
     dOverrideSigma = 0.0;
 
   // Calculate and apply the pose update...
-  Vector<6> v6Update = CalcPoseUpdate(vIterationSets, dOverrideSigma, bMarkOutliers);
-  mpCurrentMKF->mse3BaseFromWorld = SE3<>::exp(v6Update) * mpCurrentMKF->mse3BaseFromWorld;
+  TooN::Vector<6> v6Update = CalcPoseUpdate(vIterationSets, dOverrideSigma, bMarkOutliers);
+  mpCurrentMKF->mse3BaseFromWorld = TooN::SE3<>::exp(v6Update) * mpCurrentMKF->mse3BaseFromWorld;
 
   // Update the KeyFrame cam-from-world poses
   UpdateCamsFromWorld();
@@ -832,8 +836,8 @@ Vector<6> Tracker::PoseUpdateStep(std::vector<TrackerDataPtrVector>& vIterationS
 
 // Takes one linear step in updating the pose of the current MultiKeyFrame, using the TrackerDatas collected by
 // (potentially) TestForCoarse and SetupFineTracking
-Vector<6> Tracker::PoseUpdateStepLinear(std::vector<TrackerDataPtrVector>& vIterationSets, Vector<6>& v6LastUpdate,
-                                        int nIter, double dOverrideSigma, bool bMarkOutliers)
+TooN::Vector<6> Tracker::PoseUpdateStepLinear(std::vector<TrackerDataPtrVector>& vIterationSets,
+                              TooN::Vector<6>& v6LastUpdate, int nIter, double dOverrideSigma, bool bMarkOutliers)
 {
   for (unsigned j = 0; j < mvCurrCamNames.size(); ++j)
   {
@@ -849,8 +853,8 @@ Vector<6> Tracker::PoseUpdateStepLinear(std::vector<TrackerDataPtrVector>& vIter
     dOverrideSigma = 0.0;
 
   // Calculate and update pose;
-  Vector<6> v6Update = CalcPoseUpdate(vIterationSets, dOverrideSigma, bMarkOutliers);
-  mpCurrentMKF->mse3BaseFromWorld = SE3<>::exp(v6Update) * mpCurrentMKF->mse3BaseFromWorld;
+  TooN::Vector<6> v6Update = CalcPoseUpdate(vIterationSets, dOverrideSigma, bMarkOutliers);
+  mpCurrentMKF->mse3BaseFromWorld = TooN::SE3<>::exp(v6Update) * mpCurrentMKF->mse3BaseFromWorld;
 
   // Update the KeyFrame cam-from-world poses
   UpdateCamsFromWorld();
@@ -901,7 +905,7 @@ void Tracker::SetupFineTracking(TDVLevels& vPVSLevels, TrackerDataPtrVector& vIt
   if (nFinePatchesToUse < 0)
     nFinePatchesToUse = 0;
 
-  if ((int)vNextToSearch.size() > nFinePatchesToUse)
+  if (static_cast<int>(vNextToSearch.size()) > nFinePatchesToUse)
   {
     random_shuffle(vNextToSearch.begin(), vNextToSearch.end());
     vNextToSearch.resize(nFinePatchesToUse);  // Chop!
@@ -1044,7 +1048,8 @@ void Tracker::TrackMap()
     // std::cout<<"Found "<<nNumCoarseFound<<" coarse points (minimum for coarse step:
     // "<<Tracker::snCoarseMin<<std::endl;
 
-    if ((int)nNumCoarseFound > Tracker::snCoarseMin)  // Were enough found to do any meaningful optimisation?
+// Were enough found to do any meaningful optimisation?
+    if (static_cast<int>(nNumCoarseFound) > Tracker::snCoarseMin)
     {
       mbDidCoarse = true;
       for (int iter = 0; iter < 10 && mvCurrCamNames.size() > 0;
@@ -1082,8 +1087,8 @@ void Tracker::TrackMap()
   timingMsg.fine = (ros::WallTime::now() - startTime).toSec();
 
   startTime = ros::WallTime::now();
-  Vector<6> v6LastUpdate;
-  v6LastUpdate = Zeros;
+  TooN::Vector<6> v6LastUpdate;
+  v6LastUpdate = TooN::Zeros;
 
   // Again, ten gauss-newton pose update iterations.
   for (int iter = 0; iter < 10 && mvCurrCamNames.size() > 0; iter++)
@@ -1137,8 +1142,8 @@ void Tracker::TrackMap()
   {
     ROS_ASSERT(mpGLWindow);
 
-    static gvar3<int> gvnDrawLevel("DrawLevel", 0, HIDDEN | SILENT);
-    static gvar3<int> gvnDrawOnlyLevel("DrawOnlyLevel", 0, HIDDEN | SILENT);
+    static GVars3::gvar3<int> gvnDrawLevel("DrawLevel", 0, GVars3::HIDDEN | GVars3::SILENT);
+    static GVars3::gvar3<int> gvnDrawOnlyLevel("DrawOnlyLevel", 0, GVars3::HIDDEN | GVars3::SILENT);
 
     glPointSize(LevelScale(*gvnDrawLevel) + 5);
     glEnable(GL_BLEND);
@@ -1225,8 +1230,8 @@ void Tracker::RefreshSceneDepth(std::vector<TrackerDataPtrVector>& vIterationSet
       ROS_ASSERT(point.mnMEstimatorInlierCount > 0);  // should be set to 1 when point is created
 
       // Calculate the weight the same way as KeyFrame's internal scene depth calculator
-      double weight =
-        point.mnMEstimatorInlierCount / (double)(point.mnMEstimatorInlierCount + point.mnMEstimatorOutlierCount);
+      double weight = point.mnMEstimatorInlierCount / static_cast<double>((point.mnMEstimatorInlierCount
+                        + point.mnMEstimatorOutlierCount));
 
       vDepthsAndWeights.push_back(std::make_pair(norm(td.mv3Cam), weight));
     }
@@ -1265,7 +1270,7 @@ void Tracker::ReleasePointLock()
 void Tracker::RecordMeasurements()
 {
   // debug
-  static gvar3<int> gvnCrossCamera("CrossCamera", 1, HIDDEN | SILENT);
+  static GVars3::gvar3<int> gvnCrossCamera("CrossCamera", 1, GVars3::HIDDEN | GVars3::SILENT);
 
   for (unsigned i = 0; i < mvCurrCamNames.size(); ++i)
   {
@@ -1411,7 +1416,7 @@ int Tracker::SearchForPoints(TrackerDataPtrVector& vTD, std::string cameraName, 
 // dOverrideSigma is positive. Also, bMarkOutliers set to true
 // records any instances of a point being marked an outlier measurement
 // by the MEstimator.
-Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationSets, double dOverrideSigma,
+TooN::Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationSets, double dOverrideSigma,
                                   bool bMarkOutliers)
 {
   // Which M-estimator are we using?
@@ -1447,7 +1452,7 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
 
   // No valid measurements? Return null update.
   if (vErrorSquared.size() == 0)
-    return makeVector(0, 0, 0, 0, 0, 0);
+    return TooN::makeVector(0, 0, 0, 0, 0, 0);
 
   // Find the sigma squared that will be used in assigning weights
   double dSigmaSquared;
@@ -1466,7 +1471,7 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
 
   // The TooN WLSCholesky class handles reweighted least squares.
   // It just needs errors and jacobians.
-  WLS<6> wls;            //, wls_noweight;
+  TooN::WLS<6> wls;            //, wls_noweight;
   wls.add_prior(100.0);  // Stabilising prior
   // wls_noweight.add_prior(100);
   mnNumInliers = 0;
@@ -1485,7 +1490,7 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
         continue;
       }
 
-      Vector<2>& v2Error = td.mv2Error_CovScaled;
+      TooN::Vector<2>& v2Error = td.mv2Error_CovScaled;
       double dErrorSq = v2Error * v2Error;
       double dWeight;
 
@@ -1516,7 +1521,7 @@ Vector<6> Tracker::CalcPoseUpdate(std::vector<TrackerDataPtrVector>& vIterationS
         }
       }
 
-      Matrix<2, 6>& m26Jac = td.mm26Jacobian;
+      TooN::Matrix<2, 6>& m26Jac = td.mm26Jacobian;
       wls.add_mJ(v2Error[0], td.mdSqrtInvNoise * m26Jac[0], dWeight);  // These two lines are currently
       wls.add_mJ(v2Error[1], td.mdSqrtInvNoise * m26Jac[1], dWeight);  // the slowest bit of poseits
     }
@@ -1544,19 +1549,19 @@ void Tracker::ApplyMotionModel()
   mse3StartPose = mpCurrentMKF->mse3BaseFromWorld;
 
   // Old style motion update with simple velocity  model
-  Vector<6> v6Motion = mv6BaseVelocity * mLastProcessDur.toSec();
-  // Vector<6> v6Motion = Zeros;
+  TooN::Vector<6> v6Motion = mv6BaseVelocity * mLastProcessDur.toSec();
+  // TooN::Vector<6> v6Motion = TooN::Zeros;
 
   if (Tracker::sbUseRotationEstimator)  // estimate the rotation component of the motion from SmallBlurryImage
     // differences
   {
-    Vector<3> v3SBIRot = Zeros;
+    TooN::Vector<3> v3SBIRot = TooN::Zeros;
     bool bSuccess = CalcSBIRotation(v3SBIRot);
     if (bSuccess)
       v6Motion.slice<3, 3>() = v3SBIRot;
   }
 
-  mpCurrentMKF->mse3BaseFromWorld = SE3<>::exp(v6Motion) * mse3StartPose;
+  mpCurrentMKF->mse3BaseFromWorld = TooN::SE3<>::exp(v6Motion) * mse3StartPose;
 
   // Need to do this last after base pose updated
   UpdateCamsFromWorld();
@@ -1566,9 +1571,9 @@ void Tracker::ApplyMotionModel()
 void Tracker::UpdateMotionModel()
 {
   // Old style updating
-  SE3<> se3NewFromOld = mpCurrentMKF->mse3BaseFromWorld * mse3StartPose.inverse();
-  Vector<6> v6NewVel = SE3<>::ln(se3NewFromOld) / mLastProcessDur.toSec();
-  Vector<6> v6OldVel = mv6BaseVelocity;
+  TooN::SE3<> se3NewFromOld = mpCurrentMKF->mse3BaseFromWorld * mse3StartPose.inverse();
+  TooN::Vector<6> v6NewVel = TooN::SE3<>::ln(se3NewFromOld) / mLastProcessDur.toSec();
+  TooN::Vector<6> v6OldVel = mv6BaseVelocity;
 
   // Updated velocity is average of new and old
   mv6BaseVelocity = (0.5 * v6NewVel + 0.5 * v6OldVel) * 0.9;
@@ -1576,7 +1581,7 @@ void Tracker::UpdateMotionModel()
   // Also make an estimate of this which has been scaled by the mean scene depth.
   // This is used to decide if we should use a coarse tracking stage.
   // We can tolerate more translational vel when far away from scene!
-  Vector<6> v6 = mv6BaseVelocity;
+  TooN::Vector<6> v6 = mv6BaseVelocity;
   v6.slice<0, 3>() *= 1.0 / mpCurrentMKF->mdTotalDepthMean;
   mdMSDScaledVelocityMagnitude = sqrt(v6 * v6);
 }
@@ -1587,7 +1592,7 @@ void Tracker::AddNewKeyFrame()
   ROS_DEBUG("Tracker: About to add new key frame");
 
   // Save current pose because we'll need it to regenerate current MultiKeyFrame
-  SE3<> se3Pose = mpCurrentMKF->mse3BaseFromWorld;
+  TooN::SE3<> se3Pose = mpCurrentMKF->mse3BaseFromWorld;
   MultiKeyFrame* pCurrentMKF_Temp = mpCurrentMKF;
   mpCurrentMKF = NULL;
   InitCurrentMKF(se3Pose);
@@ -1667,10 +1672,10 @@ Tracker::TrackingQuality Tracker::AssessTrackingQuality(std::string cameraName)
     quality = BAD;
   else
   {
-    double dTotalFracFound = (double)nTotalFound / nTotalAttempted;
+    double dTotalFracFound = static_cast<double>(nTotalFound) / nTotalAttempted;
     double dLargeFracFound;
     if (nLargeAttempted > Tracker::snCoarseMin)
-      dLargeFracFound = (double)nLargeFound / nLargeAttempted;
+      dLargeFracFound = static_cast<double>(nLargeFound) / nLargeAttempted;
     else
       dLargeFracFound = dTotalFracFound;
 
@@ -1698,14 +1703,14 @@ void Tracker::CalcSBIRotation(TooN::SE3<>& se3RelativePose, TooN::Matrix<6>& m6C
   std::string& firstCamName = mvCurrCamNames[0];
 
   mmpSBILastFrame[firstCamName]->MakeJacs();
-  std::pair<SE2<>, double> result_pair;
+  std::pair<TooN::SE2<>, double> result_pair;
   result_pair = mmpSBIThisFrame[firstCamName]->IteratePosRelToTarget(*mmpSBILastFrame[firstCamName], 6);
 
-  SE3<> se3AdjustCamFrame;
+  TooN::SE3<> se3AdjustCamFrame;
   Matrix<6> m6AdjustCov;
   SmallBlurryImage::SE3fromSE2(result_pair.first, mmCameraModelsSBI[firstCamName], mmCameraModelsSBI[firstCamName],
 se3AdjustCamFrame, m6AdjustCov);
-  SE3<> se3AdjustBaseFrame = mpCurrentMKF->mmpKeyFrames[firstCamName]->mse3CamFromBase.get_rotation().inverse() *
+  TooN::SE3<> se3AdjustBaseFrame = mpCurrentMKF->mmpKeyFrames[firstCamName]->mse3CamFromBase.get_rotation().inverse() *
 se3AdjustCamFrame;
 
   se3RelativePose = se3AdjustBaseFrame;
@@ -1716,7 +1721,7 @@ se3AdjustCamFrame;
 // Calculate the difference between the last pose and the current pose by comparing SmallBlurryImages
 bool Tracker::CalcSBIRotation(TooN::Vector<3>& v3SBIRot)
 {
-  std::vector<Vector<3>> vRots;
+  std::vector<TooN::Vector<3>> vRots;
   int nNumUsed = 0;
   for (unsigned i = 0; i < mvCurrCamNames.size(); ++i)
   {
@@ -1726,14 +1731,14 @@ bool Tracker::CalcSBIRotation(TooN::Vector<3>& v3SBIRot)
       continue;
 
     mmpSBILastFrame[camName]->MakeJacs();
-    std::pair<SE2<>, double> result_pair;
+    std::pair<TooN::SE2<>, double> result_pair;
     result_pair = mmpSBIThisFrame[camName]->IteratePosRelToTarget(*mmpSBILastFrame[camName], 6);
-    SE3<> se3Adjust =
+    TooN::SE3<> se3Adjust =
       SmallBlurryImage::SE3fromSE2(result_pair.first, mmCameraModelsSBI[camName], mmCameraModelsSBI[camName]);
 
-    Vector<3> v3AxisAngle_Cam = se3Adjust.get_rotation().ln();
+    TooN::Vector<3> v3AxisAngle_Cam = se3Adjust.get_rotation().ln();
     // Pose found was between KeyFrames, calculate effect on base pose
-    Vector<3> v3AxisAngle_Base = mpCurrentMKF->mmpKeyFrames[camName]->mse3CamFromBase.get_rotation().inverse() *
+    TooN::Vector<3> v3AxisAngle_Base = mpCurrentMKF->mmpKeyFrames[camName]->mse3CamFromBase.get_rotation().inverse() *
                                  v3AxisAngle_Cam;  // CHECK !! GOOD
 
     vRots.push_back(v3AxisAngle_Base);
@@ -1747,7 +1752,7 @@ bool Tracker::CalcSBIRotation(TooN::Vector<3>& v3SBIRot)
   }
   else
   {
-    v3SBIRot = Zeros;
+    v3SBIRot = TooN::Zeros;
     return false;
   }
 }
@@ -1755,26 +1760,26 @@ bool Tracker::CalcSBIRotation(TooN::Vector<3>& v3SBIRot)
 TooN::Vector<3> Tracker::FindAverageRotation(std::vector<TooN::Vector<3>>& vRots)
 {
   double dEpsilon = 1e-3;
-  SO3<> R = SO3<>::exp(vRots[0]);
+  TooN::SO3<> R = TooN::SO3<>::exp(vRots[0]);
 
   // Start iterative calculation of the rotation
   // Follows the algorithm of "Rotation Averaging with Application to Camera-Rig Calibration"
   // by Dai et. al. section "geodesic L2-mean"
   while (1)
   {
-    Vector<3> r;
-    r = Zeros;
+    TooN::Vector<3> r;
+    r = TooN::Zeros;
 
     // Go through all MultiKeyFrames in the map
     for (unsigned i = 0; i < vRots.size(); ++i)
-      r += (R.inverse() * SO3<>::exp(vRots[i])).ln();  // incorporate KeyFrame's pose
+      r += (R.inverse() * TooN::SO3<>::exp(vRots[i])).ln();  // incorporate KeyFrame's pose
 
     r *= 1.0 / vRots.size();
 
     if (r * r < dEpsilon * dEpsilon)  // converged, so get out of here
       break;
 
-    R = R * SO3<>::exp(r);  // update R
+    R = R * TooN::SO3<>::exp(r);  // update R
   }
 
   return R.ln();

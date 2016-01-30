@@ -42,6 +42,10 @@
 #include <mcptam/Map.h>
 #include <mcptam/Tracker.h>
 #include <gvars3/instances.h>
+#include <deque>
+#include <limits>
+#include <algorithm>
+#include <vector>
 
 int MapMakerClientBase::snMinOutliers = 20;
 double MapMakerClientBase::sdOutlierMultiplier = 1.0;
@@ -171,7 +175,7 @@ bool MapMakerClientBase::NeedNewMultiKeyFrame(MultiKeyFrame &mkf, int nNumMeas)
     nClosestMeasSum += vpClosestMKFs[i]->NumMeasurements();
 
   // Arbitrarily choose 70% of the average measurement number to be the minimum, otherwise declare that we need new MKF
-  double dThresh = 0.7 * ((double)nClosestMeasSum / vpClosestMKFs.size());
+  double dThresh = 0.7 * (static_cast<double>(nClosestMeasSum) / vpClosestMKFs.size());
   bool bNeed = nNumMeas < dThresh;
 
   ROS_INFO_STREAM("NeedNewMultiKeyFrame: num meas: " << nNumMeas << " thresh: " << dThresh

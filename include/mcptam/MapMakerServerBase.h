@@ -329,6 +329,8 @@ protected:
   ros::ServiceClient mResetSystemClient;  ///< A service client to call the
   /// System's reset service, used by
   /// RequestResetInternal()
+
+  unsigned int seed = 1;  ///< Random seed for threadsafe rand_r
 };
 
 #endif  // MCPTAM_MAPMAKERSERVERBASE_H
