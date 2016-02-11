@@ -1,15 +1,7 @@
 #!/bin/bash
-# Normal Use: ./mcptam_install.bash /path/to/catkin_ws 
-# CI Use: ./mcptam_install.bash /path/to/catkin_ws CI
-
 set -e  # exit on first error
-
-CATKIN_WS= $1
-CI=false
-if [ $2 = "CI" ]; then
-	CI=true
-else
-fi
+ROS_VERSION="indigo"
+ROS_BASH="/opt/ros/$ROS_VERSION/setup.bash"
 
 TOON_VERSION="2.2"
 TOON_FORMAT="TooN-$TOON_VERSION"
@@ -22,6 +14,7 @@ LIBCVD_URL="http://www.edwardrosten.com/cvd/$LIBCVD_FORMAT.tar.gz"
 GVARS3_VERSION="3.0"
 GVARS3_FORMAT="gvars-$GVARS3_VERSION"
 GVARS3_URL="http://www.edwardrosten.com/cvd/$GVARS3_FORMAT.tar.gz"
+
 
 install_prerequisites()
 {
@@ -94,24 +87,26 @@ install_dependencies()
 
 build_mcptam()
 {
-	# confirm setup of ros env
+	# setup ros env
 	source $ROS_BASH
 
-	cd 
-	if [ $CI ]; then
-		# grab pull request version to be tested
-		cd ..
-	    cp -R mcptam $CATKIN_WS/src
-	    cd -
-	else
-		# clone mcptam to catkin workspace
-		cd $CATKIN_WS/src
-		git clone https://github.com/wavelab/mcptam mcptam
-		cd -
-	fi
-	cd $CATKIN_WS
-	catkin_make
+	# create catkin workspace
+	mkdir -p $HOME/catkin_ws/src
+	cd $HOME/catkin_ws/src
+	catkin_init_workspace
 	cd -
+
+	# setup catkin workspace
+	cd $HOME/catkin_ws/
+	catkin_make
+	source devel/setup.bash
+	cd -
+
+	# copy mcptam to catkin workspace
+	cd ..
+	cp -R mcptam $HOME/catkin_ws/src
+	cd $HOME/catkin_ws/
+	catkin_make
 }
 
 
