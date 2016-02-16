@@ -78,6 +78,7 @@ script:
   #testing
   - cd ~/catkin_ws
   - bash src/mcptam/test/run_catkin_tests.bash
+  - exit -1
   
 
 branches:
