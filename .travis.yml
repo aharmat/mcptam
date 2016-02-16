@@ -86,7 +86,9 @@ branches:
 
 notifications:
     recipients:
-        - stevenw@uwaterloo.ca
+      - stevenw@uwaterloo.ca
     email:
-        on_success: change
-        on_failure: always
+      on_success: change
+      on_failure: always
+    slack: 
+      wavelabteam: FXwl8QtUwMQYQfQr5PNlGQ5w
