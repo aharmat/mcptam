@@ -82,4 +82,4 @@ script:
 
 notifications:
   slack: 
-    wavelabteam: FXwl8QtUwMQYQfQr5PNlGQ5w
+    wavelabteam:FXwl8QtUwMQYQfQr5PNlGQ5w
