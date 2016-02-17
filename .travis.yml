@@ -82,6 +82,4 @@ script:
 
 notifications:
   slack: 
-    on_success: change
-    on_failure: always
     wavelabteam: FXwl8QtUwMQYQfQr5PNlGQ5w
