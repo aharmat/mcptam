@@ -81,10 +81,7 @@ script:
   - exit -1
 
 notifications:
-    #recipients:
-        #- stevenw@uwaterloo.ca
-    email:
+    slack: 
       on_success: change
       on_failure: always
-    slack: 
-      wavelabteam:FXwl8QtUwMQYQfQr5PNlGQ5w
+      wavelabteam: FXwl8QtUwMQYQfQr5PNlGQ5w
