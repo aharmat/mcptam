@@ -78,8 +78,10 @@ script:
   #testing
   #- cd ~/catkin_ws
   #- bash src/mcptam/test/run_catkin_tests.bash
-  - exit 0
+  - exit -1
 
 notifications:
   slack: 
+    on_success: change
+    on_failure: always
     wavelabteam:FXwl8QtUwMQYQfQr5PNlGQ5w
