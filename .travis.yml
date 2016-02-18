@@ -82,6 +82,7 @@ script:
 
 notifications:
   slack: 
-    wavelabteam:FXwl8QtUwMQYQfQr5PNlGQ5w
+    rooms:
+      - wavelabteam:FXwl8QtUwMQYQfQr5PNlGQ5w#mcptam-team
     on_success: change
     on_failure: always
