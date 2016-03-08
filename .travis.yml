@@ -75,18 +75,17 @@ script:
   - source $HOME/catkin_ws/devel/setup.bash
   - cd ~/catkin_ws
   - catkin_make 
-  #testing
+  # testing
   - cd ~/catkin_ws
   #- bash src/mcptam/test/run_catkin_tests.bash
   
-
 branches:
     only:
         #set the CI branch if desired
 
 notifications:
-    recipients:
-        - stevenw@uwaterloo.ca
-    email:
-        on_success: change
-        on_failure: always
+  slack: 
+    rooms:
+      - wavelabteam:FXwl8QtUwMQYQfQr5PNlGQ5w#mcptam-team
+    on_success: change
+    on_failure: always
