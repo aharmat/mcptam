@@ -13,7 +13,7 @@
   <rosparam command="load" file="$(find mcptam)/groups/$(arg group_name).yaml" />
   
   <remap from="reset" to="mcptam/reset" />
-  <param name="image_transport" type="string" value="raw"/>
+  <param name="image_transport" type="string" value="compressed"/>
   
   <param name="get_pose_separately" type="bool" value="$(arg separate_pose)" />   
   <!-- <param name="extrinsic_scale" type="double" value="0.95426" /> -->
