@@ -52,6 +52,9 @@ catkin_package(
 # Check source for formatting
 roslint_cpp()
 
+# Tests
+roslint_add_test()
+
 add_executable(mcptam src/Main.cpp src/GLWindow2.cpp src/GLWindowMenu.cpp src/VideoSourceMulti.cpp src/CameraGroupSubscriber.cpp 
                       src/SystemBase.cpp src/SystemFrontendBase.cpp src/System.cpp src/TaylorCamera.cpp src/KeyFrame.cpp src/MapPoint.cpp src/Map.cpp 
                       src/SmallBlurryImage.cpp src/ShiTomasi.cpp src/MapMaker.cpp src/MapMakerBase.cpp src/MapMakerClientBase.cpp src/MapMakerServerBase.cpp 
