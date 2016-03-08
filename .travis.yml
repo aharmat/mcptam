@@ -77,7 +77,11 @@ script:
   - catkin_make 
   # testing
   - cd ~/catkin_ws
-  - bash src/mcptam/test/run_catkin_tests.bash
+  #- bash src/mcptam/test/run_catkin_tests.bash
+  
+branches:
+    only:
+        #set the CI branch if desired
 
 notifications:
   slack: 
