@@ -131,6 +131,7 @@ public:
   MultiKeyFramePtrList mlpMultiKeyFramesTrash;  ///< List of MultiKeyFrame pointers that are in the trash
   boost::mutex mMutex;   ///< To allow multi-threaded operation safely
   bool mbGood;  ///< Is the map initialized and operational?
+  bool mbFreshMap; ///< Is the map Fresh from a BA operation?  
 };
 
 

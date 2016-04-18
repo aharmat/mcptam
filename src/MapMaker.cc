@@ -211,6 +211,8 @@ void MapMaker::run()
 
       ROS_DEBUG_STREAM("Accepted iterations: "<<nAccepted);
       ROS_DEBUG_STREAM("Number of outliers: "<<vOutliers.size());
+
+      mMap.mbFreshMap = true;
       //ROS_DEBUG_STREAM("Max cov: "<<mdMaxCov);
 
       if(nAccepted < 0) // bad
@@ -393,6 +395,8 @@ void MapMaker::AddMultiKeyFrameFromTopOfQueue()
 {
   ROS_INFO("Adding MKF from top of queue");
   boost::mutex::scoped_lock lock(mQueueMutex);
+
+  mMap.mbFreshMap = false;
 
   if(mqpMultiKeyFramesFromTracker.size() == 0)
     return;

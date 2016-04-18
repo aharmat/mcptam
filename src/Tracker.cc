@@ -479,7 +479,7 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
       if(use_entropy_keyframe) // use the entropy based keyframe method (CPER)
       {
           TooN::Vector<3> trackerEntropy = EvaluateTracker(this);
-          std::cout<<"tracker entropy: " << trackerEntropy <<std::endl;
+          //std::cout<<"tracker entropy: " << trackerEntropy <<std::endl;
           double entropyThresh = -4.0; //todo (adas) pull this out to a param
           bool addEntropyMKF = false;
           RecordMeasurementsAndBufferKeyFrame(); //todo (adas) turn into circular buffer
@@ -494,11 +494,18 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
 
           if( (trackerEntropy[0] > entropyThresh ) || (trackerEntropy[1] > entropyThresh ) || (trackerEntropy[2] > entropyThresh ) )
           {
-
-              addEntropyMKF = true;
+          		if(mMap.mbFreshMap)
+          			addEntropyMKF = true;
+          		else
+          		{
+          			ROS_WARN_STREAM("Waiting for fresh map...");
+          			addEntropyMKF = false;
+          		}
           } //todo (adas) include rotational entropies as well, plus options for the threshold type (just trans, just rot, both, etc)
 
-          if(addEntropyMKF && tracker_queue_size < 1 && (ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.2)) ) //add new keyframe //todo (adas) figure how to to limit the number of mkf we add at once.  Problem is that we can't tell how long it will take for the mkf to get into the map.  Need a smart way of adding a "delay" between additions
+          // && tracker_queue_size < 1 && (ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.2))
+
+          if(addEntropyMKF ) //add new keyframe //todo (adas) figure how to to limit the number of mkf we add at once.  Problem is that we can't tell how long it will take for the mkf to get into the map.  Need a smart way of adding a "delay" between additions
           {
               mMessageForUser << " SHOULD BE Adding MultiKeyFrame to Map";
               //sort keyframe vec
@@ -507,12 +514,12 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
               if(vKeyframeScores.size()>0)
               {
                   double bestSortIndex = vKeyframeScores[0].second;
-                  int k_itr = 1;
-                  while( bestSortIndex < vKeyframeScores.size()/2)
-                  {
-                      bestSortIndex = vKeyframeScores[k_itr].second;
-                      k_itr++;
-                  } //todo (adas) get rid of this, turn into circular buffer, this is a hack!
+                  //int k_itr = 1;
+                  //while( bestSortIndex < vKeyframeScores.size())
+                  //{
+                  //    bestSortIndex = vKeyframeScores[k_itr].second;
+                  //    k_itr++;
+                  //} //todo (adas) get rid of this, turn into circular buffer, this is a hack!
 
                   //double bestMKFScore = vKeyframeScores[k_itr].first;
                   AddNewKeyFrameFromBuffer(bestSortIndex);
@@ -1977,8 +1984,8 @@ void Tracker::RecordMeasurementsAndBufferKeyFrame()
     }
 
     mvKeyFrameBuffer.push_back(mpTempMKF); //store the MKF
-    ROS_INFO("Tracker: Buffering keyframe: %ld", mvKeyFrameBuffer.size());
-    ROS_INFO("Tracker: Total MKF Entropy Reduction is: %f", totalEntropyReduction);
+    //ROS_INFO("Tracker: Buffering keyframe: %ld", mvKeyFrameBuffer.size());
+    //ROS_INFO("Tracker: Total MKF Entropy Reduction is: %f", totalEntropyReduction);
 
     score_pair mp; mp.first = totalEntropyReduction; mp.second = mvKeyFrameBuffer.size() - 1;
     vKeyframeScores.push_back(mp);
