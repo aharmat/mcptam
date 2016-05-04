@@ -122,7 +122,4 @@ echo "##### Starting installation of mcptam dependencies..."
 install_dependencies
 echo "##### Starting build of mcptam..."
 build_mcptam
-if [ "$CI" = true ]; then
-	Status 
-fi
 echo "##### mcptam_install.bash script complete."	
