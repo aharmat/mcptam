@@ -110,10 +110,10 @@ build_mcptam()
 		cd $CATKIN_WS/src
 		git clone https://github.com/wavelab/mcptam
 		cd -
+		cd $CATKIN_WS
+		catkin_make
+		cd -
 	fi
-	cd $CATKIN_WS
-	catkin_make
-	cd -
 }
 
 
