@@ -107,7 +107,7 @@ build_mcptam()
 
 	if [ "$CI" = true ]; then
 		# grab pull request version to be tested, build done by travis
-		cd ..
+		cd $MCPTAM_DIR/..
 	    cp -R mcptam $CATKIN_WS/src
 	    cd -
 	else

@@ -62,7 +62,7 @@ env:
 
 # Install system dependencies, namely a very barebones ROS setup.
 before_install:
-- bash scripts/ros_install.bash
+- bash scripts/ros_install.bash $HOME/catkin_ws
 
 # Install all dependencies, using wstool and rosdep.
 # wstool looks for a ROSINSTALL_FILE defined in the environment variables.

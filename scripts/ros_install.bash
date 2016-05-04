@@ -1,4 +1,6 @@
 #!/bin/bash
+# CI Use: ./ros_install.bash /path/to/catkin_ws
+
 set -e  # exit on first error
 ROS_DISTRO=indigo  
 ROS_CI_DESKTOP="`lsb_release -cs`"  # e.g. [precise|trusty|...]
