@@ -6,7 +6,7 @@ ROS_BASH="/opt/ros/$ROS_DISTRO/setup.bash"
 
 # To install catkin workspace in default location run script without argument
 # To install in current directory, run with argument .
-CATKIN_WS=$HOME
+CATKIN_WS=$HOME/catkin_ws
 if [ $# = 1 ];  then
      CATKIN_WS=$1
 fi
@@ -34,6 +34,7 @@ prepare_workspace()
 	source $ROS_BASH
 
 	# create catkin workspace
+	mkdir -p $CATKIN_WS
 	cd $CATKIN_WS
 	mkdir src
 	cd src

@@ -1,16 +1,20 @@
 #!/bin/bash
 # Normal Use: ./mcptam_install.bash /path/to/catkin_ws 
 # CI Use: ./mcptam_install.bash /path/to/catkin_ws CI
+# Note: You must set up a catkin workspace in advance and either launch this script
+# from the workspace or pass the path to the workspace. Uses catkin_make to build 
+# mcptam.
 
 set -e  # exit on first error
 
-CATKIN_WS= $1
+# Determine workspace location
+CATKIN_WS=$1
 CI=false
-if [ $2 = "CI" ]; then
+if [ $# -eq 2 ] && [ $2 == "CI" ];	then
 	CI=true
-else
 fi
 
+# Define dependency versions
 TOON_VERSION="2.2"
 TOON_FORMAT="TooN-$TOON_VERSION"
 TOON_URL="http://www.edwardrosten.com/cvd/$TOON_FORMAT.tar.gz"
@@ -88,25 +92,23 @@ install_dependencies()
 	install_toon
 	install_libcvd
 	install_gvars3
-	rm -rf build_deps
 	cd ..
+	rm -rf build_deps
+
 }
 
 build_mcptam()
 {
-	# confirm setup of ros env
-	source $ROS_BASH
 
-	cd 
-	if [ $CI ]; then
+	if [ "$CI" = true ]; then
 		# grab pull request version to be tested
-		cd ..
+		cd ~
 	    cp -R mcptam $CATKIN_WS/src
 	    cd -
 	else
 		# clone mcptam to catkin workspace
 		cd $CATKIN_WS/src
-		git clone https://github.com/wavelab/mcptam mcptam
+		git clone https://github.com/wavelab/mcptam
 		cd -
 	fi
 	cd $CATKIN_WS
@@ -116,6 +118,11 @@ build_mcptam()
 
 
 # RUN
+echo "##### Starting installation of mcptam dependencies..."
 install_dependencies
+echo "##### Starting build of mcptam..."
 build_mcptam
-Status 
+if [ "$CI" = true ]; then
+	Status 
+fi
+echo "##### mcptam_install.bash script complete."	
