@@ -12,7 +12,12 @@ CATKIN_WS=$1
 CI=false
 if [ $# -eq 2 ] && [ $2 == "CI" ];	then
 	CI=true
+	MCPTAM_DIR=pwd
 fi
+echo "**********************"
+echo "MCPTAM_DIR: $MCPTAM_DIR"
+echo "**********************"
+
 
 # Define dependency versions
 TOON_VERSION="2.2"
@@ -101,12 +106,12 @@ build_mcptam()
 {
 
 	if [ "$CI" = true ]; then
-		# grab pull request version to be tested
+		# grab pull request version to be tested, build done by travis
 		cd ..
 	    cp -R mcptam $CATKIN_WS/src
 	    cd -
 	else
-		# clone mcptam to catkin workspace
+		# clone mcptam to catkin workspace and build for user
 		cd $CATKIN_WS/src
 		git clone https://github.com/wavelab/mcptam
 		cd -
