@@ -4,13 +4,16 @@ project(mcptam)
 # Add cmake_modules directory to cmake module path
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules")
 
+# Define build type
+set(CMAKE_BUILD_TYPE None)
+
 # Set our own specific flags. Want something like RelWithDebInfo but without the
 # -DNDEBUG flag that disables asserts
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x -march=core2 -msse3 -O3 -g -fopenmp")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++0x -march=native -msse3 -O3 -g -fopenmp")
 
 # Find various packages in order to set up environment variables
 find_package(catkin REQUIRED COMPONENTS roscpp image_transport sensor_msgs cv_bridge geometry_msgs tf message_filters std_msgs
-                                        std_srvs visualization_msgs dynamic_reconfigure pcl_ros message_generation)
+                                        std_srvs visualization_msgs dynamic_reconfigure pcl_ros message_generation roslint)
 find_package(Boost REQUIRED COMPONENTS system thread)
 find_package(CVD REQUIRED)
 find_package(OpenGL REQUIRED)
@@ -65,7 +68,7 @@ generate_messages(DEPENDENCIES std_msgs sensor_msgs)
 
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES ${PROJECT_NAME}
+  LIBRARIES ${PROJECT_NAME} $
   CATKIN_DEPENDS roscpp
                  image_transport
                  sensor_msgs
@@ -84,7 +87,13 @@ catkin_package(
           GVars3
 )
 
-set(MCPTAM_LIB_SRC
+# Check source for formatting
+roslint_cpp()
+
+# Tests
+roslint_add_test()
+
+set(MCPTAM_FUNCTIONS_LIB_SRC
     src/BundleAdjusterBase.cc
     src/BundleAdjusterCalib.cc
     src/BundleAdjusterMulti.cc
@@ -164,30 +173,31 @@ set(MCPTAM_LIBS
 )
 
 # create a library of all the non-main functions
-add_library(MCPTAM_FUNCTIONS_LIB ${MCPTAM_LIB_SRC})
+add_library(mcptam_functions ${MCPTAM_FUNCTIONS_LIB_SRC})
+target_link_libraries(mcptam_functions ${MCPTAM_LIBS})
 
 # add executables and link them to the libraries
 add_executable(mcptam ${MCPTAM_SRC} )
 add_dependencies(mcptam ${PROJECT_NAME}_gencpp)
-target_link_libraries(mcptam ${MCPTAM_LIBS} ${MCPTAM_FUNCTIONS_LIB})
+target_link_libraries(mcptam ${MCPTAM_LIBS} mcptam_functions)
 
 add_executable(mcptam_client ${MCPTAM_CLIENT_SRC})
 add_dependencies(mcptam_client ${PROJECT_NAME}_gencpp)
-target_link_libraries(mcptam_client ${MCPTAM_LIBS} ${MCPTAM_FUNCTIONS_LIB})
+target_link_libraries(mcptam_client ${MCPTAM_LIBS} mcptam_functions)
 
 add_executable(mcptam_server ${MCPTAM_SERVER_SRC})
 add_dependencies(mcptam_server ${PROJECT_NAME}_gencpp)
-target_link_libraries(mcptam_server ${MCPTAM_LIBS} ${MCPTAM_FUNCTIONS_LIB})
+target_link_libraries(mcptam_server ${MCPTAM_LIBS} mcptam_functions)
 
 add_executable(camera_calibrator ${CAMERA_CALIBRATOR_SRC})
 add_dependencies(camera_calibrator ${PROJECT_NAME}_gencpp)
-target_link_libraries(camera_calibrator ${MCPTAM_LIBS} ${MCPTAM_FUNCTIONS_LIB})
+target_link_libraries(camera_calibrator ${MCPTAM_LIBS} mcptam_functions)
 
 add_executable(pose_calibrator ${POSE_CALIBRATOR_SRC})
 add_dependencies(pose_calibrator ${PROJECT_NAME}_gencpp)
-target_link_libraries(pose_calibrator ${MCPTAM_LIBS} ${MCPTAM_FUNCTIONS_LIB})
+target_link_libraries(pose_calibrator ${MCPTAM_LIBS} mcptam_functions)
 
-install(TARGETS mcptam mcptam_client mcptam_server camera_calibrator pose_calibrator
+install(TARGETS mcptam #mcptam_client mcptam_server camera_calibrator pose_calibrator
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
