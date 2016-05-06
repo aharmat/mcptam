@@ -1,23 +1,36 @@
 #!/bin/bash
-# Normal Use: ./mcptam_install.bash /path/to/catkin_ws 
+# Normal Use: ./mcptam_install.bash
+#   or        ./mcptam_install.bash /path/to/catkin_ws
 # CI Use: ./mcptam_install.bash /path/to/catkin_ws CI
 # Note: You must set up a catkin workspace in advance and either launch this script
-# from the workspace or pass the path to the workspace. Uses catkin_make to build 
+# from the workspace or pass the path to the workspace. Uses catkin_make to build
 # mcptam.
 
 set -e  # exit on first error
 
 # Determine workspace location
-CATKIN_WS=$1
+CATKIN_WS=$(pwd) # set default location for workspace
 CI=false
+# If the catkin workspace folder is specified, use it
+if [ $# -gt 0 ]; then
+	CATKIN_WS=$1
+fi
+
+# If this is for CI
 if [ $# -eq 2 ] && [ $2 == "CI" ];	then
 	CI=true
-	MCPTAM_DIR=pwd
+	MCPTAM_DIR=$(pwd)
+	echo "**********************"
+	echo "MCPTAM src directory: $MCPTAM_DIR"
+	echo "**********************"
 fi
-echo "**********************"
-echo "MCPTAM_DIR: $MCPTAM_DIR"
-echo "**********************"
 
+# Confirm CATKIN_WS is a catkin workspace
+if [ ! -e $CATKIN_WS/.catkin_workspace ]; then
+	echo "Error: $CATKIN_WS not a valid catkin workspace."
+	echo "Specify workspace directory as first argument or launch from workspace root."
+	exit 1
+fi
 
 # Define dependency versions
 TOON_VERSION="2.2"
@@ -68,8 +81,8 @@ install_libcvd()
 	# configure, build and install
 	cd $LIBCVD_FORMAT
 	export CXXFLAGS=-D_REENTRANT
-	./configure --without-ffmpeg 
-	make 
+	./configure --without-ffmpeg
+	make
 	sudo make install
 	cd ..
 }
@@ -83,7 +96,7 @@ install_gvars3()
 	# configure, build and install
 	cd $GVARS3_FORMAT
 	./configure --disable-widgets
-	make 
+	make
 	sudo make install
 	cd ..
 }
@@ -92,7 +105,7 @@ install_dependencies()
 {
 	install_prerequisites
 
-	mkdir build_deps
+	mkdir -p build_deps
 	cd build_deps
 	install_toon
 	install_libcvd
@@ -111,8 +124,12 @@ build_mcptam()
 	    cp -R mcptam $CATKIN_WS/src
 	    cd -
 	else
-		# clone mcptam to catkin workspace and build for user
+		# Move to src dir and check if a previous mcptam folder exists
 		cd $CATKIN_WS/src
+		if [ -d mcptam ]; then
+			rm -rf mcptam
+		fi
+		# clone mcptam to catkin workspace and build for user
 		git clone https://github.com/wavelab/mcptam
 		cd -
 		cd $CATKIN_WS
@@ -127,4 +144,4 @@ echo "##### Starting installation of mcptam dependencies..."
 install_dependencies
 echo "##### Starting build of mcptam..."
 build_mcptam
-echo "##### mcptam_install.bash script complete."	
+echo "##### mcptam_install.bash script complete."
