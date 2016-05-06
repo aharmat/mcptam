@@ -106,7 +106,7 @@ build_mcptam()
 	cd ..
 	cp -R mcptam $HOME/catkin_ws/src
 	cd $HOME/catkin_ws/
-	catkin_make
+	catkin_make -j1
 }
 
 
