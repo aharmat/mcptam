@@ -132,7 +132,7 @@ build_mcptam()
 		git clone https://github.com/wavelab/mcptam
 		cd -
 		cd $CATKIN_WS
-		catkin_make
+		catkin_make -j1
 		cd -
 	fi
 }
