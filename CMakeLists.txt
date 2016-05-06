@@ -94,66 +94,66 @@ roslint_cpp()
 roslint_add_test()
 
 set(MCPTAM_FUNCTIONS_LIB_SRC
-    src/BundleAdjusterBase.cc
-    src/BundleAdjusterCalib.cc
-    src/BundleAdjusterMulti.cc
-    src/BundleAdjusterSingle.cc
-    src/CalibCornerPatch.cc
-    src/CalibGridCorner.cc
-    src/CalibImageTaylor.cc
-    src/CameraCalibrator.cc
-    src/CameraGroupSubscriber.cc
-    src/ChainBundle.cc
-    src/GLWindow2.cc
-    src/GLWindowMenu.cc
-    src/KeyFrame.cc
-    src/KeyFrameViewer.cc
-    src/Map.cc
-    src/MapMaker.cc
-    src/MapMakerBase.cc
-    src/MapMakerCalib.cc
-    src/MapMakerClient.cc
-    src/MapMakerClientBase.cc
-    src/MapMakerServer.cc
-    src/MapMakerServerBase.cc
-    src/MapPoint.cc
-    src/MiniPatch.cc
-    src/NetworkManager.cc
-    src/PatchFinder.cc
-    src/PoseCalibrator.cc
-    src/Relocaliser.cc
-    src/ShiTomasi.cc
-    src/SmallBlurryImage.cc
-    src/System.cc
-    src/SystemBase.cc
-    src/SystemClient.cc
-    src/SystemFrontendBase.cc
-    src/SystemServer.cc
-    src/TaylorCamera.cc
-    src/Tracker.cc
-    src/TrackerCalib.cc
-    src/VideoSourceMulti.cc
-    src/VideoSourceSingle.cc
+    src/BundleAdjusterBase.cpp
+    src/BundleAdjusterCalib.cpp
+    src/BundleAdjusterMulti.cpp
+    src/BundleAdjusterSingle.cpp
+    src/CalibCornerPatch.cpp
+    src/CalibGridCorner.cpp
+    src/CalibImageTaylor.cpp
+    src/CameraCalibrator.cpp
+    src/CameraGroupSubscriber.cpp
+    src/ChainBundle.cpp
+    src/GLWindow2.cpp
+    src/GLWindowMenu.cpp
+    src/KeyFrame.cpp
+    src/KeyFrameViewer.cpp
+    src/Map.cpp
+    src/MapMaker.cpp
+    src/MapMakerBase.cpp
+    src/MapMakerCalib.cpp
+    src/MapMakerClient.cpp
+    src/MapMakerClientBase.cpp
+    src/MapMakerServer.cpp
+    src/MapMakerServerBase.cpp
+    src/MapPoint.cpp
+    src/MiniPatch.cpp
+    src/NetworkManager.cpp
+    src/PatchFinder.cpp
+    src/PoseCalibrator.cpp
+    src/Relocaliser.cpp
+    src/ShiTomasi.cpp
+    src/SmallBlurryImage.cpp
+    src/System.cpp
+    src/SystemBase.cpp
+    src/SystemClient.cpp
+    src/SystemFrontendBase.cpp
+    src/SystemServer.cpp
+    src/TaylorCamera.cpp
+    src/Tracker.cpp
+    src/TrackerCalib.cpp
+    src/VideoSourceMulti.cpp
+    src/VideoSourceSingle.cpp
 )
 
 set(MCPTAM_SRC
-    src/Main.cc
+    src/Main.cpp
 )
 
 set(MCPTAM_CLIENT_SRC
-    src/MainClient.cc
+    src/MainClient.cpp
 )
 
 set(MCPTAM_SERVER_SRC
-    src/MainServer.cc
+    src/MainServer.cpp
 )
 
 set(POSE_CALIBRATOR_SRC
-    src/MainPoseCalibrator.cc
+    src/MainPoseCalibrator.cpp
 )
 
 set(CAMERA_CALIBRATOR_SRC
-    src/MainCameraCalibrator.cc
+    src/MainCameraCalibrator.cpp
 )
 
 
