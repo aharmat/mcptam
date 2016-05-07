@@ -57,7 +57,7 @@ virtualenv:
 # trigger a build matrix for different ROS distributions if desired.
 env:
   global:
-        
+
 ################################################################################
 
 # Install system dependencies, namely a very barebones ROS setup.
@@ -74,17 +74,17 @@ before_script:
 script:
   - source $HOME/catkin_ws/devel/setup.bash
   - cd ~/catkin_ws
-  - catkin_make 
+  - catkin_make -j1
   # testing
   - cd ~/catkin_ws
   #- bash src/mcptam/test/run_catkin_tests.bash
-  
+
 branches:
     only:
         #set the CI branch if desired
 
 notifications:
-  slack: 
+  slack:
     rooms:
       - wavelabteam:FXwl8QtUwMQYQfQr5PNlGQ5w#mcptam-team
     on_success: change

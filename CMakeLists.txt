@@ -197,7 +197,7 @@ add_executable(pose_calibrator ${POSE_CALIBRATOR_SRC})
 add_dependencies(pose_calibrator ${PROJECT_NAME}_gencpp)
 target_link_libraries(pose_calibrator ${MCPTAM_LIBS} mcptam_functions)
 
-install(TARGETS mcptam #mcptam_client mcptam_server camera_calibrator pose_calibrator
+install(TARGETS mcptam mcptam_client mcptam_server camera_calibrator pose_calibrator
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
