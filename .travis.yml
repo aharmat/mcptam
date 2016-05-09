@@ -74,7 +74,7 @@ before_script:
 script:
   - source $HOME/catkin_ws/devel/setup.bash
   - cd ~/catkin_ws
-  - catkin_make -j1
+  - catkin_make -j2
   # testing
   - cd ~/catkin_ws
   #- bash src/mcptam/test/run_catkin_tests.bash
