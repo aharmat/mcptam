@@ -1,0 +1,91 @@
+# Generic .travis.yml file for running continuous integration on Travis-CI with
+# any ROS package.
+#
+# This installs ROS on a clean Travis-CI virtual machine, creates a ROS
+# workspace, resolves all listed dependencies, and sets environment variables
+# (setup.bash). Then, it compiles the entire ROS workspace (ensuring there are
+# no compilation errors), and runs all the tests. If any of the compilation/test
+# phases fail, the build is marked as a failure.
+#
+# We handle two types of package dependencies:
+#   - packages (ros and otherwise) available through apt-get. These are installed
+#     using rosdep, based on the information in the ROS package.xml.
+#   - dependencies that must be checked out from source. These are handled by
+#     'wstool', and should be listed in a file named dependencies.rosinstall.
+#
+# There are two variables you may want to change:
+#   - ROS_DISTRO (default is indigo). Note that packages must be available for
+#     ubuntu 14.04 trusty.
+#   - ROSINSTALL_FILE (default is dependencies.rosinstall inside the repo
+#     root). This should list all necessary repositories in wstool format (see
+#     the ros wiki). If the file does not exists then nothing happens.
+#
+# See the README.md for more information.
+#
+# Author: Felix Duvallet <felixd@gmail.com>
+
+# NOTE: The build lifecycle on Travis.ci is something like this:
+#    before_install
+#    install
+#    before_script
+#    script
+#    after_success or after_failure
+#    after_script
+#    OPTIONAL before_deploy
+#    OPTIONAL deploy
+#    OPTIONAL after_deploy
+
+################################################################################
+
+# Use ubuntu trusty (14.04) with sudo privileges.
+dist: trusty
+sudo: required
+language:
+  - python
+  - c++
+cache:
+  - apt
+
+# By default travis runs all python code in a virtualenv that does not contain
+# the packages installed with apt-get. As this is essential (pip doesn't contain
+# all the necessary ROS python packages), tell travis-ci to use the system-wide
+# python packages.
+virtualenv:
+  system_site_packages: true
+
+# Configuration variables. All variables are global now, but this can be used to
+# trigger a build matrix for different ROS distributions if desired.
+env:
+  global:
+        
+################################################################################
+
+# Install system dependencies, namely a very barebones ROS setup.
+before_install:
+- bash scripts/ros_install.bash $HOME/catkin_ws
+
+# Install all dependencies, using wstool and rosdep.
+# wstool looks for a ROSINSTALL_FILE defined in the environment variables.
+before_script:
+- bash scripts/mcptam_install.bash $HOME/catkin_ws CI
+
+# Compile and test. If the CATKIN_OPTIONS file exists, use it as an argument to
+# catkin_make.
+script:
+  - source $HOME/catkin_ws/devel/setup.bash
+  - cd ~/catkin_ws
+  - catkin_make 
+  # testing
+  - cd ~/catkin_ws
+  #- bash src/mcptam/test/run_catkin_tests.bash
+  
+branches:
+    only:
+        #set the CI branch if desired
+
+notifications:
+  slack: 
+    rooms:
+      - wavelabteam:FXwl8QtUwMQYQfQr5PNlGQ5w#mcptam-team
+    on_success: change
+    on_failure: always

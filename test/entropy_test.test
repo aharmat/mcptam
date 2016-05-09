@@ -1,0 +1,3 @@
+<launch>
+   <test test-name="test_entropy" pkg="mcptam" type="test_entropy" />
+</launch>
