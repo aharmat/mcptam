@@ -42,6 +42,7 @@ lib
 bin
 *~
 
+*.orig
 ## Ros ignore stuff
 CATKIN_IGNORE
 
