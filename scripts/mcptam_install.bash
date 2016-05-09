@@ -132,7 +132,8 @@ build_mcptam()
 		git clone https://github.com/wavelab/mcptam
 		cd -
 		cd $CATKIN_WS
-		catkin_make -j1 #j1 limits thread usage
+		#make and limit to two threads to prevent using more than 8 GB of ram during build
+		catkin_make -j2 
 		cd -
 	fi
 }
