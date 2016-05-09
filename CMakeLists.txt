@@ -174,6 +174,7 @@ set(MCPTAM_LIBS
 
 # create a library of all the non-main functions
 add_library(mcptam_functions ${MCPTAM_FUNCTIONS_LIB_SRC})
+add_dependencies(mcptam_functions ${PROJECT_NAME}_gencpp)
 target_link_libraries(mcptam_functions ${MCPTAM_LIBS})
 
 # add executables and link them to the libraries
