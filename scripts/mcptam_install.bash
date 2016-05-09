@@ -117,7 +117,6 @@ install_dependencies()
 
 build_mcptam()
 {
-
 	if [ "$CI" = true ]; then
 		# grab pull request version to be tested, build done by travis
 		cd $MCPTAM_DIR/..
@@ -133,7 +132,8 @@ build_mcptam()
 		git clone https://github.com/wavelab/mcptam
 		cd -
 		cd $CATKIN_WS
-		catkin_make
+		#make and limit to two threads to prevent using more than 8 GB of ram during build
+		catkin_make -j2 
 		cd -
 	fi
 }
