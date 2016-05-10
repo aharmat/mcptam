@@ -203,13 +203,16 @@ add_dependencies(pose_calibrator ${PROJECT_NAME}_gencpp)
 target_link_libraries(pose_calibrator ${MCPTAM_LIBS} mcptam_functions)
 
 if(BUILD_TEST)
-  MESSAGE("adding files for unit testing...")
+  MESSAGE("testing entropy functions")
   find_package(rostest REQUIRED)
-  add_rostest_gtest(test_entropy test/entropy_test.test test/entropy_test.cpp)
+  add_rostest_gtest(test_entropy
+                    test/entropy_test.test
+                    test/entropy_test.cpp
+)
+
   target_link_libraries(test_entropy ${catkin_LIBRARIES})
 endif()
 
-                                     
 install(TARGETS mcptam mcptam_client mcptam_server camera_calibrator pose_calibrator
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
@@ -224,6 +227,5 @@ install(DIRECTORY launch/
 install(DIRECTORY masks/
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/masks
   PATTERN ".svn" EXCLUDE
-) 
-
+)
 

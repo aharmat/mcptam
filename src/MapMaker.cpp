@@ -415,17 +415,17 @@ void MapMaker::AddMultiKeyFrame(MultiKeyFrame *&pMKF_Incoming)
   if (mState == MM_INITIALIZING)
     {
         ROS_INFO("============== REMOVING IMAGES ===========");
-    pMKF->RemoveImages();  // don't need images when in initializing state
+        pMKF->RemoveImages();  // don't need images when in initializing state
     }
 
-    boost::mutex::scoped_lock lock(mQueueMutex);
-    mqpMultiKeyFramesFromTracker.push_back(pMKF);
-    lock.unlock();
+  boost::mutex::scoped_lock lock(mQueueMutex);
+  mqpMultiKeyFramesFromTracker.push_back(pMKF);
+  lock.unlock();
+  //ROS_INFO_STREAM("BA RUN STATE: " << mBundleAdjuster.Running());
 
-    //ROS_INFO_STREAM("BA RUN STATE: " << mBundleAdjuster.Running());
-
-    if(mBundleAdjuster.Running())   // Tell the mapmaker to stop doing low-priority stuff and concentrate on this KF first.
-        mBundleAdjuster.RequestAbort();
+  if(mBundleAdjuster.Running()){   // Tell the mapmaker to stop doing low-priority stuff and concentrate on this KF first.
+      mBundleAdjuster.RequestAbort();
+  }
 }
 
 

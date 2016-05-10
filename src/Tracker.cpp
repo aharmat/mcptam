@@ -89,7 +89,7 @@ double Tracker::sdTrackingQualityBad = 0.13;
 int Tracker::snLostFrameThresh = 3;
 bool Tracker::sbCollectAllPoints = true;
 
-bool kfComparitor ( const score_pair& l, const score_pair& r) //todo (adas): put this inside class
+bool kfComparitor ( const ScorePair& l, const ScorePair& r) //todo (adas): put this inside class
     { return l.first > r.first; }
 
 // The constructor mostly sets up interal reference variables
@@ -513,7 +513,7 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
           //ROS_INFO_STREAM("distance to closest mkf is: " << distance_to_closest_mkf);
 
           //bool test = mMapMaker.HasLocalMapConverged();
-          int tracker_queue_size = mMapMaker.TrackerQueueSize();
+          // int tracker_queue_size = mMapMaker.TrackerQueueSize();
           //ROS_WARN_STREAM("q size: " <<test_size);
 
           if( (trackerEntropy[0] > entropyThresh ) || (trackerEntropy[1] > entropyThresh ) || (trackerEntropy[2] > entropyThresh ) )
@@ -525,8 +525,7 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
           			ROS_WARN_STREAM("Waiting for fresh map...");
           			addEntropyMKF = false;
           		}
-          } //todo (adas) include rotational entropies as well, plus options for the threshold type (just trans, just rot, both, etc)
-
+          }
           // && tracker_queue_size < 1 && (ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.2))
 
           if(addEntropyMKF ) //add new keyframe //todo (adas) figure how to to limit the number of mkf we add at once.  Problem is that we can't tell how long it will take for the mkf to get into the map.  Need a smart way of adding a "delay" between additions
@@ -2037,7 +2036,7 @@ void Tracker::RecordMeasurementsAndBufferKeyFrame()
     //ROS_INFO("Tracker: Buffering keyframe: %ld", mvKeyFrameBuffer.size());
     //ROS_INFO("Tracker: Total MKF Entropy Reduction is: %f", totalEntropyReduction);
 
-    score_pair mp; mp.first = totalEntropyReduction; mp.second = mvKeyFrameBuffer.size() - 1;
+    ScorePair mp; mp.first = totalEntropyReduction; mp.second = mvKeyFrameBuffer.size() - 1;
     vKeyframeScores.push_back(mp);
 
     if(totalEntropyReduction > bestBufferKeyframeScore) //if we have a new winner

@@ -112,7 +112,7 @@ public:
     mnMEstimatorInlierCount = 1;
     // mtCreationTime = ros::Time::now();
     mpPatchSourceKF = NULL;
-    depthCovariance = InitDepthCovariance;//std::numeric_limits<double>::max(); /// todo (adas) figure out how to set initial depth covariance to a good initial value
+    depthCovariance = InitDepthCovariance;
 	};
 
   /// Delete owned TrackerData pointers
@@ -183,7 +183,7 @@ public:
   int mnID;  ///< Used when dumping map to file
   //things needed for entropy based keyframe insertion
   double depthCovariance; ///depth covariance for the point
- 
+
 };
 
 #endif  // MCPTAM_MAPPOINT_H

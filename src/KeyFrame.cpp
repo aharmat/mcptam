@@ -84,7 +84,6 @@ KeyFrame::KeyFrame(MultiKeyFrame* pMKF, std::string name) : mCamName(name), mpPa
 
 void KeyFrame::AddMeasurement(MapPoint* pPoint, Measurement* pMeas)
 {
-    //ROS_ASSERT(!mmpMeasurements.count(pPoint));
     if(mmpMeasurements.count(pPoint)) //safety: we've already added the measurements, don't add again!
         return;
 
@@ -193,12 +192,12 @@ std::tuple<double, double, double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::b
 
     if (i != 0)
     {
-      if (bPushBack)
-              lev.imagePrev.push_back(lev.image);  // save image before it's overwritten with downsampled new image
+      if (bPushBack){
+              lev.imagePrev.push_back(lev.image);
+      }// asave image before it's overwritten with downsampled new image
 
-          startTime = ros::WallTime::now();
-
-          // .. make a half-size image from the previous level..
+      startTime = ros::WallTime::now();
+      // .. make a half-size image from the previous level..
       lev.image.resize(maLevels[i - 1].image.size() / 2);
       CVD::halfSample(maLevels[i - 1].image, lev.image);
 
@@ -1042,17 +1041,14 @@ double MultiKeyFrame::Distance(MultiKeyFrame& other)
 MultiKeyFrame* MultiKeyFrame::CopyMultiKeyFramePartial()
 {
     MultiKeyFrame* returnMKF = new MultiKeyFrame();
-
     //copy stuff over
-
     returnMKF->mse3BaseFromWorld = mse3BaseFromWorld;  ///< The current pose in the world reference frame
     returnMKF->mbFixed=mbFixed; ///< Is the pose fixed? Generally only true for the first MultiKeyFrame added to the map
     returnMKF->mbBad=mbBad;  ///< Is it a dud? In that case it'll be moved to the trash soon.
     returnMKF->mbDeleted=mbDeleted; ///< Similar to mbBad, but used only in client/server code to allow immediate deletion of received MKF
+
     //returnMKF->mnUsing=mnUsing;
-
     //returnMKF->mmpKeyFrames=mmpKeyFrames;  ///< %Map of camera names to KeyFrame pointers
-
     //copy each keyframe individually
     for(KeyFramePtrMap::iterator it = mmpKeyFrames.begin(); it != mmpKeyFrames.end(); ++it)
     {
@@ -1066,7 +1062,6 @@ MultiKeyFrame* MultiKeyFrame::CopyMultiKeyFramePartial()
     returnMKF->isBufferMKF = isBufferMKF;
 
     return returnMKF;
-
 }
 
 // ------------------------------------------- Other stuff -------------------------------------------------------------
