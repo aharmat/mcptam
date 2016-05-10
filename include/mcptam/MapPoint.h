@@ -70,6 +70,8 @@
 #include <ros/ros.h>
 #include <atomic>
 
+#define InitDepthCovariance 25
+
 class TrackerData;
 
 /// Stores information on keyframe status relative to owner MapPoint
@@ -110,7 +112,7 @@ public:
     mnMEstimatorInlierCount = 1;
     // mtCreationTime = ros::Time::now();
     mpPatchSourceKF = NULL;
-    depthCovariance = 25;//std::numeric_limits<double>::max(); /// todo (adas) figure out how to set initial depth covariance to a good initial value
+    depthCovariance = InitDepthCovariance;//std::numeric_limits<double>::max(); /// todo (adas) figure out how to set initial depth covariance to a good initial value
 	};
 
   /// Delete owned TrackerData pointers

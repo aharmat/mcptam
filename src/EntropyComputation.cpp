@@ -1,20 +1,32 @@
+/****************************************************************************************
+ *
+ * \file EntropyComputation.cpp
+ * 
+ *
+ * Copyright 2015   Arun Das, University of Waterloo (adas@uwaterloo.ca)
+ *
+ *
+ ****************************************************************************************/
+
+
+
 #include <mcptam/EntropyComputation.h>
 
 //this function evaluates a point's entropy reduction
-double EvaluatePoint(Tracker* tracker, MapPoint& point, KeyFrame& tracker_kf, double priorPointCovariance, int pointLevel, double& prevEntropy)
+double EvaluatePoint(Tracker* tracker, MapPoint& point, KeyFrame& trackerKF, double priorPointCovariance, int pointLevel, double& prevEntropy)
 {
     //step 1: find the point's anchor keyframe
     KeyFrame& anchorKF = *point.mpPatchSourceKF;
 
     //check to see if the anchorKF and trackerKF are from the SAME MKF parent.  If this is the case, ignore
-    //if (anchorKF.mpParent == tracker_kf.mpParent)
+    //if (anchorKF.mpParent == trackerKF.mpParent)
     //return 0; //todo (adas): do we need this still?
 
     //step 2: extract the location of the anchor keyframe
     TooN::SE3<> anchorCamFromWorld = anchorKF.mse3CamFromWorld;
 
     //step 3: compute the relative transform from the anchor keyframe to the current tracker location
-    TooN::SE3<> trackerCamFromWorld = tracker_kf.mse3CamFromWorld;
+    TooN::SE3<> trackerCamFromWorld = trackerKF.mse3CamFromWorld;
     TooN::SE3<> relativeTransform = trackerCamFromWorld*anchorCamFromWorld.inverse();
 
     //step 4: compute the motion derivatives of the point wrt the anchor keyframe
@@ -44,18 +56,18 @@ double EvaluatePoint(Tracker* tracker, MapPoint& point, KeyFrame& tracker_kf, do
 
     //step 6: use the Taylor derivatives to map the point motion derivatives into image jacobians
 
-    TooN::Vector<3> v3_dTheta, v3_dPhi;
-    TooN::Vector<3> v3PointInTrakerCam = tracker_kf.mse3CamFromWorld*point.mv3WorldPos;
-    TaylorCamera& camera =  tracker->mmCameraModels[tracker_kf.mCamName];
-    camera.GetCamSphereDeriv(v3PointInTrakerCam, v3_dTheta, v3_dPhi);  // derivatives of spherical coords wrt camera frame coords*/
+    TooN::Vector<3> v3dTheta, v3dPhi;
+    TooN::Vector<3> v3PointInTrakerCam = trackerKF.mse3CamFromWorld*point.mv3WorldPos;
+    TaylorCamera& camera =  tracker->mmCameraModels[trackerKF.mCamName];
+    camera.GetCamSphereDeriv(v3PointInTrakerCam, v3dTheta, v3dPhi);  // derivatives of spherical coords wrt camera frame coords*/
 
     //step 7: using the jacobians, compute the predicted depth covariance of the point
 
     const TooN::Vector<3> v3Motion = m3Jac.T()[2];
     // Convert to motion on the sphere
     TooN::Vector<2> v2CamSphereMotion;
-    v2CamSphereMotion[0] = v3_dTheta * v3Motion;  // theta component
-    v2CamSphereMotion[1] = v3_dPhi * v3Motion;  // phi component
+    v2CamSphereMotion[0] = v3dTheta * v3Motion;  // theta component
+    v2CamSphereMotion[1] = v3dPhi * v3Motion;  // phi component
 
     // Convert to motion on the image
     TooN::Matrix<2> m2CamDerivs = camera.GetProjectionDerivs();
@@ -89,13 +101,13 @@ TooN::Vector<3> EvaluateTracker(Tracker* tracker) //TODO (adas): include rotatio
 {
     TooN::Vector<3> trackerEntropy;
 
-    double cov_xx = tracker->mm6PoseCovariance(0,0);
-    double cov_yy = tracker->mm6PoseCovariance(1,1);
-    double cov_zz = tracker->mm6PoseCovariance(2,2);
+    double covXX = tracker->mm6PoseCovariance(0,0);
+    double covYY = tracker->mm6PoseCovariance(1,1);
+    double covZZ = tracker->mm6PoseCovariance(2,2);
 
-    double hx = compute_point_entropy_scalar(cov_xx);
-    double hy = compute_point_entropy_scalar(cov_yy);
-    double hz = compute_point_entropy_scalar(cov_zz);
+    double hx = compute_point_entropy_scalar(covXX);
+    double hy = compute_point_entropy_scalar(covYY);
+    double hz = compute_point_entropy_scalar(covZZ);
 
     trackerEntropy[0] = hx; trackerEntropy[1] = hy; trackerEntropy[2] = hz;
 

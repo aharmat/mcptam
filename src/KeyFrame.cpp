@@ -89,7 +89,7 @@ void KeyFrame::AddMeasurement(MapPoint* pPoint, Measurement* pMeas)
         return;
 
 
-  boost::mutex::scoped_lock lock(mMeasMutex);
+   boost::mutex::scoped_lock lock(mMeasMutex);
 
     mmpMeasurements[pPoint] = pMeas;
 
@@ -285,17 +285,17 @@ std::tuple<double, double, double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::b
           fast_corner_score_10(lev.image, lev.vCorners, MIN_FAST_THRESH, vScores);  // Score them
 
       for (unsigned j = 0; j < vScores.size(); ++j)
-          {
+      {
               // For each score, increment all bins where score >= bin threshold value
         for (int t = MIN_FAST_THRESH; t <= MAX_FAST_THRESH; ++t)
-              {
+        {
           if (vScores[j] >= t)
                       lev.vFastFrequency[t]++;
 
           if (vScores[j] == t)  // reached the end, no point continuing
                       break;
-              }
-          }
+        }
+      }
 
           // Find the derivative that will indicate the "knee point" we are looking for
       // double targetDeriv = KeyFrame::saThreshDerivs[i];  // use fixed thresholds on derivatives

@@ -503,6 +503,7 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
       {
           TooN::Vector<3> trackerEntropy = EvaluateTracker(this);
           //std::cout<<"tracker entropy: " << trackerEntropy <<std::endl;
+          ROS_INFO("tracker entropy: (%f,%f,%f)",trackerEntropy[0],trackerEntropy[1],trackerEntropy[2]);
           double entropyThresh = -4.0; //todo (adas) pull this out to a param
           bool addEntropyMKF = false;
           RecordMeasurementsAndBufferKeyFrame(); //todo (adas) turn into circular buffer
@@ -546,7 +547,8 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
 
                   //double bestMKFScore = vKeyframeScores[k_itr].first;
                   AddNewKeyFrameFromBuffer(bestSortIndex);
-                  std::cout<<"adding MKF: " << bestSortIndex << "with score: " << bestBufferKeyframeScore<< "Entropy Tracker" << trackerEntropy<< std::endl;
+                  //std::cout<<"adding MKF: " << bestSortIndex << "with score: " << bestBufferKeyframeScore<< "Entropy Tracker" << trackerEntropy<< std::endl;
+                  ROS_INFO("adding MKF:%f with score: %f Entropy Tracker (%f,%f,%f)",bestSortIndex,bestBufferKeyframeScore,trackerEntropy[0],trackerEntropy[1],trackerEntropy[2]);
                   bestBufferKeyframeIndex = 0;
                   bestBufferKeyframeScore = 0;
                   //clear score buffer
@@ -814,6 +816,7 @@ int Tracker::TestForCoarse(TDVLevels& vPVSLevels, std::string cameraName, unsign
                            unsigned int nCoarseMax, int nCoarseSubPixIts, TrackerDataPtrVector& vIterationSet)
 {
   // std::cout<<"In Tracker::TestForCoarse, working on "<<cameraName<<std::endl;
+  ROS_INFO("In Tracker::TestForCoarse, working on %s",cameraName.c_str());
   TrackerDataPtrVector vNextToSearch;
 
   // Fill the vNextToSearch struct with an appropriate number of
@@ -993,6 +996,7 @@ void Tracker::SetupFineTracking(TDVLevels& vPVSLevels, TrackerDataPtrVector& vIt
   // Keep sub pix its at 0 to be a bit lenient and allow recovery from slightly
   // bad poses
   // std::cout<<"About to call SearchForPoints with "<<vNextToSearch.size()<<" TrackerDatas"<<std::endl;
+  //ROS_INFO("About to call SearchForPoints with %lu",vNextToSearch.size());
   SearchForPoints(vNextToSearch, cameraName, nFineRange, 0);  // 10);
 
   // And attach them all to the end of the optimisation-set.
@@ -1011,6 +1015,7 @@ void Tracker::SetupFineTracking(TDVLevels& vPVSLevels, TrackerDataPtrVector& vIt
 void Tracker::TrackMap()
 {
   // std::cout<<"Starting TrackMap"<<std::endl;
+  ROS_INFO("Starting TrackMap");
 
   // This will collect TrackerDatas that will be used in the pose update near the end of the function
   mvIterationSets.clear();
