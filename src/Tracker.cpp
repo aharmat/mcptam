@@ -502,9 +502,8 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
       if(use_entropy_keyframe) // use the entropy based keyframe method (CPER)
       {
           TooN::Vector<3> trackerEntropy = EvaluateTracker(this);
-          //std::cout<<"tracker entropy: " << trackerEntropy <<std::endl;
-          ROS_INFO("tracker entropy: (%f,%f,%f)",trackerEntropy[0],trackerEntropy[1],trackerEntropy[2]);
-          double entropyThresh = -4.0; //todo (adas) pull this out to a param
+          ROS_DEBUG("tracker entropy: (%f,%f,%f)",trackerEntropy[0],trackerEntropy[1],trackerEntropy[2]);
+          double entropyThresh = -4.0;
           bool addEntropyMKF = false;
           RecordMeasurementsAndBufferKeyFrame(); //todo (adas) turn into circular buffer
 
@@ -537,16 +536,7 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
               if(vKeyframeScores.size()>0)
               {
                   double bestSortIndex = vKeyframeScores[0].second;
-                  //int k_itr = 1;
-                  //while( bestSortIndex < vKeyframeScores.size())
-                  //{
-                  //    bestSortIndex = vKeyframeScores[k_itr].second;
-                  //    k_itr++;
-                  //} //todo (adas) get rid of this, turn into circular buffer, this is a hack!
-
-                  //double bestMKFScore = vKeyframeScores[k_itr].first;
                   AddNewKeyFrameFromBuffer(bestSortIndex);
-                  //std::cout<<"adding MKF: " << bestSortIndex << "with score: " << bestBufferKeyframeScore<< "Entropy Tracker" << trackerEntropy<< std::endl;
                   ROS_INFO("adding MKF:%f with score: %f Entropy Tracker (%f,%f,%f)",bestSortIndex,bestBufferKeyframeScore,trackerEntropy[0],trackerEntropy[1],trackerEntropy[2]);
                   bestBufferKeyframeIndex = 0;
                   bestBufferKeyframeScore = 0;
