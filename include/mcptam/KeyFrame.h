@@ -402,7 +402,9 @@ public:
   MultiKeyFrame* CopyMultiKeyFramePartial(); //returns a pointer to the partially copied MKF
   
   // Variables
-  bool isBufferMKF;  ///am I a buffer MKF?  If so, we'll use the flag to disable things such as updating measurements to the global points list when buffering keyframe information
+  bool isBufferMKF; // Determines whether the current MKF is buffered. A multi-keyframe buffer is a vector that stores
+                    // MKFs since the last insertion time, until the next insertion time is detected. It is used to select an MKF which
+                    // maximizes the reduction in expected entropy if it was inserted in the map. 
   
   TooN::SE3<> mse3BaseFromWorld;  ///< The current pose in the world reference frame
   bool mbFixed;                   ///< Is the pose fixed? Generally only true for the first

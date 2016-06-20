@@ -92,7 +92,9 @@ void KeyFrame::AddMeasurement(MapPoint* pPoint, Measurement* pMeas)
 
     mmpMeasurements[pPoint] = pMeas;
 
-    if(!(mpParent->isBufferMKF)) //This keyframe is NOT part of a buffer, add measurements to global points
+    if(!(mpParent->isBufferMKF)) // This keyframe is NOT part of a buffer, add measurements to global points. Otherwise,
+                                 // disable things such as updating measurements to the global points list when buffering
+                                 // keyframe information. 
     {
         pPoint->mMMData.spMeasurementKFs.insert(this);
     }
@@ -1047,8 +1049,6 @@ MultiKeyFrame* MultiKeyFrame::CopyMultiKeyFramePartial()
     returnMKF->mbBad=mbBad;  ///< Is it a dud? In that case it'll be moved to the trash soon.
     returnMKF->mbDeleted=mbDeleted; ///< Similar to mbBad, but used only in client/server code to allow immediate deletion of received MKF
 
-    //returnMKF->mnUsing=mnUsing;
-    //returnMKF->mmpKeyFrames=mmpKeyFrames;  ///< %Map of camera names to KeyFrame pointers
     //copy each keyframe individually
     for(KeyFramePtrMap::iterator it = mmpKeyFrames.begin(); it != mmpKeyFrames.end(); ++it)
     {

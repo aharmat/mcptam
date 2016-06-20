@@ -89,8 +89,6 @@ double Tracker::sdTrackingQualityBad = 0.13;
 int Tracker::snLostFrameThresh = 3;
 bool Tracker::sbCollectAllPoints = true;
 
-bool kfComparitor ( const ScorePair& l, const ScorePair& r) //todo (adas): put this inside class
-    { return l.first > r.first; }
 
 // The constructor mostly sets up interal reference variables
 // to the other classes..
@@ -127,7 +125,7 @@ Tracker::Tracker(Map& map, MapMakerClientBase& mapmaker, TaylorCameraMap& camera
   maskPub = mNodeHandlePrivate.advertise<sensor_msgs::Image>("mask", 1);
   timingPub = mNodeHandlePrivate.advertise<mcptam::TrackerTiming>("timing_tracker", 1);
 
-  bestBufferKeyframeScore = 0;
+  mdBestBufferKeyframeScore = 0;
 
 
 }
@@ -498,24 +496,25 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
 
       static GVars3::gvar3<int> gvnAddingMKFs("AddingMKFs", 1, GVars3::HIDDEN | GVars3::SILENT);
 
-      bool use_entropy_keyframe = true;
-      if(use_entropy_keyframe) // use the entropy based keyframe method (CPER)
+      if(USE_CPER) // use the entropy based keyframe method (CPER)
       {
           TooN::Vector<3> trackerEntropy = EvaluateTracker(this);
-          ROS_DEBUG("tracker entropy: (%f,%f,%f)",trackerEntropy[0],trackerEntropy[1],trackerEntropy[2]);
-          double entropyThresh = -4.0;
           bool addEntropyMKF = false;
-          RecordMeasurementsAndBufferKeyFrame(); //todo (adas) turn into circular buffer
+          RecordMeasurementsAndBufferKeyFrame();
 
-          //MultiKeyFrame* closest_mkf = mMapMaker.ClosestMultiKeyFrame(*mpCurrentMKF);
-          //double distance_to_closest_mkf = closest_mkf->Distance(*mpCurrentMKF);
-          //ROS_INFO_STREAM("distance to closest mkf is: " << distance_to_closest_mkf);
+          #if DEBUG_CPER
+            ROS_DEBUG("tracker entropy: (%f,%f,%f)",trackerEntropy[0],trackerEntropy[1],trackerEntropy[2]);
+            
+            MultiKeyFrame* closest_mkf = mMapMaker.ClosestMultiKeyFrame(*mpCurrentMKF);
+            double distance_to_closest_mkf = closest_mkf->Distance(*mpCurrentMKF);
+            ROS_DEBUG("distance to closest mkf is: " << distance_to_closest_mkf);
 
-          //bool test = mMapMaker.HasLocalMapConverged();
-          // int tracker_queue_size = mMapMaker.TrackerQueueSize();
-          //ROS_WARN_STREAM("q size: " <<test_size);
+            bool test = mMapMaker.HasLocalMapConverged();
+            int tracker_queue_size = mMapMaker.TrackerQueueSize();
+            ROS_WARN_STREAM("q size: " <<test_size);
+          #endif
 
-          if( (trackerEntropy[0] > entropyThresh ) || (trackerEntropy[1] > entropyThresh ) || (trackerEntropy[2] > entropyThresh ) )
+          if( (trackerEntropy[0] > ENTROPY_THRESHOLD ) || (trackerEntropy[1] > ENTROPY_THRESHOLD ) || (trackerEntropy[2] > ENTROPY_THRESHOLD) )
           {
           		if(mMap.mbFreshMap)
           			addEntropyMKF = true;
@@ -525,9 +524,9 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
           			addEntropyMKF = false;
           		}
           }
-          // && tracker_queue_size < 1 && (ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.2))
+    
 
-          if(addEntropyMKF ) //add new keyframe //todo (adas) figure how to to limit the number of mkf we add at once.  Problem is that we can't tell how long it will take for the mkf to get into the map.  Need a smart way of adding a "delay" between additions
+          if(addEntropyMKF )
           {
               mMessageForUser << " SHOULD BE Adding MultiKeyFrame to Map";
               //sort keyframe vec
@@ -537,9 +536,13 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
               {
                   double bestSortIndex = vKeyframeScores[0].second;
                   AddNewKeyFrameFromBuffer(bestSortIndex);
-                  ROS_INFO("adding MKF:%f with score: %f Entropy Tracker (%f,%f,%f)",bestSortIndex,bestBufferKeyframeScore,trackerEntropy[0],trackerEntropy[1],trackerEntropy[2]);
-                  bestBufferKeyframeIndex = 0;
-                  bestBufferKeyframeScore = 0;
+
+                  #if DEBUG_CPER
+                    ROS_DEBUG("adding MKF:%f with score: %f Entropy Tracker (%f,%f,%f)",bestSortIndex,mdBestBufferKeyframeScore,trackerEntropy[0],trackerEntropy[1],trackerEntropy[2]);
+                  #endif
+
+                  mnBestBufferKeyframeIndex = 0;
+                  mdBestBufferKeyframeScore = 0;
                   //clear score buffer
                   vKeyframeScores.clear();
               }
@@ -550,7 +553,7 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
     else  if (mbAddNext ||  // mMapMaker.Initializing() ||
           (*gvnAddingMKFs && mOverallTrackingQuality == GOOD && mnLostFrames == 0 &&
            ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.1) &&
-           // mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF, CountMeasurements()))
+
            mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF)))
       {
         if (mbAddNext)
@@ -566,7 +569,7 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
       }
       timingMsg.add = (ros::WallTime::now() - startTime).toSec();
 
-      ReleasePointLock();  // Important! Do this whenever tracking step has finished
+      ReleasePointLock();  // Do this whenever tracking step has finished
     }
     else  // what if there is a map, but tracking has been lost?
     {
@@ -575,7 +578,7 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
       {
         TrackMap();
         AssessOverallTrackingQuality();
-        ReleasePointLock();  // Important! Do this whenever tracking step has finished
+        ReleasePointLock();  // Do this whenever tracking step has finished
       }
     }
 
@@ -2007,12 +2010,12 @@ void Tracker::RecordMeasurementsAndBufferKeyFrame()
             double priorPointCovariance = point.depthCovariance;
             double prevPointEntropy = 0;
 
-            if( !std::isfinite(priorPointCovariance) || priorPointCovariance < 1e-7) //todo (adas): don't hardcode these
-                priorPointCovariance = 1e-8;
+            if( !std::isfinite(priorPointCovariance) || priorPointCovariance < EXP_7 ) 
+                priorPointCovariance = EXP_8;
 
             double entropyReduction = EvaluatePoint(this, point, kf, priorPointCovariance, pMeas->nLevel, prevPointEntropy);
 
-            if(!isnan(entropyReduction) ) //if non NAN, todo (adas) need to figure out why nan, probably ill conditioned covariance
+            if(!isnan(entropyReduction) ) 
             {
                 totalPreviousEntropy+=prevPointEntropy;
                 totalEntropyReduction +=entropyReduction;
@@ -2023,16 +2026,19 @@ void Tracker::RecordMeasurementsAndBufferKeyFrame()
     }
 
     mvKeyFrameBuffer.push_back(mpTempMKF); //store the MKF
-    //ROS_INFO("Tracker: Buffering keyframe: %ld", mvKeyFrameBuffer.size());
-    //ROS_INFO("Tracker: Total MKF Entropy Reduction is: %f", totalEntropyReduction);
+
+    #if DEBUG_CPER
+      ROS_DEBUG("Tracker: Buffering keyframe: %ld", mvKeyFrameBuffer.size());
+      ROS_DEBUG("Tracker: Total MKF Entropy Reduction is: %f", totalEntropyReduction);
+    #endif
 
     ScorePair mp; mp.first = totalEntropyReduction; mp.second = mvKeyFrameBuffer.size() - 1;
     vKeyframeScores.push_back(mp);
 
-    if(totalEntropyReduction > bestBufferKeyframeScore) //if we have a new winner
+    if(totalEntropyReduction > mdBestBufferKeyframeScore) //if we have a new winner
     {
-        bestBufferKeyframeScore = totalEntropyReduction;
-        bestBufferKeyframeIndex = mvKeyFrameBuffer.size() - 1;
+        mdBestBufferKeyframeScore = totalEntropyReduction;
+        mnBestBufferKeyframeIndex = mvKeyFrameBuffer.size() - 1;
     }
 
 
@@ -2040,11 +2046,11 @@ void Tracker::RecordMeasurementsAndBufferKeyFrame()
 
 void Tracker::AddNewKeyFrameFromBuffer(int bufferPosition)
 {
-    if( (int)mvKeyFrameBuffer.size() < bufferPosition) //exceeding index
+    //note: should check to make sure index doesnt exceed buffer size
+    if( (int)mvKeyFrameBuffer.size() <= bufferPosition) //exceeding index
         return;
 
     static GVars3::gvar3<int> gvnCrossCamera("CrossCamera", 1, GVars3::HIDDEN|GVars3::SILENT);
-    //note: should check to make sure index doesnt exceed buffer size
 
     //pull out the keyframe from the buffer
     MultiKeyFrame* mpTempMKF =  mvKeyFrameBuffer[bufferPosition];
@@ -2052,14 +2058,13 @@ void Tracker::AddNewKeyFrameFromBuffer(int bufferPosition)
     //set it's status to NOT a bufferkeyframe (it's getting inserted into the map!
     mpTempMKF->isBufferMKF = false;
 
-    //iterate through all the measurements in the chosen MKF and all all the measurements to the map points
+    //iterate through all the measurements in the chosen MKF and all the measurements to the map points
     //boost::mutex::scoped_lock lock(mMap.mMutex);
     for(KeyFramePtrMap::iterator it = mpTempMKF->mmpKeyFrames.begin(); it != mpTempMKF->mmpKeyFrames.end(); ++it)
     {
         std::string cName = (it->first);
         KeyFrame* kf = (it->second);
 
-        //std::cout<<"At Keyframe %x " << &kf <<std::endl;
 
         //iterate through each measurement map in the keyframe
         std::vector<MapPoint*> ptsToDelete;
@@ -2067,20 +2072,24 @@ void Tracker::AddNewKeyFrameFromBuffer(int bufferPosition)
         {
             MapPoint& kf_point = *(it_mp->first);
 
-            //IMPORTANT: check to see if the pointer is still in the map! It may have been trashed by the map maker
-            if(std::count(mMap.mlpPoints.begin(), mMap.mlpPoints.end(), &kf_point)) //is the point still in the map??
+            // check to see if the pointer is still in the map. It may have been trashed by the map maker
+            if(std::count(mMap.mlpPoints.begin(), mMap.mlpPoints.end(), &kf_point)) //is the point still in the map?
             {
                 //if(kf_point.mMMData.spMeasurementKFs.count(kf)) //if its not in there already, or is bad (bad points taken car of when handed to map maker)
                 //continue;
 
-                //std::cout<<"inserting keyframe " << kf.mCamName << " at point %x " <<  &kf_point <<std::endl;
+                #if DEBUG_CPER
+                  ROS_DEBUG("inserting keyframe " << kf.mCamName << " at point %x " <<  &kf_point);
+                #endif
                 //boost::mutex::scoped_lock lock(kf->mMeasMutex);
 
                 kf_point.mMMData.spMeasurementKFs.insert(kf); //add measurements of the keyframe to the point
             }
             else //want to erase measurement to the point
             {
-                //std::cout<<"erasing meas of nonexisting point..."<<std::endl;
+                #if DEBUG_CPER
+                  ROS_DEBUG("erasing meas of nonexisting point...");
+                #endif
                 //kf->EraseMeasurementOfPoint(&kf_point);
                 //kf_point.mMMData.spMeasurementKFs.erase(kf);
 
@@ -2101,7 +2110,7 @@ void Tracker::AddNewKeyFrameFromBuffer(int bufferPosition)
     for(int i=0; i<bufferSize; i++) // for the whole buffer
     {
         if(i==bufferPosition)
-            continue; //skip this, otherwise we'll delete the data for our selected keyframe!
+            continue; //skip this, otherwise we'll delete the data for our selected keyframe.
         MultiKeyFrame *pMKF = mvKeyFrameBuffer[i];
         delete pMKF;
         pMKF = NULL;

@@ -77,6 +77,7 @@
 #include <mcptam/KeyFrame.h>  // needed for LEVELS define
 #include <mcptam/GLWindow2.h>
 #include <mcptam/TrackerTiming.h>
+#include <mcptam/Cper.h>
 #include <sstream>
 #include <vector>
 #include <boost/intrusive_ptr.hpp>
@@ -208,6 +209,12 @@ public:
     return mLastProcessTime;
   }
 
+  /** @brief Compare multi-keyframe's scores
+   *  @return True if the first KF's score is higher */
+  static bool kfComparitor ( const ScorePair& l, const ScorePair& r)
+  { 
+    return l.first > r.first; 
+  }
   /** @brief Gets messages to be printed on-screen for the user
    *  @return The message string */
   std::string GetMessageForUser();
@@ -457,8 +464,6 @@ protected:
   /// Clear the keyframe buffer
   void ClearKeyFrameBuffer();
 
-  double CalculatePFPScore(cv::Mat& EPFP, cv::Mat& PPFP);
-
   /// Clears mvIterationSets, which causes the "using" count of MapPoints to
   /// decrement as the boost intrusive pointers destruct
   void ReleasePointLock();
@@ -630,9 +635,9 @@ protected:
 
   //for keyframe buffering
   //MultiKeyFramePtrList mvKeyFrameBuffer;
-  std::vector< MultiKeyFrame* > mvKeyFrameBuffer; ///< vector that holds a buffer of MKF pointers
-  int bestBufferKeyframeIndex; ///< index in the buffer for the keyframe with the best entropy reduction score
-  double bestBufferKeyframeScore; ///< best entropy reduction score so far in the buffer
+  std::vector< MultiKeyFrame* > mvKeyFrameBuffer; ///< vector that holds  MKF pointers
+  int mnBestBufferKeyframeIndex; ///< index in the buffer for the keyframe with the best entropy reduction score
+  double mdBestBufferKeyframeScore; ///< best entropy reduction score so far in the buffer
   std::vector<ScorePair> vKeyframeScores; //vector of pairs which keeps track of
 
   // testing

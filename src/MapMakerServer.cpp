@@ -107,7 +107,7 @@ void MapMakerServer::run()
   while (!shouldStop() &&
          ros::ok())  // ShouldStop is a CVD::Thread func which return true if the thread is told to exit.
   {
-    ROS_INFO("running server");
+    ROS_INFO("MCPTAM Map Maker Server now running...");
     if (ResetRequested())
     {
       Reset();
