@@ -458,8 +458,8 @@ protected:
   void AddNewKeyFrameFromBuffer(int bufferPosition);
 
 
-  /// Records the measurements and Buffers Keyframes while tracking.  We can later select a keyframe from the buffer to add to the map
-  void RecordMeasurementsAndBufferKeyFrame();
+  /// Records the measurements and Buffers Multi-Keyframes while tracking.  We can later select a multi-keyframe from the buffer to add to the map
+  void RecordMeasurementsAndBufferMultiKeyFrame();
 
   /// Clear the keyframe buffer
   void ClearKeyFrameBuffer();

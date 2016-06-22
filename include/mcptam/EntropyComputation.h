@@ -70,9 +70,16 @@ inline double compute_point_entropy_scalar(double pointCovariance)
 }
 
 /// evaluates a map point and computes the expected entropy reduction based on the current keyframe observation in the tracker.
-double EvaluatePoint(Tracker* tracker, MapPoint& point, KeyFrame& trackerKF,double priorPointCovariance, int level, double& prevEntropy);
+double EvaluatePointEntropyReduction(Tracker* tracker, MapPoint& point, KeyFrame& trackerKF,double priorPointCovariance, int level, double& prevEntropy);
 
 /// evaluates the tracker covariance and returns the entropy for the x y and z directions in a vector
-TooN::Vector<3> EvaluateTracker(Tracker* tracker);
+TooN::Vector<3> EvaluateTrackerEntropy(Tracker* tracker);
+
+void ComputePointMotionInAnchorKF(TooN::Vector<3> pointInCamera, KeyFrame& anchorKF, double deltaLength, TooN::SO3<>& Rp);
+
+void PerturbPoint(TooN::Vector<3> pointInCamera, TooN::SO3<> rp, double deltaLength, TooN::Matrix<3>& jacobian);
+
+double ComputeUpdatedCovariance(int pointLevel, TooN::Vector<2> imageJacobian, double priorPointCovariance);
+
 
 #endif // __ENTROPYCOMPUTATION_H

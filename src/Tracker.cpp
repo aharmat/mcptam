@@ -356,7 +356,7 @@ void Tracker::TrackFrameSetup(ImageBWMap& imFrames, ros::Time timestamp, bool bD
   static GVars3::gvar3<int> gvnDrawLevel("DrawLevel", 0, GVars3::HIDDEN | GVars3::SILENT);
   static GVars3::gvar3<int> gvnDrawMasks("DrawMasks", 0, GVars3::HIDDEN | GVars3::SILENT);
 
-  double dMaxPointCov = mMapMaker.GetMaxCov();
+ double dMaxPointCov = mMapMaker.GetMaxCov();
 
   if (mbDraw)  // Draw the camera images and optionally the FAST corners
   {
@@ -498,9 +498,9 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
 
       if(USE_CPER) // use the entropy based keyframe method (CPER)
       {
-          TooN::Vector<3> trackerEntropy = EvaluateTracker(this);
+          TooN::Vector<3> trackerEntropy = EvaluateTrackerEntropy(this);
           bool addEntropyMKF = false;
-          RecordMeasurementsAndBufferKeyFrame();
+          RecordMeasurementsAndBufferMultiKeyFrame();
 
           #if DEBUG_CPER
             ROS_DEBUG("tracker entropy: (%f,%f,%f)",trackerEntropy[0],trackerEntropy[1],trackerEntropy[2]);
@@ -1969,7 +1969,7 @@ void Tracker::UpdateCamsFromWorld(MultiKeyFrame* mpTempMKF)
     }
 }
 
-void Tracker::RecordMeasurementsAndBufferKeyFrame()
+void Tracker::RecordMeasurementsAndBufferMultiKeyFrame()
 {
 
     //save all the tracker measurements
@@ -2013,7 +2013,7 @@ void Tracker::RecordMeasurementsAndBufferKeyFrame()
             if( !std::isfinite(priorPointCovariance) || priorPointCovariance < EXP_7 ) 
                 priorPointCovariance = EXP_8;
 
-            double entropyReduction = EvaluatePoint(this, point, kf, priorPointCovariance, pMeas->nLevel, prevPointEntropy);
+            double entropyReduction = EvaluatePointEntropyReduction(this, point, kf, priorPointCovariance, pMeas->nLevel, prevPointEntropy);
 
             if(!isnan(entropyReduction) ) 
             {
