@@ -2058,6 +2058,8 @@ void Tracker::AddNewKeyFrameFromBuffer()
 
     //pull out the multi-keyframe with the best score from buffer
     MultiKeyFrame* mpTempMKF =  mMultiKeyFrameBuffer.Head().second;
+    ////// SABA
+    ROS_INFO("Best Score MKF being added: %f", mMultiKeyFrameBuffer.Head().first);
 
     //set it's status to NOT a bufferkeyframe (it's getting inserted into the map!)
     mpTempMKF->isBufferMKF = false;
@@ -2118,5 +2120,4 @@ void Tracker::AddNewKeyFrameFromBuffer()
     //mvKeyFrameBuffer.clear(); //clear the buffer.  Note: this clears the pointers in the buffer, but doesn't call delete on each item, so we retain the data for the selected insterted keyframe
     mMultiKeyFrameBuffer.Clear();
     mtLastMultiKeyFrameDropped = ros::Time::now();
-
-}
+}    

@@ -135,7 +135,7 @@ double EvaluatePointEntropyReduction(Tracker* tracker, MapPoint& point, KeyFrame
     prevEntropy = previousEntropy; //save this
 
     ///// SABA 
-    ROS_INFO("ENTROPY EVALUATE FUNCTIONALIZED: %f" << depthEntropyReduction);    
+    ROS_INFO("ENTROPY EVALUATE FUNCTIONALIZED: %f", depthEntropyReduction);    
     return depthEntropyReduction;
 }
 

@@ -15,7 +15,7 @@
 #define EXP_7              1e-7
 #define EXP_8              1e-8
 #define ENTROPY_THRESHOLD -4.0
-
+#define MKF_BUFFER_SIZE    50
 
 template <class PairItem1, class PairItem2, class Compare = std::less<PairItem1> >
 struct SortPair
@@ -34,7 +34,7 @@ template <class Element>
 class StreamBuffer
 {
   public:
-    StreamBuffer(std::size_t capacity = 50) 
+    StreamBuffer(std::size_t capacity = MKF_BUFFER_SIZE) 
     {
         capacity_ = capacity;
         head_ = 0;
