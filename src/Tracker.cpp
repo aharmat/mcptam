@@ -101,6 +101,7 @@ Tracker::Tracker(Map& map, MapMakerClientBase& mapmaker, TaylorCameraMap& camera
   , mmFixedPoses(poses)
   , mNodeHandlePrivate("~")
   , mpGLWindow(pWindow)
+  , mMultiKeyFrameBuffer(50)
 {
   ROS_DEBUG("Tracker: In constructor");
 
@@ -125,8 +126,9 @@ Tracker::Tracker(Map& map, MapMakerClientBase& mapmaker, TaylorCameraMap& camera
   maskPub = mNodeHandlePrivate.advertise<sensor_msgs::Image>("mask", 1);
   timingPub = mNodeHandlePrivate.advertise<mcptam::TrackerTiming>("timing_tracker", 1);
 
-  mdBestBufferKeyframeScore = 0;
+  //mdBestBufferKeyframeScore = 0;
 
+  mNodeHandle.param<bool>("USE_CPER", mbUseCper, true);
 
 }
 
@@ -496,11 +498,11 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
 
       static GVars3::gvar3<int> gvnAddingMKFs("AddingMKFs", 1, GVars3::HIDDEN | GVars3::SILENT);
 
-      if(USE_CPER) // use the entropy based keyframe method (CPER)
+      if(mbUseCper) // use the entropy based keyframe method (CPER)
       {
           TooN::Vector<3> trackerEntropy = EvaluateTrackerEntropy(this);
           bool addEntropyMKF = false;
-          RecordMeasurementsAndBufferMultiKeyFrame();
+          RecordMeasurementsAndBufferMKF();
 
           #if DEBUG_CPER
             ROS_DEBUG("tracker entropy: (%f,%f,%f)",trackerEntropy[0],trackerEntropy[1],trackerEntropy[2]);
@@ -529,22 +531,23 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
           if(addEntropyMKF )
           {
               mMessageForUser << " SHOULD BE Adding MultiKeyFrame to Map";
-              //sort keyframe vec
-              std::sort (vKeyframeScores.begin(), vKeyframeScores.end(), kfComparitor);
+              // Sort multi-keyframe buffer based on scores
+              std::sort(mMultiKeyFrameBuffer.GetBuffer().begin(), mMultiKeyFrameBuffer.GetBuffer().end(), SortPair<double, MultiKeyFrame*>());
 
-              if(vKeyframeScores.size()>0)
+              if(!mMultiKeyFrameBuffer.Empty())
               {
-                  double bestSortIndex = vKeyframeScores[0].second;
-                  AddNewKeyFrameFromBuffer(bestSortIndex);
+                  // Buffer is already sorted based on scores. Add a new MKF from top of Buffer.
+                  AddNewKeyFrameFromBuffer();
 
                   #if DEBUG_CPER
-                    ROS_DEBUG("adding MKF:%f with score: %f Entropy Tracker (%f,%f,%f)",bestSortIndex,mdBestBufferKeyframeScore,trackerEntropy[0],trackerEntropy[1],trackerEntropy[2]);
+                    ROS_DEBUG("adding MKF with Entropy Tracker (%f,%f,%f)",trackerEntropy[0],trackerEntropy[1],trackerEntropy[2]);
                   #endif
 
-                  mnBestBufferKeyframeIndex = 0;
-                  mdBestBufferKeyframeScore = 0;
+                  // mnBestBufferKeyframeIndex = 0;
+                  //mdBestBufferKeyframeScore = 0;
                   //clear score buffer
-                  vKeyframeScores.clear();
+                  // vKeyframeScores.clear();
+                  // mMultiKeyFrameBuffer.Clear(); this will be done in AddNewKeyFrameFromBuffer
               }
 
           }
@@ -553,7 +556,6 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
     else  if (mbAddNext ||  // mMapMaker.Initializing() ||
           (*gvnAddingMKFs && mOverallTrackingQuality == GOOD && mnLostFrames == 0 &&
            ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.1) &&
-
            mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF)))
       {
         if (mbAddNext)
@@ -616,7 +618,7 @@ bool Tracker::AttemptRecovery()
     // The pose returned is for a KeyFrame, so we have to calculate the appropriate base MultiKeyFrame pose from it
     TooN::SE3<> se3Best = mRelocaliser.BestPose();
     mse3StartPose = mpCurrentMKF->mse3BaseFromWorld =
-                      mpCurrentMKF->mmpKeyFrames[camName]->mse3CamFromBase.inverse() * se3Best;  // CHECK!! GOOD
+                      mpCurrentMKF->mmpKeyFrames[camName]->mse3CamFromBase.inverse() * se3Best; 
 
     bSuccess = true;
     break;
@@ -735,7 +737,7 @@ void Tracker::UpdateCamsFromWorld()
   for (KeyFramePtrMap::iterator kf_it = mpCurrentMKF->mmpKeyFrames.begin(); kf_it != mpCurrentMKF->mmpKeyFrames.end();
        ++kf_it)
   {
-    kf_it->second->mse3CamFromWorld = kf_it->second->mse3CamFromBase * mpCurrentMKF->mse3BaseFromWorld;  // CHECK!! GOOD
+    kf_it->second->mse3CamFromWorld = kf_it->second->mse3CamFromBase * mpCurrentMKF->mse3BaseFromWorld;  
   }
 }
 
@@ -1804,7 +1806,7 @@ bool Tracker::CalcSBIRotation(TooN::Vector<3>& v3SBIRot)
     TooN::Vector<3> v3AxisAngle_Cam = se3Adjust.get_rotation().ln();
     // Pose found was between KeyFrames, calculate effect on base pose
     TooN::Vector<3> v3AxisAngle_Base = mpCurrentMKF->mmpKeyFrames[camName]->mse3CamFromBase.get_rotation().inverse() *
-                                 v3AxisAngle_Cam;  // CHECK !! GOOD
+                                 v3AxisAngle_Cam;  
 
     vRots.push_back(v3AxisAngle_Base);
     ++nNumUsed;
@@ -1965,11 +1967,11 @@ void Tracker::UpdateCamsFromWorld(MultiKeyFrame* mpTempMKF)
 {
     for(KeyFramePtrMap::iterator kf_it = mpTempMKF->mmpKeyFrames.begin(); kf_it != mpTempMKF->mmpKeyFrames.end(); ++kf_it)
     {
-        kf_it->second->mse3CamFromWorld = kf_it->second->mse3CamFromBase * mpTempMKF->mse3BaseFromWorld; // CHECK!! GOOD
+        kf_it->second->mse3CamFromWorld = kf_it->second->mse3CamFromBase * mpTempMKF->mse3BaseFromWorld; 
     }
 }
 
-void Tracker::RecordMeasurementsAndBufferMultiKeyFrame()
+void Tracker::RecordMeasurementsAndBufferMKF()
 {
 
     //save all the tracker measurements
@@ -2025,37 +2027,39 @@ void Tracker::RecordMeasurementsAndBufferMultiKeyFrame()
         }
     }
 
-    mvKeyFrameBuffer.push_back(mpTempMKF); //store the MKF
+   // mvKeyFrameBuffer.push_back(mpTempMKF); //store the MKF
 
     #if DEBUG_CPER
-      ROS_DEBUG("Tracker: Buffering keyframe: %ld", mvKeyFrameBuffer.size());
+      //ROS_DEBUG("Tracker: Buffering keyframe: %ld", mvKeyFrameBuffer.size());
       ROS_DEBUG("Tracker: Total MKF Entropy Reduction is: %f", totalEntropyReduction);
     #endif
 
-    ScorePair mp; mp.first = totalEntropyReduction; mp.second = mvKeyFrameBuffer.size() - 1;
-    vKeyframeScores.push_back(mp);
-
+   // ScorePair mp; mp.first = totalEntropyReduction; mp.second = mvKeyFrameBuffer.size() - 1;
+   // vKeyframeScores.push_back(mp);
+/*
     if(totalEntropyReduction > mdBestBufferKeyframeScore) //if we have a new winner
     {
         mdBestBufferKeyframeScore = totalEntropyReduction;
         mnBestBufferKeyframeIndex = mvKeyFrameBuffer.size() - 1;
     }
-
-
+*/
+      MKFScorePair pair;
+      pair.first = totalEntropyReduction; pair.second = mpTempMKF;
+      mMultiKeyFrameBuffer.Enqueue(pair);
 }
 
-void Tracker::AddNewKeyFrameFromBuffer(int bufferPosition)
+void Tracker::AddNewKeyFrameFromBuffer()
 {
-    //note: should check to make sure index doesnt exceed buffer size
-    if( (int)mvKeyFrameBuffer.size() <= bufferPosition) //exceeding index
+    //note: should check to make sure buffer is not empty
+    if(mMultiKeyFrameBuffer.Empty())
         return;
 
     static GVars3::gvar3<int> gvnCrossCamera("CrossCamera", 1, GVars3::HIDDEN|GVars3::SILENT);
 
-    //pull out the keyframe from the buffer
-    MultiKeyFrame* mpTempMKF =  mvKeyFrameBuffer[bufferPosition];
+    //pull out the multi-keyframe with the best score from buffer
+    MultiKeyFrame* mpTempMKF =  mMultiKeyFrameBuffer.Head().second;
 
-    //set it's status to NOT a bufferkeyframe (it's getting inserted into the map!
+    //set it's status to NOT a bufferkeyframe (it's getting inserted into the map!)
     mpTempMKF->isBufferMKF = false;
 
     //iterate through all the measurements in the chosen MKF and all the measurements to the map points
@@ -2075,9 +2079,7 @@ void Tracker::AddNewKeyFrameFromBuffer(int bufferPosition)
             // check to see if the pointer is still in the map. It may have been trashed by the map maker
             if(std::count(mMap.mlpPoints.begin(), mMap.mlpPoints.end(), &kf_point)) //is the point still in the map?
             {
-                //if(kf_point.mMMData.spMeasurementKFs.count(kf)) //if its not in there already, or is bad (bad points taken car of when handed to map maker)
-                //continue;
-
+               
                 #if DEBUG_CPER
                   ROS_DEBUG("inserting keyframe " << kf.mCamName << " at point %x " <<  &kf_point);
                 #endif
@@ -2090,8 +2092,6 @@ void Tracker::AddNewKeyFrameFromBuffer(int bufferPosition)
                 #if DEBUG_CPER
                   ROS_DEBUG("erasing meas of nonexisting point...");
                 #endif
-                //kf->EraseMeasurementOfPoint(&kf_point);
-                //kf_point.mMMData.spMeasurementKFs.erase(kf);
 
                 ptsToDelete.push_back(&kf_point);
             }
@@ -2105,18 +2105,18 @@ void Tracker::AddNewKeyFrameFromBuffer(int bufferPosition)
     }
 
     mMapMaker.AddMultiKeyFrame(mpTempMKF);  // map maker takes ownership
-    //now we can delete the buffer
-    int bufferSize = (int)mvKeyFrameBuffer.size();
-    for(int i=0; i<bufferSize; i++) // for the whole buffer
+    //now we can delete the buffernt bufferSize = (int)mvKeyFrameBuffer.size();
+    std::size_t bufferSize = mMultiKeyFrameBuffer.Size();
+    for(std::size_t i=1; i<bufferSize; i++) // for the whole buffer
     {
-        if(i==bufferPosition)
-            continue; //skip this, otherwise we'll delete the data for our selected keyframe.
-        MultiKeyFrame *pMKF = mvKeyFrameBuffer[i];
-        delete pMKF;
+        MultiKeyFrame *pMKF = mMultiKeyFrameBuffer.AtIndex(i).second;
+        if(pMKF)
+            delete pMKF;
         pMKF = NULL;
     }
 
-    mvKeyFrameBuffer.clear(); //clear the buffer.  Note: this clears the pointers in the buffer, but doesn't call delete on each item, so we retain the data for the selected insterted keyframe
+    //mvKeyFrameBuffer.clear(); //clear the buffer.  Note: this clears the pointers in the buffer, but doesn't call delete on each item, so we retain the data for the selected insterted keyframe
+    mMultiKeyFrameBuffer.Clear();
     mtLastMultiKeyFrameDropped = ros::Time::now();
 
 }

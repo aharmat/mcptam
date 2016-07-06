@@ -468,7 +468,7 @@ bool MapMakerCalib::CalibInit()
           TooN::SE3<> se3CamFromBase_onlyrot = mkf.mmpKeyFrames[camName]->mse3CamFromBase;
           se3CamFromBase_onlyrot.get_translation() = TooN::Zeros;
 
-          const TooN::Vector<4> v4Motion_Cam = se3CamFromBase_onlyrot * v4Motion_Base;  // CHECK!! GOOD
+          const TooN::Vector<4> v4Motion_Cam = se3CamFromBase_onlyrot * v4Motion_Base;
 
           // Insert into the top half of the 6x6 matrix
           m6Jac.slice(0, m, 3, 1) = v4Motion_Cam.slice<0, 3>().as_col();

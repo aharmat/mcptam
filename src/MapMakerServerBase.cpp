@@ -583,7 +583,7 @@ void MapMakerServerBase::ApplyGlobalScaleToMap(double dScale)
     for (KeyFramePtrMap::iterator kf_it = mkf.mmpKeyFrames.begin(); kf_it != mkf.mmpKeyFrames.end(); ++kf_it)
     {
       KeyFrame& kf = *(kf_it->second);
-      kf.mse3CamFromWorld = kf.mse3CamFromBase * mkf.mse3BaseFromWorld;  // CHECK!! GOOD
+      kf.mse3CamFromWorld = kf.mse3CamFromBase * mkf.mse3BaseFromWorld;
       kf.RefreshSceneDepthRobust();
     }
   }
@@ -604,7 +604,7 @@ void MapMakerServerBase::ApplyGlobalTransformationToMap(TooN::SE3<> se3NewFromOl
     for (KeyFramePtrMap::iterator jiter = mkf.mmpKeyFrames.begin(); jiter != mkf.mmpKeyFrames.end(); ++jiter)
     {
       KeyFrame& kf = *(jiter->second);
-      kf.mse3CamFromWorld = kf.mse3CamFromBase * mkf.mse3BaseFromWorld;  // CHECK!! GOOD
+      kf.mse3CamFromWorld = kf.mse3CamFromBase * mkf.mse3BaseFromWorld; 
     }
   }
 

@@ -316,7 +316,7 @@ int BundleAdjusterMulti::AdjustAndUpdate(ChainBundle& multiBundle, std::set<Mult
       {
         KeyFrame& kf = *(kf_it->second);
         kf.mse3CamFromWorld =
-          kf.mse3CamFromBase * mkf.mse3BaseFromWorld;  // Update keyframe mse3CamFromWorld only here!! CHECK!! GOOD
+          kf.mse3CamFromBase * mkf.mse3BaseFromWorld;  // Update keyframe mse3CamFromWorld only here!!
       }
     }
 

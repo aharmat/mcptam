@@ -71,13 +71,13 @@
 #ifndef MCPTAM_TRACKER_H
 #define MCPTAM_TRACKER_H
 
+#include <mcptam/Cper.h>
 #include <mcptam/Types.h>
 #include <mcptam/MapPoint.h>
 #include <mcptam/Relocaliser.h>
 #include <mcptam/KeyFrame.h>  // needed for LEVELS define
 #include <mcptam/GLWindow2.h>
 #include <mcptam/TrackerTiming.h>
-#include <mcptam/Cper.h>
 #include <sstream>
 #include <vector>
 #include <boost/intrusive_ptr.hpp>
@@ -89,13 +89,15 @@
 #include <fstream>
 #include <set>
 
-
+class MultiKeyFrame;
 class TrackerData;
 class Map;
 class MapMakerClientBase;
 struct TrackerMeasurementData;
-typedef std::pair<double,int> ScorePair; // pair to keep track of keyframe score (double is score, int is index)
-
+typedef std::pair<double, MultiKeyFrame*> MKFScorePair; // pair to keep track of keyframe score (double is score of MKF)
+template class StreamBuffer<MKFScorePair>;
+typedef StreamBuffer<MKFScorePair> MKFScorePairStreamBuffer;
+//class StreamBuffer<std::pair<double, MultiKeyFrame*>>;
 /// Using a boost intrusive_ptr allows claiming a MapPoint as "used", so it
 /// won't
 /// be deleted until it is released. See MapPoint.
@@ -211,10 +213,10 @@ public:
 
   /** @brief Compare multi-keyframe's scores
    *  @return True if the first KF's score is higher */
-  static bool kfComparitor ( const ScorePair& l, const ScorePair& r)
+  /*static bool kfComparitor ( const ScorePair& l, const ScorePair& r)
   { 
     return l.first > r.first; 
-  }
+  }*/
   /** @brief Gets messages to be printed on-screen for the user
    *  @return The message string */
   std::string GetMessageForUser();
@@ -455,11 +457,11 @@ protected:
 
 
   /// Gives a buffered MultiKeyFrame to the map maker. The current MultiKeyFrame needs to be regenerated.
-  void AddNewKeyFrameFromBuffer(int bufferPosition);
+  void AddNewKeyFrameFromBuffer();
 
 
   /// Records the measurements and Buffers Multi-Keyframes while tracking.  We can later select a multi-keyframe from the buffer to add to the map
-  void RecordMeasurementsAndBufferMultiKeyFrame();
+  void RecordMeasurementsAndBufferMKF();
 
   /// Clear the keyframe buffer
   void ClearKeyFrameBuffer();
@@ -635,13 +637,16 @@ protected:
 
   //for keyframe buffering
   //MultiKeyFramePtrList mvKeyFrameBuffer;
-  std::vector< MultiKeyFrame* > mvKeyFrameBuffer; ///< vector that holds  MKF pointers
-  int mnBestBufferKeyframeIndex; ///< index in the buffer for the keyframe with the best entropy reduction score
-  double mdBestBufferKeyframeScore; ///< best entropy reduction score so far in the buffer
-  std::vector<ScorePair> vKeyframeScores; //vector of pairs which keeps track of
+ // std::vector< MultiKeyFrame* > mvKeyFrameBuffer; ///< vector that holds  MKF pointers
+ // int mnBestBufferKeyframeIndex; ///< index in the buffer for the keyframe with the best entropy reduction score
+ // double mdBestBufferKeyframeScore; ///< best entropy reduction score so far in the buffer
+StreamBuffer<MKFScorePair> mMultiKeyFrameBuffer; // MKF buffer which is an unlimited circular buffer of pairs of scores and MKF pointers
 
   // testing
   bool mbAddNext;  ///< Add the next MKF now
+
+  bool mbUseCper;  // Use CPER entropy based method for MKF selection.
+
 };
 
 #endif  // MCPTAM_TRACKER_H

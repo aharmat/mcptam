@@ -124,7 +124,7 @@ public:
     for (unsigned i = 0; i < _vpVertices.size(); ++i)
     {
       const VertexPoseSE3* pPoseVertex = _vpVertices[i];
-      se3BfW = pPoseVertex->estimate() * se3BfW;  // CHECK!! GOOD
+      se3BfW = pPoseVertex->estimate() * se3BfW; 
 
       _vTransforms[i].first = se3BfW;
     }
@@ -522,7 +522,7 @@ public:
         // Then the motion of the point in the originally measuring camera only depends on the relative rotation between
         // it and the current pose, not the translation
         // Keep in mind we zeroed out the translation components in the pose chain helper's update function
-        const TooN::Vector<4> v4Motion_Cam = _pPoseChainHelper->_vTransforms[i].second * v4Motion_Base;  // CHECK!! GOOD
+        const TooN::Vector<4> v4Motion_Cam = _pPoseChainHelper->_vTransforms[i].second * v4Motion_Base; 
 
         // Convert to motion on the sphere
         TooN::Vector<2> v2CamSphereMotion;
@@ -580,7 +580,7 @@ public:
         TooN::SE3<> se3CamFromBase = _pPoseChainHelper->_vTransforms.back().first *
                                      (pPointVertex->_pPoseChainHelper->_vTransforms[i].first).inverse();
         se3CamFromBase.get_translation() = TooN::Zeros;
-        const TooN::Vector<4> v4Motion_Cam = se3CamFromBase * v4Motion_Base;  // CHECK!! GOOD
+        const TooN::Vector<4> v4Motion_Cam = se3CamFromBase * v4Motion_Base; 
 
         // Convert to motion on the sphere
         TooN::Vector<2> v2CamSphereMotion;
@@ -681,7 +681,7 @@ public:
       {
         // Get the motion of the point in the camera frame when the position of the point changes by one of the degrees
         // of freedom
-        const TooN::Vector<3> v3Motion = m3Jac.T()[m];  // CHECK!! GOOD
+        const TooN::Vector<3> v3Motion = m3Jac.T()[m];  
 
         // Convert to motion on the sphere
         TooN::Vector<2> v2CamSphereMotion;
