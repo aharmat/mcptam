@@ -4,12 +4,7 @@
 #include <vector>
 #include <cstddef>
 #include <algorithm>
-#include <mcptam/KeyFrame.h> 
-#include <mcptam/Types.h>       
-#include <mcptam/MapPoint.h>   
-#include <mcptam/Relocaliser.h>
-#include <mcptam/GLWindow2.h>
-#include <mcptam/TrackerTiming.h>
+#include <ros/console.h>
 
 #define DEBUG_CPER         0
 #define EXP_7              1e-7
@@ -17,10 +12,12 @@
 #define ENTROPY_THRESHOLD -4.0
 #define MKF_BUFFER_SIZE    50
 
+
+
 template <class PairItem1, class PairItem2, class Compare = std::less<PairItem1> >
 struct SortPair
 {
-  bool operator()(const std::pair<PairItem1,PairItem2>&left, const std::pair<PairItem1,PairItem2>&right) 
+  bool operator()(const std::pair<PairItem1,PairItem2>& left, const std::pair<PairItem1,PairItem2>& right) 
   {
     Compare compare;
     return compare(left.first, right.first);
@@ -37,6 +34,7 @@ class StreamBuffer
     StreamBuffer(std::size_t capacity = MKF_BUFFER_SIZE) 
     {
         capacity_ = capacity;
+        size_ = 0;
         head_ = 0;
         tail_ = 0;
         buffer_.reserve(capacity);
@@ -54,18 +52,41 @@ class StreamBuffer
      }
      else
      {
-        ++tail_ %= capacity_;
-        buffer_.at(tail_) = element;
+        try
+        {
+            buffer_.at(tail_) = element;
+            ++tail_ %= capacity_;
+        }
+        catch(const std::out_of_range& error)
+        {
+            ROS_ERROR_STREAM("Out of Range error in StrAeamBuffer::Enqueue(Element& element) -- Buffer size: " << \
+                              size_ << ", Tried accessing: " << tail_ << " \n");
+        }
      }
    }
 
    Element& AtIndex(std::size_t index)
    {
-     return buffer_.at(index);
+       if (index >= size_)
+       {
+           char index_str[21], size_str[21];
+           sprintf(index_str, "%lu", static_cast<unsigned long>(index));
+           sprintf(size_str,  "%lu", static_cast<unsigned long>(size_));
+           std::string error = "Out of Range error in StreamBuffer::AtIndex(size_t index) -- Buffer size: " + \
+                                std::string(size_str) + ", Tried accessing: " + std::string(index_str) + " \n";
+           throw std::out_of_range (error); 
+       }
+
+       return buffer_.at(index);
    }
    
    Element& Head()
    {
+       if (buffer_.empty())
+       {
+           throw std::out_of_range ("Out of Range error in StreamBuffer::Head(): Buffer is empty. \n");
+       }
+       
        return buffer_.front();
    }
 
@@ -92,6 +113,15 @@ class StreamBuffer
    std::vector<Element>& GetBuffer()
    {
      return buffer_;
+   }
+
+   void PrintBuffer()
+   {
+        typename std::vector<Element>::iterator it;
+        for(it = buffer_.begin(); it != buffer_.end(); ++it) 
+        {
+            ROS_DEBUG_STREAM( "(" << (*it).first << ", " << (*it).second << ") ");
+        }
    }
 
 
