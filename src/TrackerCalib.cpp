@@ -329,7 +329,7 @@ void TrackerCalib::TrackFrame(CVD::Image<CVD::byte>& imFrame, ros::Time timestam
         SignalNewKeyFrame();   // Make our desire known
       }
 
-      ReleasePointLock();  // Important! Do this whenever tracking step has finished
+      ReleasePointLock();  //  Do this whenever tracking step has finished
     }
     else  // what if there is a map, but tracking has been lost?
     {
@@ -338,7 +338,7 @@ void TrackerCalib::TrackFrame(CVD::Image<CVD::byte>& imFrame, ros::Time timestam
       {
         TrackMap();
         AssessOverallTrackingQuality();
-        ReleasePointLock();  // Important! Do this whenever tracking step has finished
+        ReleasePointLock();  // Do this whenever tracking step has finished
       }
     }
 
@@ -387,7 +387,7 @@ void TrackerCalib::TrackFrame(CVD::Image<CVD::byte>& imFrame, ros::Time timestam
           ROS_INFO_STREAM("TrackerCalib: " << mCamName << " quality bad after checkerboard!");
         }
 
-        ReleasePointLock();  // Important! Do this whenever tracking step has finished
+        ReleasePointLock();  // Do this whenever tracking step has finished
       }
 
       mbJustRecoveredSoUseCoarse = true;

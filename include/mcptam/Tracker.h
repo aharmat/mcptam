@@ -85,7 +85,6 @@
 #include <ros/ros.h>
 #include <map>
 #include <string>
-// #include <iostream>
 #include <fstream>
 #include <set>
 
@@ -97,7 +96,7 @@ struct TrackerMeasurementData;
 typedef std::pair<double, MultiKeyFrame*> MKFScorePair; // pair to keep track of keyframe score (double is score of MKF)
 template class StreamBuffer<MKFScorePair>;
 typedef StreamBuffer<MKFScorePair> MKFScorePairStreamBuffer;
-//class StreamBuffer<std::pair<double, MultiKeyFrame*>>;
+
 /// Using a boost intrusive_ptr allows claiming a MapPoint as "used", so it
 /// won't
 /// be deleted until it is released. See MapPoint.
@@ -635,18 +634,14 @@ protected:
   ros::Publisher timingPub;         ///< Publisher for the Tracker timing messages
   mcptam::TrackerTiming timingMsg;  ///< Message for the various timing sections of the Tracker
 
-  //for keyframe buffering
-  //MultiKeyFramePtrList mvKeyFrameBuffer;
- // std::vector< MultiKeyFrame* > mvKeyFrameBuffer; ///< vector that holds  MKF pointers
- // int mnBestBufferKeyframeIndex; ///< index in the buffer for the keyframe with the best entropy reduction score
- // double mdBestBufferKeyframeScore; ///< best entropy reduction score so far in the buffer
-StreamBuffer<MKFScorePair> mMultiKeyFrameBuffer; // MKF buffer which is an unlimited circular buffer of pairs of scores and MKF pointers
+  StreamBuffer<MKFScorePair> mMultiKeyFrameBuffer; // MKF buffer which is a limited buffer of pairs of scores and MKF pointers
 
-  // testing
-  bool mbAddNext;  ///< Add the next MKF now
+  bool mbAddNext;  // Add the next MKF now 
 
   bool mbUseCper;  // Use CPER entropy based method for MKF selection.
 
+  int miMKFBufferCapacity;  // rosparam  MKF buffer capacity 
+  std::size_t muiMKFBufferSize;  // rosparam  MKF buffer capacity 
 };
 
 #endif  // MCPTAM_TRACKER_H

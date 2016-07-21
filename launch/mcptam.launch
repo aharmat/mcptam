@@ -11,6 +11,7 @@
 <!-- mcptam node -->
 <node name="mcptam" pkg="mcptam" type="mcptam" clear_params="true" output="screen" launch-prefix="$(arg debug_prefix)">
   <rosparam command="load" file="$(find mcptam)/groups/$(arg group_name).yaml" />
+  <rosparam command="load" file="$(find mcptam)/params/CPER.yaml" />
   
   <remap from="reset" to="mcptam/reset" />
   <param name="image_transport" type="string" value="compressed"/>

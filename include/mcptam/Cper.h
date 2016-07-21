@@ -3,18 +3,20 @@
 
 #include <vector>
 #include <cstddef>
+#include <sstream>
 #include <algorithm>
 #include <ros/console.h>
 
 #define DEBUG_CPER         0
 #define EXP_7              1e-7
 #define EXP_8              1e-8
+#define EPSILON            0.00001
 #define ENTROPY_THRESHOLD -4.0
-#define MKF_BUFFER_SIZE    50
+#define MKF_BUFFER_SIZE    10000
 
 
 
-template <class PairItem1, class PairItem2, class Compare = std::less<PairItem1> >
+template <class PairItem1, class PairItem2, class Compare = std::greater<PairItem1> >
 struct SortPair
 {
   bool operator()(const std::pair<PairItem1,PairItem2>& left, const std::pair<PairItem1,PairItem2>& right) 
@@ -31,12 +33,20 @@ template <class Element>
 class StreamBuffer
 {
   public:
-    StreamBuffer(std::size_t capacity = MKF_BUFFER_SIZE) 
+    StreamBuffer() 
+    {
+        capacity_ = MKF_BUFFER_SIZE;
+        size_ = 0;
+        head_ = 0;
+        tail_ = -1;
+        buffer_.reserve(capacity_);
+    }
+    StreamBuffer(std::size_t capacity) 
     {
         capacity_ = capacity;
         size_ = 0;
         head_ = 0;
-        tail_ = 0;
+        tail_ = -1;
         buffer_.reserve(capacity);
     }
 
@@ -54,8 +64,9 @@ class StreamBuffer
      {
         try
         {
-            buffer_.at(tail_) = element;
-            ++tail_ %= capacity_;
+            ++tail_        %= capacity_;
+            buffer_[tail_]  = element;
+            ++head_        %= capacity_;           
         }
         catch(const std::out_of_range& error)
         {
@@ -67,7 +78,7 @@ class StreamBuffer
 
    Element& AtIndex(std::size_t index)
    {
-       if (index >= size_)
+       if (index >= size_ || index < 0)
        {
            char index_str[21], size_str[21];
            sprintf(index_str, "%lu", static_cast<unsigned long>(index));
@@ -80,19 +91,27 @@ class StreamBuffer
        return buffer_.at(index);
    }
    
-   Element& Head()
+   Element& Front()
    {
        if (buffer_.empty())
        {
            throw std::out_of_range ("Out of Range error in StreamBuffer::Head(): Buffer is empty. \n");
        }
        
-       return buffer_.front();
+       return buffer_.at(head_);
+   }
+
+   Element& Back()
+   {
+       return buffer_.at(tail_);
    }
 
    void Clear()
    {
        buffer_.clear();
+       size_ = 0;
+       head_ = 0;
+       tail_ = -1;
    }
 
    bool Empty()
@@ -115,14 +134,60 @@ class StreamBuffer
      return buffer_;
    }
 
+   void SetCapacity(std::size_t capacity)
+   {
+       buffer_.reserve(capacity);
+       capacity_ = buffer_.capacity();
+   }
+
    void PrintBuffer()
    {
+        ROS_INFO("Printing StreamBuffer object...");
+        
+        std::stringstream sbufferContents;
+        sbufferContents << "\n";
         typename std::vector<Element>::iterator it;
         for(it = buffer_.begin(); it != buffer_.end(); ++it) 
         {
-            ROS_DEBUG_STREAM( "(" << (*it).first << ", " << (*it).second << ") ");
+            sbufferContents << "(" << (*it).first << ", " << (*it).second << ")\n";
         }
+
+        ROS_INFO_STREAM(sbufferContents.str());
    }
+
+   void PrintBuffer(std::size_t bound)
+   {
+
+       ROS_INFO_STREAM("Printing first " << bound << " elements of StreamBuffer object...");
+
+       std::stringstream sbufferContents;
+       sbufferContents << "\n";
+       for(std::size_t i=0; i<size_ && i<bound; i++) 
+       {
+           sbufferContents <<  "(" << buffer_[i].first << ", " << buffer_[i].second << ")\n";
+       }
+
+       ROS_INFO_STREAM(sbufferContents.str());
+   }
+
+   void PrintQueueBuffer()
+   {
+       std::stringstream sbufferContents;
+       sbufferContents << "\n";
+       for(unsigned int i=head_; i<size_; i++)
+       {
+           sbufferContents << "(" << buffer_[i].first << ", " << buffer_[i].second << ")\n";
+       }
+
+       for(unsigned int i=0; i<=tail_; i++)
+       {
+           sbufferContents << "(" << buffer_[i].first << ", " << buffer_[i].second << ")\n";
+       }
+
+       ROS_INFO_STREAM(sbufferContents.str());
+   }
+
+
 
 
  private:
