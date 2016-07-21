@@ -551,7 +551,6 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
                     ROS_DEBUG("adding MKF with Entropy Tracker (%f,%f,%f)",trackerEntropy[0],trackerEntropy[1],trackerEntropy[2]);
                   #endif
 
-                  // mMultiKeyFrameBuffer.Clear(); this will be done in AddNewKeyFrameFromBuffer
               }
 
           }
