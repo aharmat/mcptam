@@ -7,12 +7,12 @@
 #include <algorithm>
 #include <ros/console.h>
 
-#define DEBUG_CPER         0
-#define EXP_7              1e-7
-#define EXP_8              1e-8
-#define EPSILON            0.00001
-#define ENTROPY_THRESHOLD -4.0
-#define MKF_BUFFER_SIZE    10000
+#define DEBUG_CPER           0
+#define EXP_7                1e-7
+#define EXP_8                1e-8
+#define EPSILON              0.00001
+#define ENTROPY_THRESHOLD   -4.0
+#define MKF_BUFFER_CAPACITY  60
 
 
 
@@ -35,7 +35,7 @@ class StreamBuffer
   public:
     StreamBuffer() 
     {
-        capacity_ = MKF_BUFFER_SIZE;
+        capacity_ = MKF_BUFFER_CAPACITY;
         size_ = 0;
         head_ = 0;
         tail_ = -1;

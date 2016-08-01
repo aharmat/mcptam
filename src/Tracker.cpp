@@ -101,7 +101,7 @@ Tracker::Tracker(Map& map, MapMakerClientBase& mapmaker, TaylorCameraMap& camera
   , mmFixedPoses(poses)
   , mNodeHandlePrivate("~")
   , mpGLWindow(pWindow)
-  , mMultiKeyFrameBuffer(MKF_BUFFER_SIZE)
+  , mMultiKeyFrameBuffer(MKF_BUFFER_CAPACITY)
 {
   ROS_DEBUG("Tracker: In constructor");
 
@@ -126,8 +126,9 @@ Tracker::Tracker(Map& map, MapMakerClientBase& mapmaker, TaylorCameraMap& camera
   maskPub = mNodeHandlePrivate.advertise<sensor_msgs::Image>("mask", 1);
   timingPub = mNodeHandlePrivate.advertise<mcptam::TrackerTiming>("timing_tracker", 1);
 
-  mNodeHandle.param<bool>("USE_CPER", mbUseCper, true);
-  mNodeHandle.param<int>("MKF_BUFFER_SIZE", miMKFBufferCapacity, MKF_BUFFER_SIZE);
+  mNodeHandle.param("/mcptam/USE_CPER", mbUseCper, false);
+  mNodeHandle.param("/mcptam/MKF_BUFFER_CAPACITY", miMKFBufferCapacity, MKF_BUFFER_CAPACITY);
+
   mMultiKeyFrameBuffer.SetCapacity((std::size_t)miMKFBufferCapacity);
 }
 
@@ -561,6 +562,8 @@ void Tracker::TrackFrame(ImageBWMap& imFrames, ros::Time timestamp, bool bDraw)
            ros::Time::now() - mtLastMultiKeyFrameDropped > ros::Duration(0.1) &&
            mMapMaker.NeedNewMultiKeyFrame(*mpCurrentMKF)))
       {
+          ROS_WARN("In Default Keyframe Selection");
+
         if (mbAddNext)
           ROS_DEBUG("Adding MKF because add next was clicked");
 
