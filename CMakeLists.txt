@@ -123,6 +123,7 @@ set(MCPTAM_FUNCTIONS_LIB_SRC
     src/MapPoint.cpp
     src/MiniPatch.cpp
     src/NetworkManager.cpp
+    src/odomSubscriber.cpp
     src/PatchFinder.cpp
     src/PoseCalibrator.cpp
     src/Relocaliser.cpp
