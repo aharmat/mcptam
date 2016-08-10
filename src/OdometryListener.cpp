@@ -1,4 +1,4 @@
-#include <mcptam/odomSubscriber.h>
+#include <mcptam/OdometryListener.h>
 
 void OdometryListener::odomCallback(
     const geometry_msgs::TwistWithCovarianceStamped &msg
@@ -30,6 +30,8 @@ int OdometryListener::subscribeToOdom()
         &OdometryListener::odomCallback,
         this
     );
+
+    return 0;
 }
 
 
