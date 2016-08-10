@@ -106,7 +106,7 @@ set(MCPTAM_FUNCTIONS_LIB_SRC
     src/CalibImageTaylor.cpp
     src/CameraCalibrator.cpp
     src/CameraGroupSubscriber.cpp
-    src/ChainBundle.cpp 
+    src/ChainBundle.cpp
     src/EntropyComputation.cpp
     src/GLWindow2.cpp
     src/GLWindowMenu.cpp
@@ -123,7 +123,7 @@ set(MCPTAM_FUNCTIONS_LIB_SRC
     src/MapPoint.cpp
     src/MiniPatch.cpp
     src/NetworkManager.cpp
-    src/odomSubscriber.cpp
+    src/OdometryListener.cpp
     src/PatchFinder.cpp
     src/PoseCalibrator.cpp
     src/Relocaliser.cpp
