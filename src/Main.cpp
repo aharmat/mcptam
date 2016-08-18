@@ -40,11 +40,13 @@
  ****************************************************************************************/
 
 #include <mcptam/System.h>
+#include <mcptam/ThresholdConfig.h>
+#include <mcptam/GuiCallBacks.h> 
 #include <mcptam/LoadStaticParamsGeneral.h>
 #include <mcptam/LoadStaticParamsClient.h>
 #include <mcptam/LoadStaticParamsServer.h>
 #include <ros/ros.h>
-
+#include <dynamic_reconfigure/server.h>
 #include <ros/console.h>
 #include <log4cxx/logger.h>
 
@@ -87,6 +89,11 @@ int main(int argc, char** argv)
   LoadStaticParamsGeneral();
   LoadStaticParamsClient();
   LoadStaticParamsServer();
+
+  dynamic_reconfigure::Server<mcptam::ThresholdConfig> threshold;
+  dynamic_reconfigure::Server<mcptam::ThresholdConfig>::CallbackType f;
+  f = boost::bind(&threshold_gui_callback, _1, _2);
+  threshold.setCallback(f);
 
   try
   {

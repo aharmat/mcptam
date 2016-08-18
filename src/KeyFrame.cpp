@@ -37,6 +37,7 @@
 //=========================================================================================
 
 #include <mcptam/KeyFrame.h>
+#include <mcptam/GuiCallBacks.h>
 #include <mcptam/ShiTomasi.h>
 #include <mcptam/SmallBlurryImage.h>
 #include <mcptam/MapPoint.h>
@@ -346,25 +347,57 @@ std::tuple<double, double, double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::b
           // whose aim is to balance the different levels' relative feature densities.
 
       if (i == 0)
+      {
+          if(threshold_state==1)
           {
-              fast_corner_detect_10(lev.image, lev.vCorners, 10);
-              lev.nFastThresh = 10;
+            fast_corner_detect_10(lev.image, lev.vCorners, level0);
+            lev.nFastThresh = level0;
           }
+          else
+          {
+            fast_corner_detect_10(lev.image, lev.vCorners, 10);
+            lev.nFastThresh = 10;
+          }
+      }
       if (i == 1)
+      {
+          if(threshold_state==1)
           {
-              fast_corner_detect_10(lev.image, lev.vCorners, 15);
-              lev.nFastThresh = 15;
+            fast_corner_detect_10(lev.image, lev.vCorners, level1);
+            lev.nFastThresh = level1;
           }
+          else
+          {
+            fast_corner_detect_10(lev.image, lev.vCorners, 15);
+            lev.nFastThresh = 15;
+          }
+      }
       if (i == 2)
+      {
+          if(threshold_state==1)
           {
-              fast_corner_detect_10(lev.image, lev.vCorners, 15);
-              lev.nFastThresh = 15;
+            fast_corner_detect_10(lev.image, lev.vCorners, level2);
+            lev.nFastThresh = level2;
           }
+          else
+          {
+            fast_corner_detect_10(lev.image, lev.vCorners, 15);
+            lev.nFastThresh = 15;
+          }
+      }
       if (i == 3)
+      {
+          if(threshold_state==1)
           {
-              fast_corner_detect_10(lev.image, lev.vCorners, 10);
-              lev.nFastThresh = 10;
+            fast_corner_detect_10(lev.image, lev.vCorners, level3);
+            lev.nFastThresh = level3;
           }
+          else
+          {
+            fast_corner_detect_10(lev.image, lev.vCorners, 10);
+            lev.nFastThresh = 10;
+          }
+      }
 
           //do nonmax suppression
 

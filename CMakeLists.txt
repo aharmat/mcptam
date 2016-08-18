@@ -69,6 +69,10 @@ add_service_files( DIRECTORY srv
 
 generate_messages(DEPENDENCIES std_msgs sensor_msgs)
 
+generate_dynamic_reconfigure_options(
+    cfg/thresholdParams.cfg
+)
+
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME} $
@@ -110,6 +114,7 @@ set(MCPTAM_FUNCTIONS_LIB_SRC
     src/EntropyComputation.cpp
     src/GLWindow2.cpp
     src/GLWindowMenu.cpp
+    src/GuiCallBacks.cpp
     src/KeyFrame.cpp
     src/KeyFrameViewer.cpp
     src/Map.cpp
@@ -184,7 +189,7 @@ target_link_libraries(mcptam_functions ${MCPTAM_LIBS})
 
 # add executables and link them to the libraries
 add_executable(mcptam ${MCPTAM_SRC} )
-add_dependencies(mcptam ${PROJECT_NAME}_gencpp)
+add_dependencies(mcptam ${PROJECT_NAME}_gencpp ${PROJECT_NAME}_gencfg)
 target_link_libraries(mcptam ${MCPTAM_LIBS} mcptam_functions)
 
 add_executable(mcptam_client ${MCPTAM_CLIENT_SRC})
