@@ -9,6 +9,8 @@
 <arg name="debug_prefix" value="" unless="$(arg debug)"/>
 
 <!-- mcptam node -->
+    <!-- rqt_reconfigure node -->
+    <node pkg="rqt_reconfigure" type="rqt_reconfigure" respawn="false" name="rqt_reconfigure" output="screen"/>
 <node name="mcptam" pkg="mcptam" type="mcptam" clear_params="true" output="screen" launch-prefix="$(arg debug_prefix)">
   <rosparam command="load" file="$(find mcptam)/groups/$(arg group_name).yaml" />
   <rosparam command="load" file="$(find mcptam)/params/CPER.yaml" />
