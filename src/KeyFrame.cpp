@@ -74,6 +74,12 @@ std::string KeyFrame::ssCandidateCriterion = "percent";
 bool KeyFrame::sbAdaptiveThresh = true;
 int Level::snNumPrev = 2;
 
+int level0 = 10;
+int level1 = 15;
+int level2 = 15;
+int level3 = 10;
+int threshold_state = 0;
+
 KeyFrame::KeyFrame(MultiKeyFrame* pMKF, std::string name) : mCamName(name), mpParent(pMKF)
 {
   mpSBI = NULL;

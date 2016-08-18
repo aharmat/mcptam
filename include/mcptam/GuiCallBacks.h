@@ -4,12 +4,12 @@
 #include <mcptam/ThresholdConfig.h>
 #include <dynamic_reconfigure/server.h>
 
-int level0 = 10;
-int level1 = 15;
-int level2 = 15;
-int level3 = 10;
-
-int threshold_state = 0;
+extern int level0;
+extern int level1;
+extern int level2;
+extern int level3;
+ 
+extern int threshold_state;
 
 void threshold_gui_callback(mcptam::ThresholdConfig &config, uint32_t level);
 
