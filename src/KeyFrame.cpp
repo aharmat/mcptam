@@ -358,12 +358,13 @@ std::tuple<double, double, double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::b
           {
             fast_corner_detect_10(lev.image, lev.vCorners, level0);
             lev.nFastThresh = level0;
-            ROS_INFO_STREAM("KeyFrame.cpp Level0: " << level0);
+            //ROS_INFO_STREAM("KeyFrame.cpp Level0: " << level0);
           }
           else
           {
             fast_corner_detect_10(lev.image, lev.vCorners, 10);
             lev.nFastThresh = 10;
+            //ROS_INFO_STREAM("KeyFrame.cpp Level0: " << level0);
           }
       }
       if (i == 1)
@@ -372,13 +373,13 @@ std::tuple<double, double, double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::b
           {
             fast_corner_detect_10(lev.image, lev.vCorners, level1);
             lev.nFastThresh = level1;
-            ROS_INFO_STREAM("KeyFrame.cpp Level1: " << level1);
+            //ROS_INFO_STREAM("KeyFrame.cpp Level1: " << level1);
           }
           else
           {
             fast_corner_detect_10(lev.image, lev.vCorners, 15);
             lev.nFastThresh = 15;
-            ROS_INFO_STREAM("KeyFrame.cpp Level1 state not 1: " << level1);
+            //ROS_INFO_STREAM("KeyFrame.cpp Level1 state not 1: " << level1);
           }
       }
       if (i == 2)
@@ -387,12 +388,13 @@ std::tuple<double, double, double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::b
           {
             fast_corner_detect_10(lev.image, lev.vCorners, level2);
             lev.nFastThresh = level2;
-            ROS_INFO_STREAM("KeyFrame.cpp Level2: " << level2);
+            //ROS_INFO_STREAM("KeyFrame.cpp Level2: " << level2);
           }
           else
           {
             fast_corner_detect_10(lev.image, lev.vCorners, 15);
             lev.nFastThresh = 15;
+            //ROS_INFO_STREAM("KeyFrame.cpp Level2: " << level2);
           }
       }
       if (i == 3)
@@ -401,12 +403,13 @@ std::tuple<double, double, double> KeyFrame::MakeKeyFrame_Lite(CVD::Image<CVD::b
           {
             fast_corner_detect_10(lev.image, lev.vCorners, level3);
             lev.nFastThresh = level3;
-            ROS_INFO_STREAM("KeyFrame.cpp Level3: " << level3);
+            //ROS_INFO_STREAM("KeyFrame.cpp Level3: " << level3);
           }
           else
           {
             fast_corner_detect_10(lev.image, lev.vCorners, 10);
             lev.nFastThresh = 10;
+            //ROS_INFO_STREAM("KeyFrame.cpp Level3: " << level3);
           }
       }
 

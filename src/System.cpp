@@ -199,6 +199,7 @@ void System::Run()
   // Loop until instructed to stop
   while (!mbDone && ros::ok())
   {
+    ros::spinOnce(); //SABA spin
     if (mpGLWindow)
     {
       // Required before drawing

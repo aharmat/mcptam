@@ -2,7 +2,7 @@
 
 void threshold_gui_callback(mcptam::ThresholdConfig &config, uint32_t level)
 {
-    ROS_ERROR_STREAM("threshold gui callback: state " << config.groups.thresh.state);
+    //ROS_ERROR_STREAM("threshold gui callback: state " << config.groups.thresh.state);
 
     level0 = config.level_0;
     level1 = config.level_1;
