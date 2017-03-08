@@ -1,0 +1,83 @@
+[0m[ INFO] [1471566210.921360047]:   Welcome to mcptam [0m
+[0m[ INFO] [1471566210.921410275]:   --------------- [0m
+[0m[ INFO] [1471566210.921423191]:   Multiple Camera Parallel Tracking and Mapping (MCPTAM[0m
+[0m[ INFO] [1471566210.921434976]:   Copyright 2014 Adam Harmat, McGill University[0m
+[0m[ INFO] [1471566210.921447778]:                  Michael Tribou, University of Waterloo[0m
+[0m[ INFO] [1471566210.921458610]:   [0m
+[0m[ INFO] [1471566210.921471629]:   Multi-Camera Parallel Tracking and Mapping (MCPTAM) is free software:[0m
+[0m[ INFO] [1471566210.921483936]:   you can redistribute it and/or modify it under the terms of the GNU [0m
+[0m[ INFO] [1471566210.921496916]:   General Public License as published by the Free Software Foundation,[0m
+[0m[ INFO] [1471566210.921509934]:   either version 3 of the License, or (at your option) any later[0m
+[0m[ INFO] [1471566210.921522973]:   version.[0m
+[0m[ INFO] [1471566210.921536647]:   [0m
+[0m[ INFO] [1471566210.921549735]:   This program is distributed in the hope that it will be useful,[0m
+[0m[ INFO] [1471566210.921563597]:   but WITHOUT ANY WARRANTY; without even the implied warranty of[0m
+[0m[ INFO] [1471566210.921576525]:   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the[0m
+[0m[ INFO] [1471566210.921590865]:   GNU General Public License for more details.[0m
+[0m[ INFO] [1471566210.921603177]:   [0m
+[0m[ INFO] [1471566210.921616082]:   You should have received a copy of the GNU General Public License[0m
+[0m[ INFO] [1471566210.921628856]:   along with this program.  If not, see <http://www.gnu.org/licenses/>.[0m
+[0m[ INFO] [1471566210.921640885]:   [0m
+[0m[ INFO] [1471566210.921653723]:   Based on Parallel Tracking and Mapping (PTAM) software[0m
+[0m[ INFO] [1471566210.921666096]:   Copyright 2008 Isis Innovation Limited[0m
+[0m[ INFO] [1471566210.921678250]:   [0m
+[0m[ INFO] [1471566210.953190727]: VideoSourceMulti: Initializing[0m
+[0m[ INFO] [1471566210.954122249]: CameraGroupsParser: Adding camera camera1 to group 0[0m
+[0m[ INFO] [1471566210.954155647]: CameraGroupsParser: Adding camera camera2 to group 0[0m
+[0m[ INFO] [1471566210.954173374]: CameraGroupsParser: Adding camera camera3 to group 0[0m
+[0m[ INFO] [1471566210.954197477]: VideoSourceMulti: Creating camera group from camera1[0m
+[0m[ INFO] [1471566210.954229142]: VideoSourceMulti: Creating camera group from camera2[0m
+[0m[ INFO] [1471566210.954245361]: VideoSourceMulti: Creating camera group from camera3[0m
+[0m[ INFO] [1471566210.972145881]: CameraGroupSubscriber: Loading 3 cameras[0m
+[0m[ INFO] [1471566211.039596284]: CameraGroupSubscriber: Waiting for camera info from all cameras[0m
+... logging to /home/saba/.ros/log/ebdc81b2-65a1-11e6-bd85-e4b3189fb77b/roslaunch-saba-27379.log
+Checking log directory for disk usage. This may take awhile.
+Press Ctrl-C to interrupt
+Done checking log file disk usage. Usage is <1GB.
+]2;/home/saba/catkin_ws/src/mcptam/launch/mcptam.launch
+[1mstarted roslaunch server http://saba:44680/[0m
+
+SUMMARY
+========
+
+CLEAR PARAMETERS
+ * /mcptam/
+
+PARAMETERS
+ * /mcptam/MKF_BUFFER_CAPACITY: 55
+ * /mcptam/USE_CPER: False
+ * /mcptam/adjuster_recent_min_size: 60
+ * /mcptam/cam_group_list: [['camera1', 'cam...
+ * /mcptam/dynamic_sync: True
+ * /mcptam/get_pose_separately: False
+ * /mcptam/headless: False
+ * /mcptam/image_transport: compressed
+ * /mcptam/kf_adaptive_thresh: True
+ * /mcptam/kf_distance_mean_diff_fraction: 0.1
+ * /mcptam/level_zero_points: True
+ * /mcptam/mm_init_cov_thresh: 0.01
+ * /mcptam/mm_init_point_max_num: 200
+ * /mcptam/mm_init_point_mode: both
+ * /mcptam/mm_max_scaled_mkf_dist: 0.3
+ * /mcptam/mm_outlier_multiplier: 1.1
+ * /rosdistro: indigo
+ * /rosversion: 1.11.20
+
+NODES
+  /
+    mcptam (mcptam/mcptam)
+    rqt_reconfigure (rqt_reconfigure/rqt_reconfigure)
+    world_tf (tf/static_transform_publisher)
+
+[1mROS_MASTER_URI=http://localhost:11311[0m
+]2;/home/saba/catkin_ws/src/mcptam/launch/mcptam.launch http://localhost:11311
+core service [/rosout] found
+[1mprocess[rqt_reconfigure-1]: started with pid [27398][0m
+[1mprocess[mcptam-2]: started with pid [27399][0m
+[1mprocess[world_tf-3]: started with pid [27400][0m
+[world_tf-3] killing on exit
+[mcptam-2] killing on exit
+[rqt_reconfigure-1] killing on exit
+shutting down processing monitor...
+... shutting down processing monitor complete
+[1mdone[0m
